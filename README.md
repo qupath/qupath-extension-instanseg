@@ -72,7 +72,7 @@ Open `build.gradle` and follow a similar process to with `settings.gradle`, to u
 For the extension to work, you need to create at least one file that extends `qupath.lib.gui.extensions.QuPathExtension`.
 
 There are two examples in the template, in two languages:
-* **Java:** `qupath.ext.template.DemoExtension.java`.
+* **Java:** `qupath.ext.template.InstanSegExtension.java`.
 * **Groovy:** `qupath.ext.template.DemoGroovyExtension.java`.
 
 You can pick the one that corresponds to the language you want to use, and delete the other.
