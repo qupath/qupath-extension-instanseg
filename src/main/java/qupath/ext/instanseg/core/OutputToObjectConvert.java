@@ -1,4 +1,4 @@
-package qupath.ext.template;
+package qupath.ext.instanseg.core;
 
 
 import org.bytedeco.opencv.opencv_core.Mat;

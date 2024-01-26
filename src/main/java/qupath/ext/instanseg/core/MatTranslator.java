@@ -1,4 +1,4 @@
-package qupath.ext.template;
+package qupath.ext.instanseg.core;
 
 import ai.djl.ndarray.NDList;
 import ai.djl.translate.Translator;

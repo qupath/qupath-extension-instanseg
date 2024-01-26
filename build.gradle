@@ -54,6 +54,7 @@ dependencies {
 
     // If you aren't using Groovy, this can be removed
     shadow libs.deepJavaLibrary
+    shadow libs.qupath.fxtras
 
     testImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     testImplementation libs.junit
