@@ -93,22 +93,22 @@ public class InstanSegCommand {
                         // ImageOps.Core.divide(255.0)
                         ImageOps.Normalize.percentile(1, 99, true, 1e-6)
                 );
-                var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                        layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
-                var processor = OpenCVProcessor.builder(predictionProcessor)
-                        // .tiler(Tiler.builder(inputWidth-padding*2, inputHeight-padding*2)
-                        .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
-                                .alignTopLeft()
-                                .cropTiles(false)
-                                .build()
-                        )
-                        .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConvert()))
-                        .padding(padding)
-                        .mergeSharedBoundaries(0.25)
-                        .downsample(downsample)
-                        .build();
-                var runner = createTaskRunner(nThreads);
-                processor.processObjects(runner, imageData, QP.getSelectedObjects());
+//                var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
+//                        layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
+//                var processor = OpenCVProcessor.builder(predictionProcessor)
+//                        // .tiler(Tiler.builder(inputWidth-padding*2, inputHeight-padding*2)
+//                        .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
+//                                .alignTopLeft()
+//                                .cropTiles(false)
+//                                .build()
+//                        )
+//                        .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConvert()))
+//                        .padding(padding)
+//                        .mergeSharedBoundaries(0.25)
+//                        .downsample(downsample)
+//                        .build();
+//                var runner = createTaskRunner(nThreads);
+//                processor.processObjects(runner, imageData, QP.getSelectedObjects());
             } finally {
                 for (var predictor: predictors) {
                     predictor.close();
