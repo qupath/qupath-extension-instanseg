@@ -40,7 +40,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     }
 
     @Override
-    public Mat process(Parameters<Mat, Mat> params) throws IOException {
+    public Mat process(Parameters<Mat, Mat> params) throws IOException, InterruptedException {
 
         var mat = params.getImage();
         mat = preprocessing.apply(mat);
