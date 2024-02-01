@@ -58,14 +58,14 @@
                 <Separator prefWidth="200.0" />
 
                 <!--**********************Selections**********************-->
-                <VBox alignment="CENTER" styleClass="standard-spacing standard-padding">
-                    <children>
-                        <Label styleClass="regular" text="Parameter 1" />
-                        <Label styleClass="regular" text="Parameter 2" />
-                        <Label styleClass="regular" text="Parameter 3" />
-                    </children>
-                </VBox>
-                <Separator prefWidth="200.0" />
+<!--                <VBox alignment="CENTER" styleClass="standard-spacing standard-padding">-->
+<!--                    <children>-->
+<!--                        <Label styleClass="regular" text="Parameter 1" />-->
+<!--                        <Label styleClass="regular" text="Parameter 2" />-->
+<!--                        <Label styleClass="regular" text="Parameter 3" />-->
+<!--                    </children>-->
+<!--                </VBox>-->
+<!--                <Separator prefWidth="200.0" />-->
 
                 <!--**********************Run**********************-->
                 <VBox alignment="CENTER" styleClass="standard-spacing standard-padding">
@@ -98,20 +98,20 @@
                     </children>
                 </HBox>
 <!--            Thread Selection-->
-                <HBox alignment="CENTER" styleClass="standard-spacing">
-                    <children>
-                        <Label styleClass="regular" text="%ui.options.threads" />
-<!--                        <Spinner fx:id="spinnerBatchSize" prefWidth="75.0">-->
-                        <Spinner prefWidth="75.0">
-                            <tooltip>
-                                <Tooltip text="%ui.options.threads.tooltip" />
-                            </tooltip>
-                            <valueFactory>
-                                <SpinnerValueFactory.IntegerSpinnerValueFactory initialValue="1" max="512" min="1" />
-                            </valueFactory>
-                        </Spinner>
-                    </children>
-                </HBox>
+<!--                <HBox alignment="CENTER" styleClass="standard-spacing">-->
+<!--                    <children>-->
+<!--                        <Label styleClass="regular" text="%ui.options.threads" />-->
+<!--&lt;!&ndash;                        <Spinner fx:id="spinnerBatchSize" prefWidth="75.0">&ndash;&gt;-->
+<!--                        <Spinner prefWidth="75.0">-->
+<!--                            <tooltip>-->
+<!--                                <Tooltip text="%ui.options.threads.tooltip" />-->
+<!--                            </tooltip>-->
+<!--                            <valueFactory>-->
+<!--                                <SpinnerValueFactory.IntegerSpinnerValueFactory initialValue="1" max="512" min="1" />-->
+<!--                            </valueFactory>-->
+<!--                        </Spinner>-->
+<!--                    </children>-->
+<!--                </HBox>-->
 <!--            Tile Size Selection-->
                 <HBox alignment="CENTER" styleClass="standard-spacing">
                     <children>
@@ -123,7 +123,19 @@
                         </Spinner>
                     </children>
                 </HBox>
+<!--            Channel Selection-->
+                <HBox alignment="CENTER" styleClass="standard-spacing">
+                    <children>
+                        <Label styleClass="regular" text="%ui.options.channel" />
+                        <ChoiceBox prefWidth="150.0">
+                            <tooltip>
+                                <Tooltip text="%ui.options.channel.tooltip" />
+                            </tooltip>
+                        </ChoiceBox>
+                    </children>
+                </HBox>
                 <Separator prefWidth="200.0" />
+
 <!--            Model Directory Selection-->
                 <VBox alignment="CENTER" styleClass="standard-vertical-spacing">
                     <children>
