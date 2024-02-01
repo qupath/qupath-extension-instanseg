@@ -48,7 +48,7 @@
                    <children>
                        <Label styleClass="regular" text="%ui.selection.label" />
                        <Label alignment="CENTER" styleClass="instanseg-sub-title" text="%ui.selection.alt" textAlignment="CENTER" />
-                      <Button maxWidth="500" mnemonicParsing="false" text="Button">
+                      <Button maxWidth="500" mnemonicParsing="false" text="%ui.selection.sub-label">
                           <ToggleButton fx:id="toggleSelectAllDetections" onAction="#runInstanSeg" text="%ui.selection.all-annotations">
                             <tooltip><Tooltip text="%ui.selection.all-annotations.tooltip" /></tooltip>
                           </ToggleButton>
