@@ -4,9 +4,12 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
 import org.bytedeco.opencv.global.opencv_core;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import qupath.lib.experimental.pixels.Processor;
 import org.bytedeco.opencv.opencv_core.Mat;
 import qupath.lib.experimental.pixels.Parameters;
+import qupath.lib.plugins.objects.SmoothFeaturesPlugin;
 import qupath.lib.regions.Padding;
 import qupath.opencv.ops.ImageOp;
 import qupath.opencv.tools.OpenCVTools;
@@ -15,6 +18,7 @@ import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 
 class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
+    private static final Logger logger = LoggerFactory.getLogger(TilePredictionProcessor.class);
 
     private final BlockingQueue<Predictor<Mat, Mat>> predictors;
 
@@ -40,7 +44,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     }
 
     @Override
-    public Mat process(Parameters<Mat, Mat> params) throws IOException, InterruptedException {
+    public Mat process(Parameters<Mat, Mat> params) throws IOException {
 
         var mat = params.getImage();
         mat = preprocessing.apply(mat);
@@ -69,8 +73,13 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
             // todo: deal with exception
             throw new RuntimeException(e);
         } finally {
-            if (predictor != null)
-                predictors.put(predictor);
+            if (predictor != null) {
+                try {
+                    predictors.put(predictor);
+                } catch (InterruptedException e) {
+                    logger.warn("Tiling interrupted");
+                }
+            }
         }
     }
 }
