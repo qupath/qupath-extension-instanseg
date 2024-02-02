@@ -2,6 +2,7 @@ package qupath.ext.instanseg.ui;
 
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import qupath.ext.instanseg.core.InstanSegCommand;
 
@@ -13,6 +14,9 @@ import java.util.ResourceBundle;
  */
 public class InstanSegController extends VBox {
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
+
+    @FXML
+    private TextField tfModelDirectory;
 
     public static InstanSegController createInstance() throws IOException {
         return new InstanSegController();
@@ -28,6 +32,6 @@ public class InstanSegController extends VBox {
 
     @FXML
     private void runInstanSeg() {
-        InstanSegCommand.runInstanSeg();
+        InstanSegCommand.runInstanSeg(tfModelDirectory.getText());
     }
 }

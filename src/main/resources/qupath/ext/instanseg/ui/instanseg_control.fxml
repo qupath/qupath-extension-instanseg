@@ -72,7 +72,7 @@
                     <VBox alignment="CENTER">
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
-                                <Button fx:id="runButton" disable="true" onAction="#runInstanSeg" prefWidth="252.0" text="%ui.run">
+                                <Button fx:id="runButton" onAction="#runInstanSeg" prefWidth="252.0" text="%ui.run">
                                     <tooltip><Tooltip text="%ui.run.tooltip" /></tooltip>
                                 </Button>
                             </children>

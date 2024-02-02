@@ -28,7 +28,7 @@ import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
 public class InstanSegCommand {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegCommand.class);
 
-    public static void runInstanSeg() {
+    public static void runInstanSeg(String path) {
         if (QP.getCurrentImageData() == null) {
             Dialogs.showErrorNotification("Instanseg", "No image open!");
             return;
@@ -48,7 +48,6 @@ public class InstanSegCommand {
         int nPredictors = 1;
 
         // TODO: Set path!
-        var path = "/home/alan/Documents/github/imaging/models/instanseg_39107731.pt";
         var imageData = QP.getCurrentImageData();
 
         double downsample = 0.5 / imageData.getServer().getPixelCalibration().getAveragedPixelSize().doubleValue();
