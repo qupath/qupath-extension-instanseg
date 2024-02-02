@@ -10,5 +10,5 @@ Development setup:
 - Clone this repo in the same directory
 - Run QuPath
 - Open extension
-- Point extension to the instanseg PT file
+- Enter the path to the model file in "Downloaded model directory" (yes, I know, but for now :))
 - Run...?
