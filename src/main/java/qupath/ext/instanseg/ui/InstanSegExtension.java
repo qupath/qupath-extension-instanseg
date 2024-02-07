@@ -8,6 +8,7 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.fx.dialogs.Dialogs;
+import qupath.fx.utils.FXUtils;
 import qupath.lib.common.Version;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.extensions.GitHubProject;
@@ -15,11 +16,13 @@ import qupath.lib.gui.extensions.QuPathExtension;
 import qupath.lib.gui.prefs.PathPrefs;
 
 import java.io.IOException;
+import java.util.ResourceBundle;
 
 
 public class InstanSegExtension implements QuPathExtension, GitHubProject {
 	
 	private static final Logger logger = LoggerFactory.getLogger(InstanSegExtension.class);
+	private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
 
 	private static final String EXTENSION_NAME = "InstanSeg";
 
@@ -32,9 +35,6 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 
 	private boolean isInstalled = false;
 
-	private StringProperty modelDirectoryProperty = PathPrefs.createPersistentPreference(
-			"instanseg.model.dir",
-			null);
 
 	private final BooleanProperty enableExtensionProperty = PathPrefs.createPersistentPreference(
 			"enableExtension", true);
@@ -47,18 +47,9 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 			return;
 		}
 		isInstalled = true;
-		addPreference(qupath);
 		addMenuItem(qupath);
 	}
 
-	private void addPreference(QuPathGUI qupath) {
-		qupath.getPreferencePane().addPropertyPreference(
-				modelDirectoryProperty,
-				String.class,
-				"InstanSeg path",
-				EXTENSION_NAME,
-				"Path to InstanSeg model file.");
-	}
 
 	private void addMenuItem(QuPathGUI qupath) {
 		var menu = qupath.getMenu("Extensions>" + EXTENSION_NAME, true);
@@ -72,8 +63,13 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 		if (stage == null) {
 			try {
 				stage = new Stage();
-				Scene scene = new Scene(InstanSegController.createInstance());
+				var pane = InstanSegController.createInstance();
+				Scene scene = new Scene(pane);
+				pane.heightProperty().addListener((v, o, n) -> handleStageHeightChange());
 				stage.setScene(scene);
+				stage.initOwner(QuPathGUI.getInstance().getStage());
+				stage.setTitle(resources.getString("title"));
+				stage.setResizable(false);
 			} catch (IOException e) {
 				Dialogs.showErrorMessage("InstanSeg", "GUI loading failed");
 				logger.error("Unable to load InstanSeg FXML", e);
@@ -81,6 +77,16 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 		}
 		stage.show();
 	}
+
+
+	private void handleStageHeightChange() {
+		stage.sizeToScene();
+		// This fixes a bug where the stage would migrate to the corner of a screen if it is
+		// resized, hidden, then shown again
+		if (stage.isShowing() && Double.isFinite(stage.getX()) && Double.isFinite(stage.getY()))
+			FXUtils.retainWindowPosition(stage);
+	}
+
 
 	@Override
 	public String getName() {
