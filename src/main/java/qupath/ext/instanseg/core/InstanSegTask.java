@@ -66,7 +66,6 @@ public class InstanSegTask extends Task<Void> {
             // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt)
             String layoutOutput = "CHW";
 
-
             var device = Device.fromName(deviceName);
 
             try (var model = Criteria.builder()

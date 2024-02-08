@@ -6,7 +6,7 @@
 <?import javafx.scene.text.*?>
 <?import org.controlsfx.control.*?>
 
-<fx:root type="BorderPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instansegstyles.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+<fx:root type="BorderPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
     <center>
         <VBox fx:id="vBox">
             <TitledPane fx:id="pane1" animated="false" collapsible="false" prefHeight="262.0" prefWidth="330.0" text="%ui.processing.pane" VBox.vgrow="NEVER">
@@ -44,28 +44,21 @@
                         <Separator prefWidth="200.0" />
 
                         <!--**********************Selections**********************-->
-                        <VBox alignment="CENTER" styleClass="standard-spacing standard-padding">
+                        <VBox alignment="CENTER" styleClass="standard-spacing">
                            <children>
                                <Label styleClass="regular" text="%ui.selection.label" />
                                <Label alignment="CENTER" styleClass="instanseg-sub-title" text="%ui.selection.alt" textAlignment="CENTER" />
-                               <Button maxWidth="500" fx:id="toggleSelectAllDetections" mnemonicParsing="false" text="%ui.selection.sub-label" onAction="#selectAllAnnotations">
-                                   <tooltip><Tooltip text="%ui.selection.all-annotations.tooltip" /></tooltip>
-                                   <!--                          <ToggleButton fx:id="toggleSelectAllDetections" text="%ui.selection.all-annotations" on>-->
-        <!--                          </ToggleButton>-->
-                              </Button>
+                               <HBox>
+                                   <Button maxWidth="500" fx:id="toggleSelectAllDetections" mnemonicParsing="false" text="%ui.selection.all-annotations" onAction="#selectAllAnnotations">
+                                       <tooltip><Tooltip text="%ui.selection.all-annotations.tooltip" /></tooltip>
+                                  </Button>
+                                   <Button maxWidth="500" fx:id="toggleSelectAllTMACores" mnemonicParsing="false" text="%ui.selection.all-TMA-cores" onAction="#selectAllTMACores">
+                                       <tooltip><Tooltip text="%ui.selection.all-TMA-cores.tooltip" /></tooltip>
+                                   </Button>
+                               </HBox>
                            </children>
                         </VBox>
                         <Separator prefWidth="200.0" />
-
-                        <!--**********************Selections**********************-->
-        <!--                <VBox alignment="CENTER" styleClass="standard-spacing standard-padding">-->
-        <!--                    <children>-->
-        <!--                        <Label styleClass="regular" text="Parameter 1" />-->
-        <!--                        <Label styleClass="regular" text="Parameter 2" />-->
-        <!--                        <Label styleClass="regular" text="Parameter 3" />-->
-        <!--                    </children>-->
-        <!--                </VBox>-->
-        <!--                <Separator prefWidth="200.0" />-->
 
                         <!--**********************Run**********************-->
                         <VBox alignment="CENTER" styleClass="standard-spacing standard-padding">
@@ -101,7 +94,6 @@
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.threads" />
-        <!--                        <Spinner fx:id="spinnerBatchSize" prefWidth="75.0">-->
                                 <Spinner fx:id="threadSpinner" prefWidth="75.0">
                                     <tooltip>
                                         <Tooltip text="%ui.options.threads.tooltip" />

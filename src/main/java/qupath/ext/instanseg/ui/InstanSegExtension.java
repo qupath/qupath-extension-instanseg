@@ -1,7 +1,6 @@
 package qupath.ext.instanseg.ui;
 
 import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.StringProperty;
 import javafx.scene.Scene;
 import javafx.scene.control.MenuItem;
 import javafx.stage.Stage;
@@ -70,6 +69,8 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 				stage.initOwner(QuPathGUI.getInstance().getStage());
 				stage.setTitle(resources.getString("title"));
 				stage.setResizable(false);
+				stage.setOnShown(e -> pane.restart());
+				stage.setOnHidden(e -> pane.interrupt());
 			} catch (IOException e) {
 				Dialogs.showErrorMessage("InstanSeg", "GUI loading failed");
 				logger.error("Unable to load InstanSeg FXML", e);

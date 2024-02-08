@@ -12,11 +12,8 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
@@ -40,13 +37,23 @@ import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.Collection;
+import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 
 /**
  * Controller for UI pane contained in instanseg_control.fxml
@@ -58,6 +65,8 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private VBox vBox;
+    private final Watcher watcher = new Watcher();
+    private ExecutorService executor;
 
     public VBox getVBox() {
         return vBox;
@@ -114,12 +123,14 @@ public class InstanSegController extends BorderPane {
         });
     }
 
+    public void interrupt() {
+        watcher.interrupt();
+    }
+
     private void addListeners() {
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
-        if (tfModelDirectory.getText() != null && !tfModelDirectory.getText().isEmpty()) {
-            tryToPopulateChoiceBox(tfModelDirectory.getText());
-        }
-        tfModelDirectory.textProperty().addListener((v, o, n) -> tryToPopulateChoiceBox(n));
+        handleModelDirectory(tfModelDirectory.getText());
+        tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
         runButton.disableProperty().bind(
             qupath.imageDataProperty().isNull()
                     .or(pendingTask.isNotNull())
@@ -136,6 +147,18 @@ public class InstanSegController extends BorderPane {
         factory.setMax(Runtime.getRuntime().availableProcessors());
         threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty());
         InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
+    }
+
+    private void handleModelDirectory(String n) {
+        var path = Path.of(n);
+        if (Files.exists(path) && Files.isDirectory(path)) {
+            try {
+                watcher.register(path);
+            } catch (IOException e) {
+                logger.error("Unable to watch directory", e);
+            }
+        }
+        tryToPopulateChoiceBox(n);
     }
 
     private void configureAvailableDevices() {
@@ -169,9 +192,12 @@ public class InstanSegController extends BorderPane {
         });
     }
 
-    private void tryToPopulateChoiceBox(String dir) {
+
+    void tryToPopulateChoiceBox(String dir) {
+        if (dir == null || dir.isEmpty()) return;
         modelChoiceBox.getItems().clear();
         var path = Path.of(dir);
+        if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {
             for (var file: ps.toList()) {
                 if (file.toString().endsWith(".pt")) {
@@ -182,6 +208,105 @@ public class InstanSegController extends BorderPane {
             logger.error("Unable to list directory", e);
         }
     }
+
+    public void restart() {
+        executor = Executors.newSingleThreadExecutor();
+        executor.submit(watcher::processEvents);
+    }
+
+    class Watcher {
+        private static final Logger logger = LoggerFactory.getLogger(Watcher.class);
+
+        private final WatchService watchService;
+        private final Map<WatchKey, Path> keys;
+        private boolean interrupted;
+
+        @SuppressWarnings("unchecked")
+        static <T> WatchEvent<T> cast(WatchEvent<?> event) {
+            return (WatchEvent<T>)event;
+        }
+
+        private void register(Path dir) throws IOException {
+            WatchKey key = dir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
+            keys.put(key, dir);
+        }
+
+        private void unregister(Path dir) {
+            for (var es: keys.entrySet()) {
+                if (es.getValue().equals(dir)) {
+                    logger.debug("Unregister: {}", es.getValue());
+                    es.getKey().cancel();
+                    keys.remove(es.getKey());
+                }
+            }
+        }
+
+        /**
+         * Creates a WatchService and registers the given directory
+         */
+        Watcher() throws IOException {
+            this.watchService = FileSystems.getDefault().newWatchService();
+            this.keys = new ConcurrentHashMap<>();
+        }
+
+        /**
+         * Process all events for keys queued to the watcher
+         */
+        void processEvents() {
+            while (!interrupted) {
+
+                // wait for key to be signalled
+                WatchKey key;
+                try {
+                    key = watchService.take();
+                } catch (InterruptedException x) {
+                    return;
+                }
+
+                Path dir = keys.get(key);
+                if (dir == null) {
+                    logger.error("WatchKey not recognized!!");
+                    continue;
+                }
+
+                for (WatchEvent<?> event : key.pollEvents()) {
+                    WatchEvent.Kind<?> kind = event.kind();
+                    WatchEvent<Path> ev = cast(event);
+                    Path name = ev.context();
+
+                    // Context for directory entry event is the file name of entry
+                    Path child = dir.resolve(name);
+
+                    // print out event
+                    logger.debug("{}: {}", event.kind().name(), child);
+
+                    if (kind == ENTRY_CREATE && name.toString().endsWith(".pt")) {
+                        modelChoiceBox.getItems().add(child);
+                    }
+                    if (kind == ENTRY_DELETE && name.toString().endsWith(".pt")) {
+                        modelChoiceBox.getItems().remove(child);
+                    }
+
+                }
+
+                // reset key and remove from set if directory no longer accessible
+                boolean valid = key.reset();
+                if (!valid) {
+                    keys.remove(key);
+
+                    // all directories are inaccessible
+                    if (keys.isEmpty()) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        void interrupt() {
+            interrupted = true;
+        }
+    }
+
 
     @FXML
     private void runInstanSeg() {
@@ -203,6 +328,11 @@ public class InstanSegController extends BorderPane {
     @FXML
     private void selectAllAnnotations() {
         QP.selectAnnotations();
+    }
+
+    @FXML
+    private void selectAllTMACores() {
+        QP.selectTMACores();
     }
 
     /**
@@ -259,10 +389,15 @@ public class InstanSegController extends BorderPane {
         private String getSelectedObjectText() {
             int nAnnotations = selectedObjectCounter.numSelectedAnnotations.get();
             int nDetections = selectedObjectCounter.numSelectedDetections.get();
+            int nCores = selectedObjectCounter.numSelectedTMACores.get();
             if (nAnnotations == 1)
                 return resources.getString("ui.selection.annotations-single");
             else if (nAnnotations > 1)
                 return String.format(resources.getString("ui.selection.annotations-multiple"), nAnnotations);
+            else if (nCores == 1)
+                return resources.getString("ui.selection.TMA-cores-single");
+            else if (nCores > 1)
+                return String.format(resources.getString("ui.selection.TMA-cores-multiple"), nCores);
             else if (nDetections == 1)
                 return resources.getString("ui.selection.detections-single");
             else if (nDetections > 1)
@@ -276,6 +411,7 @@ public class InstanSegController extends BorderPane {
                     qupath.imageDataProperty(),
                     modelChoiceBox.getSelectionModel().selectedItemProperty(),
                     selectedObjectCounter.numSelectedAnnotations,
+                    selectedObjectCounter.numSelectedTMACores,
                     selectedObjectCounter.numSelectedDetections);
         }
 
@@ -284,7 +420,9 @@ public class InstanSegController extends BorderPane {
                 return resources.getString("ui.error.no-image");
             if (modelChoiceBox.getSelectionModel().isEmpty())
                 return resources.getString("ui.error.no-model");
-            if (selectedObjectCounter.numSelectedAnnotations.get() == 0 && selectedObjectCounter.numSelectedDetections.get() == 0)
+            if (selectedObjectCounter.numSelectedAnnotations.get() == 0 &&
+                    selectedObjectCounter.numSelectedDetections.get() == 0 &&
+                    selectedObjectCounter.numSelectedTMACores.get() == 0)
                 return resources.getString("ui.error.no-selection");
             return null;
         }
@@ -306,6 +444,7 @@ public class InstanSegController extends BorderPane {
 
         private final IntegerProperty numSelectedAnnotations = new SimpleIntegerProperty();
         private final IntegerProperty numSelectedDetections = new SimpleIntegerProperty();
+        private final IntegerProperty numSelectedTMACores = new SimpleIntegerProperty();
 
         SelectedObjectCounter(ObservableValue<ImageData<BufferedImage>> imageDataProperty) {
             this.imageDataProperty.bind(imageDataProperty);
@@ -345,19 +484,26 @@ public class InstanSegController extends BorderPane {
             if (hierarchy == null) {
                 numSelectedAnnotations.set(0);
                 numSelectedDetections.set(0);
-            } else {
-                var selected = hierarchy.getSelectionModel().getSelectedObjects();
-                numSelectedAnnotations.set(
-                        (int)selected
-                                .stream().filter(PathObject::isAnnotation)
-                                .count()
-                );
-                numSelectedDetections.set(
-                        (int)selected
-                                .stream().filter(PathObject::isDetection)
-                                .count()
-                );
+                numSelectedTMACores.set(0);
+                return;
             }
+
+            var selected = hierarchy.getSelectionModel().getSelectedObjects();
+            numSelectedAnnotations.set(
+                    (int)selected
+                            .stream().filter(PathObject::isAnnotation)
+                            .count()
+            );
+            numSelectedDetections.set(
+                    (int)selected
+                            .stream().filter(PathObject::isDetection)
+                            .count()
+            );
+            numSelectedTMACores.set(
+                    (int)selected
+                            .stream().filter(PathObject::isTMACore)
+                            .count()
+            );
         }
 
     }

@@ -6,7 +6,7 @@
 }
 
 /* Sub-title */
-.instanseg {
+.instanseg-sub-title {
     -fx-text-fill: -fx-text-base-color;
     -fx-opacity:0.6;
     -fx-font-style: italic;
