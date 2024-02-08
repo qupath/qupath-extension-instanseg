@@ -116,7 +116,7 @@ public class InstanSegController extends BorderPane {
 
     private void addListeners() {
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
-        if (!tfModelDirectory.getText().isEmpty()) {
+        if (tfModelDirectory.getText() != null && !tfModelDirectory.getText().isEmpty()) {
             tryToPopulateChoiceBox(tfModelDirectory.getText());
         }
         tfModelDirectory.textProperty().addListener((v, o, n) -> tryToPopulateChoiceBox(n));
