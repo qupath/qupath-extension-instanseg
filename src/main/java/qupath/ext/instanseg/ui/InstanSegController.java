@@ -14,12 +14,7 @@ import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.control.Button;
-import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.Spinner;
-import javafx.scene.control.SpinnerValueFactory;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -62,7 +57,6 @@ public class InstanSegController extends BorderPane {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegController.class);
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
 
-
     @FXML
     private VBox vBox;
     private final Watcher watcher = new Watcher();
@@ -87,7 +81,9 @@ public class InstanSegController extends BorderPane {
     @FXML
     private Spinner<Integer> threadSpinner;
     @FXML
-    private Button selectAllAnnotationsButton;
+    private ToggleButton selectAllAnnotationsButton;
+    @FXML
+    private ToggleButton selectAllTMACoresButton;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("wsinfer", true));
     private final QuPathGUI qupath = QuPathGUI.getInstance();
