@@ -150,6 +150,7 @@ public class InstanSegController extends BorderPane {
     }
 
     private void handleModelDirectory(String n) {
+        if (n == null) return;
         var path = Path.of(n);
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
