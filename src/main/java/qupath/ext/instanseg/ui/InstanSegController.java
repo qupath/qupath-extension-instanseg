@@ -14,7 +14,13 @@ import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -101,22 +107,28 @@ public class InstanSegController extends BorderPane {
         loader.setController(this);
         loader.load();
         configureMessageLabel();
+        configureTileSizes();
+        addListeners();
+        configureDeviceChoices();
+        configureSelectButtons();
+    }
+
+    private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
-        addListeners();
-        configureAvailableDevices();
-        modelChoiceBox.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(Path object) {
-                if (object == null) return null;
-                return object.getFileName().toString();
-            }
+    }
 
-            @Override
-            public Path fromString(String string) {
-                return Path.of(InstanSegPreferences.modelDirectoryProperty().get(), string);
-            }
-        });
+    private void configureSelectButtons() {
+        selectAllAnnotationsButton.disableProperty().bind(qupath.imageDataProperty().isNull());
+        selectAllTMACoresButton.disableProperty().bind(qupath.imageDataProperty().isNull());
+        overrideToggleSelected(selectAllAnnotationsButton);
+        overrideToggleSelected(selectAllTMACoresButton);
+    }
+
+    // Hack to prevent the toggle buttons from staying selected
+    // This allows us to use a segmented button with the appearance of regular, non-toggle buttons
+    private static void overrideToggleSelected(ToggleButton button) {
+        button.selectedProperty().addListener((value, oldValue, newValue) -> button.setSelected(false));
     }
 
     public void interrupt() {
@@ -158,7 +170,7 @@ public class InstanSegController extends BorderPane {
         tryToPopulateChoiceBox(n);
     }
 
-    private void configureAvailableDevices() {
+    private void configureDeviceChoices() {
         var available = PytorchManager.getAvailableDevices();
         deviceChoices.getItems().setAll(available);
         var selected = InstanSegPreferences.preferredDeviceProperty().get();
@@ -171,6 +183,18 @@ public class InstanSegController extends BorderPane {
         // changed elsewhere
         deviceChoices.getSelectionModel().selectedItemProperty().addListener(
                 (value, oldValue, newValue) -> InstanSegPreferences.preferredDeviceProperty().set(newValue));
+        modelChoiceBox.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Path object) {
+                if (object == null) return null;
+                return object.getFileName().toString();
+            }
+
+            @Override
+            public Path fromString(String string) {
+                return Path.of(InstanSegPreferences.modelDirectoryProperty().get(), string);
+            }
+        });
     }
 
     private void configureMessageLabel() {
