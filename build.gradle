@@ -10,21 +10,16 @@ plugins {
     id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 
-// TODO: Change the module name
-ext.moduleName = 'io.github.qupath.extension.template'
+ext.moduleName = 'io.github.qupath.extension.instanseg'
 
-// TODO: Define the extension name & version, and provide a short description
 base {
     archivesName = rootProject.name
     version = '0.0.1-SNAPSHOT'
-    description = 'A simple QuPath extension template'
+    description = 'A QuPath extension for running inference with the InstanSeg deep learning model'
 }
 
-// TODO: Specify the QuPath version, compatible with the extension.
-// The default 'gradle.ext.qupathVersion' reads this from settings.gradle.
 ext.qupathVersion = gradle.ext.qupathVersion
 
-// TODO: Specify the Java version compatible with the extension
 // Should be Java 17 for QuPath v0.5.0
 ext.qupathJavaVersion = 17
 
@@ -55,6 +50,7 @@ dependencies {
     // If you aren't using Groovy, this can be removed
     shadow libs.deepJavaLibrary
     shadow libs.qupath.fxtras
+    shadow libs.bioimageio.spec
 
     testImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     testImplementation libs.junit
