@@ -45,11 +45,6 @@
     -fx-padding: 2;
 }
 
-/*download button*/
-/*.download-btn {
-    -fx-background-image: url("icons/download.png");
-}*/
-
 .fa-icon {
     -fx-font-family: FontAwesome;
     -fx-font-size: 14px;

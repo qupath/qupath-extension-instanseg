@@ -48,13 +48,18 @@
                            <children>
                                <Label styleClass="regular" text="%ui.selection.label" />
                                <Label alignment="CENTER" styleClass="instanseg-sub-title" text="%ui.selection.alt" textAlignment="CENTER" />
-                               <HBox>
-                                   <Button maxWidth="500" fx:id="toggleSelectAllDetections" mnemonicParsing="false" text="%ui.selection.all-annotations" onAction="#selectAllAnnotations">
-                                       <tooltip><Tooltip text="%ui.selection.all-annotations.tooltip" /></tooltip>
-                                  </Button>
-                                   <Button maxWidth="500" fx:id="toggleSelectAllTMACores" mnemonicParsing="false" text="%ui.selection.all-TMA-cores" onAction="#selectAllTMACores">
-                                       <tooltip><Tooltip text="%ui.selection.all-TMA-cores.tooltip" /></tooltip>
-                                   </Button>
+                               <HBox alignment="CENTER" styleClass="standard-spacing">
+                                   <Label styleClass="regular" text="%ui.selection.sub-label" />
+                                   <SegmentedButton fx:id="segButton" maxWidth="500">
+                                       <buttons>
+                                           <ToggleButton fx:id="selectAllAnnotationsButton" onAction="#selectAllAnnotations" text="%ui.selection.all-annotations">
+                                               <tooltip><Tooltip text="%ui.selection.all-annotations.tooltip" /></tooltip>
+                                           </ToggleButton>
+                                           <ToggleButton fx:id="selectAllTMACoresButton" onAction="#selectAllTMACores" text="%ui.selection.all-TMA-cores">
+                                               <tooltip><Tooltip text="%ui.selection.all-TMA-cores.tooltip" /></tooltip>
+                                           </ToggleButton>
+                                       </buttons>
+                                   </SegmentedButton>
                                </HBox>
                            </children>
                         </VBox>
