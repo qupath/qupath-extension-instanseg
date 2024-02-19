@@ -52,10 +52,10 @@
                                    <Label styleClass="regular" text="%ui.selection.sub-label" />
                                    <SegmentedButton fx:id="segButton" maxWidth="500">
                                        <buttons>
-                                           <ToggleButton fx:id="toggleSelectAllAnnotations" onAction="#selectAllAnnotations" text="%ui.selection.all-annotations">
+                                           <ToggleButton fx:id="selectAllAnnotationsButton" onAction="#selectAllAnnotations" text="%ui.selection.all-annotations">
                                                <tooltip><Tooltip text="%ui.selection.all-annotations.tooltip" /></tooltip>
                                            </ToggleButton>
-                                           <ToggleButton fx:id="toggleSelectAllTMACores" onAction="#selectAllTMACores" text="%ui.selection.all-TMA-cores">
+                                           <ToggleButton fx:id="selectAllTMACoresButton" onAction="#selectAllTMACores" text="%ui.selection.all-TMA-cores">
                                                <tooltip><Tooltip text="%ui.selection.all-TMA-cores.tooltip" /></tooltip>
                                            </ToggleButton>
                                        </buttons>
