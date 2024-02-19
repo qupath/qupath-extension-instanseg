@@ -77,11 +77,11 @@ public class InstanSegModel {
     }
 
     private static void downloadAndUnzip(URL url, Path localDirectory) throws IOException {
-        // Open a connection to the URL
         try (BufferedInputStream in = new BufferedInputStream(url.openStream())) {
             String fileName = url.toString().substring(url.toString().lastIndexOf('/') + 1);
             Path localFilePath = localDirectory.resolve(fileName);
             Files.copy(in, localFilePath, StandardCopyOption.REPLACE_EXISTING);
+            // todo: option?
             Path outdir = localDirectory.resolve(fileName.replace(".zip", ""));
             unzip(localFilePath, outdir);
         }
@@ -89,7 +89,7 @@ public class InstanSegModel {
 
     private static void unzip(Path zipFilePath, Path destDirectory) throws IOException {
         if (!Files.exists(destDirectory)) {
-            Files.createDirectory(destDirectory); // todo: deal with this?
+            Files.createDirectory(destDirectory); // todo: check if existing? rename if so?
         }
         try (ZipFile zipFile = new ZipFile(String.valueOf(zipFilePath))) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
