@@ -33,6 +33,7 @@ import qupath.ext.instanseg.core.InstanSegTask;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.images.ImageData;
+import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
@@ -364,10 +365,15 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private void runInstanSeg() {
+        // todo: pixel size
+        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        ImageServer<?> server = qupath.getImageData().getServer();
         var task = new InstanSegTask(
-                modelChoiceBox.getSelectionModel().getSelectedItem().getPath().resolve("instanseg.pt"),
+                // todo: get weights from inside zipped models
+                model.getPath().resolve("instanseg.pt"),
                 InstanSegPreferences.tileSizeProperty().get(),
                 InstanSegPreferences.numThreadsProperty().getValue(),
+                model.getPixelSizeX() / (double)server.getPixelCalibration().getAveragedPixelSize(),
                 deviceChoices.getSelectionModel().getSelectedItem());
         pendingTask.set(task);
         // Reset the pending task when it completes (either successfully or not)

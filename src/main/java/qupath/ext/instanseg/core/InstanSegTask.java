@@ -29,31 +29,33 @@ import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
 public class InstanSegTask extends Task<Void> {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
     private final int tileSize, nThreads;
+    private double downsample;
     private final Path modelPath;
     private final String deviceName;
 
-    public InstanSegTask(Path modelPath, int tileSize, int nThreads, String deviceName) {
+    public InstanSegTask(Path modelPath, int tileSize, int nThreads, double downsample, String deviceName) {
         this.modelPath = modelPath;
         this.tileSize = tileSize;
         this.nThreads = nThreads;
+        this.downsample = downsample;
         this.deviceName = deviceName;
     }
 
     private static void printResourceCount(String title, BaseNDManager manager) {
+        logger.info(title);
         manager.debugDump(2);
     }
 
     @Override
     protected Void call() throws Exception {
-            // May need to reduce threads to avoid trouble (especially if using mps/cuda)
-            // int nThreads = qupath.lib.common.ThreadTools.getParallelism()
             logger.info("Using $nThreads threads");
             int nPredictors = 1;
 
             // TODO: Set path!
             var imageData = QP.getCurrentImageData();
 
-            double downsample = 0.5 / imageData.getServer().getPixelCalibration().getAveragedPixelSize().doubleValue();
+            // todo: based on pixel size
+            // double downsample = 0.5 / imageData.getServer().getPixelCalibration().getAveragedPixelSize().doubleValue();
 
             int inputWidth = tileSize;
             // int inputWidth = 256;
