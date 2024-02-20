@@ -124,11 +124,11 @@
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.channel" />
-                                <ChoiceBox prefWidth="150.0" disable="true">
+                                <CheckComboBox fx:id="comboChannels">
                                     <tooltip>
                                         <Tooltip text="%ui.options.channel.tooltip" />
                                     </tooltip>
-                                </ChoiceBox>
+                                </CheckComboBox>
                             </children>
                         </HBox>
                         <Separator prefWidth="200.0" />

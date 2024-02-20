@@ -25,6 +25,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
+import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ import qupath.ext.instanseg.core.InstanSegTask;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.images.ImageData;
+import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
@@ -54,6 +56,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
@@ -67,13 +70,10 @@ public class InstanSegController extends BorderPane {
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
 
     @FXML
-    private VBox vBox;
+    private CheckComboBox<ColorTransforms.ColorTransform> comboChannels;
+
     private final Watcher watcher = new Watcher();
     private ExecutorService executor;
-
-    public VBox getVBox() {
-        return vBox;
-    }
 
     @FXML
     private TextField tfModelDirectory;
@@ -116,6 +116,29 @@ public class InstanSegController extends BorderPane {
         configureSelectButtons();
         configureRunning();
         configureThreadSpinner();
+
+        var imageData = qupath.getImageData();
+        comboChannels.disableProperty().bind(qupath.imageDataProperty().isNull());
+        if (imageData != null) {
+            configureChannelPicker(comboChannels, imageData);
+        }
+        qupath.imageDataProperty().addListener((v, o, n) -> configureChannelPicker(comboChannels, n));
+    }
+
+    private static void configureChannelPicker(CheckComboBox<ColorTransforms.ColorTransform> comboBox, ImageData<BufferedImage> imageData) {
+        comboBox.getItems().setAll(ImageDataTransformerBuilder.getAvailableChannels(imageData));
+        comboBox.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+        comboBox.titleProperty().bind(Bindings.createStringBinding(() -> getTitle(comboBox),
+                comboBox.getCheckModel().getCheckedItems()));
+    }
+
+    private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
+        int n = comboBox.getCheckModel().getCheckedItems().size();
+        if (n == 0)
+            return "No channels selected!";
+        if (n == 1)
+            return "1 channel selected";
+        return n + " channels selected";
     }
 
     private void configureThreadSpinner() {
