@@ -118,20 +118,25 @@ public class InstanSegController extends BorderPane {
         configureThreadSpinner();
 
         var imageData = qupath.getImageData();
-        comboChannels.disableProperty().bind(qupath.imageDataProperty().isNull());
+        configureChannelPicker();
         if (imageData != null) {
-            configureChannelPicker(imageData);
+            updateChannelPicker(imageData);
         }
-        qupath.imageDataProperty().addListener((v, o, n) -> configureChannelPicker(n));
     }
 
-    private void configureChannelPicker(ImageData<BufferedImage> imageData) {
-        if (imageData == null) return;
-        comboChannels.getItems().setAll(ImageDataTransformerBuilder.getAvailableChannels(imageData));
-        comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+    private void configureChannelPicker() {
+        updateChannelPicker(qupath.getImageData());
+        qupath.imageDataProperty().addListener((v, o, n) -> updateChannelPicker(n));
+        comboChannels.disableProperty().bind(qupath.imageDataProperty().isNull());
         comboChannels.titleProperty().bind(Bindings.createStringBinding(() -> getTitle(comboChannels),
                 comboChannels.getCheckModel().getCheckedItems()));
         FXUtils.installSelectAllOrNoneMenu(comboChannels);
+    }
+
+    private void updateChannelPicker(ImageData<BufferedImage> imageData) {
+        if (imageData == null) return;
+        comboChannels.getItems().setAll(ImageDataTransformerBuilder.getAvailableChannels(imageData));
+        comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
     }
 
     private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
