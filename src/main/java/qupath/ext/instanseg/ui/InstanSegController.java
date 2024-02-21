@@ -23,7 +23,6 @@ import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
-import javafx.util.StringConverter;
 import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
@@ -109,6 +108,7 @@ public class InstanSegController extends BorderPane {
         loader.setRoot(this);
         loader.setController(this);
         loader.load();
+
         configureMessageLabel();
         configureTileSizes();
         configureDeviceChoices();
@@ -174,20 +174,6 @@ public class InstanSegController extends BorderPane {
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
         handleModelDirectory(tfModelDirectory.getText());
         tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
-
-        // todo: toString or StringConverter?
-        modelChoiceBox.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(InstanSegModel object) {
-                if (object == null) return null;
-                return object.getName();
-            }
-
-            @Override
-            public InstanSegModel fromString(String string) {
-                return null; // dont need this unless the combobox is editable?
-            }
-        });
     }
 
     private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {

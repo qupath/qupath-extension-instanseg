@@ -128,4 +128,9 @@ public class InstanSegModel {
         }
         return path;
     }
+
+    @Override
+    public String toString() {
+        return getName();
+    }
 }
