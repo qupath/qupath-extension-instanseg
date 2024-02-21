@@ -23,7 +23,6 @@ import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
@@ -31,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.ext.instanseg.core.InstanSegTask;
+import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.images.ImageData;
@@ -120,16 +120,18 @@ public class InstanSegController extends BorderPane {
         var imageData = qupath.getImageData();
         comboChannels.disableProperty().bind(qupath.imageDataProperty().isNull());
         if (imageData != null) {
-            configureChannelPicker(comboChannels, imageData);
+            configureChannelPicker(imageData);
         }
-        qupath.imageDataProperty().addListener((v, o, n) -> configureChannelPicker(comboChannels, n));
+        qupath.imageDataProperty().addListener((v, o, n) -> configureChannelPicker(n));
     }
 
-    private static void configureChannelPicker(CheckComboBox<ColorTransforms.ColorTransform> comboBox, ImageData<BufferedImage> imageData) {
-        comboBox.getItems().setAll(ImageDataTransformerBuilder.getAvailableChannels(imageData));
-        comboBox.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
-        comboBox.titleProperty().bind(Bindings.createStringBinding(() -> getTitle(comboBox),
-                comboBox.getCheckModel().getCheckedItems()));
+    private void configureChannelPicker(ImageData<BufferedImage> imageData) {
+        if (imageData == null) return;
+        comboChannels.getItems().setAll(ImageDataTransformerBuilder.getAvailableChannels(imageData));
+        comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+        comboChannels.titleProperty().bind(Bindings.createStringBinding(() -> getTitle(comboChannels),
+                comboChannels.getCheckModel().getCheckedItems()));
+        FXUtils.installSelectAllOrNoneMenu(comboChannels);
     }
 
     private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
@@ -391,9 +393,11 @@ public class InstanSegController extends BorderPane {
         // todo: pixel size
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
+        var selectedChannels = comboChannels.getCheckModel().getCheckedItems();
         var task = new InstanSegTask(
                 // todo: get weights from inside zipped models
                 model.getPath().resolve("instanseg.pt"),
+                selectedChannels,
                 InstanSegPreferences.tileSizeProperty().get(),
                 InstanSegPreferences.numThreadsProperty().getValue(),
                 model.getPixelSizeX() / (double)server.getPixelCalibration().getAveragedPixelSize(),

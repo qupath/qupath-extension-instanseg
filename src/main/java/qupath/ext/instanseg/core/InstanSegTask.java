@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import qupath.fx.dialogs.Dialogs;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
+import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
 import qupath.lib.objects.utils.Tiler;
 import qupath.lib.scripting.QP;
@@ -21,6 +22,7 @@ import qupath.opencv.ops.ImageOps;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -29,12 +31,19 @@ import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
 public class InstanSegTask extends Task<Void> {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
     private final int tileSize, nThreads;
+    private final List<ColorTransforms.ColorTransform> channels;
     private double downsample;
     private final Path modelPath;
     private final String deviceName;
 
-    public InstanSegTask(Path modelPath, int tileSize, int nThreads, double downsample, String deviceName) {
+    public InstanSegTask(Path modelPath,
+                         List<ColorTransforms.ColorTransform> channels,
+                         int tileSize,
+                         int nThreads,
+                         double downsample,
+                         String deviceName) {
         this.modelPath = modelPath;
+        this.channels = channels;
         this.tileSize = tileSize;
         this.nThreads = nThreads;
         this.downsample = downsample;
@@ -92,14 +101,17 @@ public class InstanSegTask extends Task<Void> {
 
                     printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
 
+                    ;
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
+//                            , // todo
                             // ImageOps.Core.divide(255.0)
                             ImageOps.Normalize.percentile(1, 99, true, 1e-6)
                     );
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
                     var processor = OpenCVProcessor.builder(predictionProcessor)
+                            .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
                             // .tiler(Tiler.builder(inputWidth-padding*2, inputHeight-padding*2)
                             .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
                                     .alignTopLeft()
