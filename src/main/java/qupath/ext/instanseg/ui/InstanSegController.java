@@ -48,7 +48,10 @@ import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -135,9 +138,43 @@ public class InstanSegController extends BorderPane {
 
     private void updateChannelPicker(ImageData<BufferedImage> imageData) {
         if (imageData == null) return;
-        comboChannels.getItems().setAll(ImageDataTransformerBuilder.getAvailableChannels(imageData));
+        comboChannels.getItems().setAll(getAvailableChannels(imageData));
         comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
     }
+
+    private static Collection<ColorTransforms.ColorTransform> getAvailableChannels(ImageData<?> imageData) {
+        List<ColorTransforms.ColorTransform> list = new ArrayList<>();
+        for (var name : getAvailableUniqueChannelNames(imageData.getServer()))
+            list.add(ColorTransforms.createChannelExtractor(name));
+        var stains = imageData.getColorDeconvolutionStains();
+        if (stains != null) {
+            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 1));
+            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 2));
+            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 3));
+        }
+        return list;
+    }
+
+    /**
+     * Create a collection representing available unique channel names, logging a warning if a channel name is duplicated
+     * @param server server containing channels
+     * @return set of channel names
+     */
+    private static Collection<String> getAvailableUniqueChannelNames(ImageServer<?> server) {
+        var set = new LinkedHashSet<String>();
+        int i = 1;
+        for (var c : server.getMetadata().getChannels()) {
+            var name = c.getName();
+            if (!set.contains(name))
+                set.add(name);
+            else
+                logger.warn("Found duplicate channel name! Will skip channel " + i + " (name '" + name + "')");
+            i++;
+        }
+        return set;
+    }
+
+
 
     private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
         int n = comboBox.getCheckModel().getCheckedItems().size();

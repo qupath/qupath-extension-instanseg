@@ -11,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -64,7 +66,12 @@ public class InstanSegModel {
     }
 
     private Map<String, Double> getPixelSize() {
-        return (Map<String, Double>) ((LinkedTreeMap<?, ?>)getModel().getConfig().get("qupath")).get("pixel_size");
+        var map = new HashMap<String, Double>();
+        var config = (LinkedTreeMap)getModel().getConfig().get("qupath");
+        var axes = (ArrayList)config.get("axes");
+        map.put("x", (Double) ((LinkedTreeMap)(axes.get(0))).get("step"));
+        map.put("y", (Double) ((LinkedTreeMap)(axes.get(1))).get("step"));
+        return map;
     }
 
     private void fetchModel() throws IOException {
