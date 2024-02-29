@@ -16,6 +16,7 @@ import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
+import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.Tiler;
 import qupath.lib.scripting.QP;
 import qupath.opencv.ops.ImageOps;
@@ -30,25 +31,62 @@ import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
 
 public class InstanSegTask extends Task<Void> {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
-    private final int tileSize, nThreads;
-    private final List<ColorTransforms.ColorTransform> channels;
+    private int tileSize, nThreads;
+    private List<ColorTransforms.ColorTransform> channels;
+    private int padding;
     private double downsample;
     private final Path modelPath;
-    private final String deviceName;
+    private String deviceName;
+    private double boundaryThreshold;
+    private double overlapTolerance;
 
-    public InstanSegTask(Path modelPath,
-                         List<ColorTransforms.ColorTransform> channels,
-                         int tileSize,
-                         int nThreads,
-                         double downsample,
-                         String deviceName) {
+    public InstanSegTask(Path modelPath) {
         this.modelPath = modelPath;
-        this.channels = channels;
-        this.tileSize = tileSize;
-        this.nThreads = nThreads;
-        this.downsample = downsample;
-        this.deviceName = deviceName;
     }
+
+    public InstanSegTask tileSize(int tileSize) {
+        this.tileSize = tileSize;
+        return this;
+    }
+
+    public InstanSegTask nThreads(int nThreads) {
+        this.nThreads = nThreads;
+        return this;
+    }
+
+    public InstanSegTask channels(List<ColorTransforms.ColorTransform> channels) {
+        this.channels = channels;
+        return this;
+    }
+
+    public InstanSegTask padding(int padding) {
+        this.padding = padding;
+        return this;
+    }
+
+    public InstanSegTask downsample(double downsample) {
+        this.downsample = downsample;
+        return this;
+    }
+
+    public InstanSegTask deviceName(String deviceName) {
+        this.deviceName = deviceName;
+        return this;
+    }
+
+    public InstanSegTask boundaryThreshold(double boundaryThreshold) {
+        this.boundaryThreshold = boundaryThreshold;
+        return this;
+    }
+
+    public InstanSegTask overlapTolerance(double overlapTolerance) {
+        this.overlapTolerance = overlapTolerance;
+        return this;
+    }
+
+
+
+
 
     private static void printResourceCount(String title, BaseNDManager manager) {
         logger.info(title);
@@ -69,7 +107,6 @@ public class InstanSegTask extends Task<Void> {
             int inputWidth = tileSize;
             // int inputWidth = 256;
             int inputHeight = inputWidth;
-            int padding = 16;
             // Optionally pad images to the required size
             boolean padToInputSize = true;
             String layout = "CHW";
@@ -120,7 +157,8 @@ public class InstanSegTask extends Task<Void> {
                             )
                             .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConvert()))
                             .padding(padding)
-                            .mergeSharedBoundaries(0.25)
+                            .merger(ObjectMerger.createSharedTileBoundaryMerger(boundaryThreshold, overlapTolerance))
+                            // .mergeSharedBoundaries(0.25)
                             .downsample(downsample)
                             .build();
                     var runner = createTaskRunner(nThreads);

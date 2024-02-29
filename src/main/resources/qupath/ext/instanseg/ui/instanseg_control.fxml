@@ -120,7 +120,37 @@
                                 </ChoiceBox>
                             </children>
                         </HBox>
-        <!--            Channel Selection-->
+                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                            <children>
+                                <Label styleClass="regular" text="%ui.options.padding" />
+                                <ChoiceBox prefWidth="75.0" fx:id="paddingChoiceBox">
+                                    <tooltip>
+                                        <Tooltip text="%ui.options.padding.tooltip" />
+                                    </tooltip>
+                                </ChoiceBox>
+                            </children>
+                        </HBox>
+                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                            <children>
+                                <Label styleClass="regular" text="%ui.options.boundary" />
+                                <Slider prefWidth="75.0" fx:id="boundarySlider" min="0" max="1" value="0.25">
+                                    <tooltip>
+                                        <Tooltip text="%ui.options.boundary.tooltip" />
+                                    </tooltip>
+                                </Slider>
+                            </children>
+                        </HBox>
+                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                            <children>
+                                <Label styleClass="regular" text="%ui.options.tolerance" />
+                                <Slider prefWidth="75.0" fx:id="toleranceSlider" min="0" max="1" value = "0.125">
+                                    <tooltip>
+                                        <Tooltip text="%ui.options.tolerance.tooltip" />
+                                    </tooltip>
+                                </Slider>
+                            </children>
+                        </HBox>
+                        <!--            Channel Selection-->
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.channel" />

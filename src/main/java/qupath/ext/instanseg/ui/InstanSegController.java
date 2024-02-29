@@ -18,6 +18,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
@@ -90,11 +91,17 @@ public class InstanSegController extends BorderPane {
     @FXML
     private ChoiceBox<Integer> tileSizeChoiceBox;
     @FXML
+    private ChoiceBox<Integer> paddingChoiceBox;
+    @FXML
     private Spinner<Integer> threadSpinner;
     @FXML
     private ToggleButton selectAllAnnotationsButton;
     @FXML
     private ToggleButton selectAllTMACoresButton;
+    @FXML
+    private Slider boundarySlider;
+    @FXML
+    private Slider toleranceSlider;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("wsinfer", true));
     private final QuPathGUI qupath = QuPathGUI.getInstance();
@@ -220,6 +227,8 @@ public class InstanSegController extends BorderPane {
     private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
+        paddingChoiceBox.getItems().addAll(16, 32, 64);
+        paddingChoiceBox.getSelectionModel().select(Integer.valueOf(16));
         InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
     }
 
@@ -422,19 +431,21 @@ public class InstanSegController extends BorderPane {
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
         var selectedChannels = comboChannels.getCheckModel().getCheckedItems();
-        var task = new InstanSegTask(
-                // todo: get weights from inside zipped models
-                model.getPath().resolve("instanseg.pt"),
-                selectedChannels,
-                InstanSegPreferences.tileSizeProperty().get(),
-                InstanSegPreferences.numThreadsProperty().getValue(),
-                model.getPixelSizeX() / (double)server.getPixelCalibration().getAveragedPixelSize(),
-                deviceChoices.getSelectionModel().getSelectedItem());
+        var task = new InstanSegTask(model.getPath().resolve("instanseg.pt"))
+                .channels(selectedChannels)
+                .tileSize(InstanSegPreferences.tileSizeProperty().get())
+                .nThreads(InstanSegPreferences.numThreadsProperty().getValue())
+                .downsample(model.getPixelSizeX() / (double)server.getPixelCalibration().getAveragedPixelSize())
+                .deviceName(deviceChoices.getSelectionModel().getSelectedItem())
+                .padding(paddingChoiceBox.getValue())
+                .boundaryThreshold(boundarySlider.getValue())
+                .overlapTolerance(toleranceSlider.getValue()
+                );
         pendingTask.set(task);
         // Reset the pending task when it completes (either successfully or not)
         task.stateProperty().addListener((observable, oldValue, newValue) -> {
             if (Set.of(Worker.State.CANCELLED, Worker.State.SUCCEEDED, Worker.State.FAILED).contains(newValue)) {
-                if (pendingTask.get() == task)
+                if (pendingTask.get() ==  task)
                     pendingTask.set(null);
             }
         });
