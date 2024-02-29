@@ -123,7 +123,7 @@
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.padding" />
-                                <ChoiceBox prefWidth="75.0" fx:id="paddingChoiceBox">
+                                <ChoiceBox prefWidth="150.0" fx:id="paddingChoiceBox">
                                     <tooltip>
                                         <Tooltip text="%ui.options.padding.tooltip" />
                                     </tooltip>
@@ -133,7 +133,7 @@
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.boundary" />
-                                <Slider prefWidth="75.0" fx:id="boundarySlider" min="0" max="1" value="0.25">
+                                <Slider prefWidth="150.0" fx:id="boundarySlider" min="0" max="1" value="0.25">
                                     <tooltip>
                                         <Tooltip text="%ui.options.boundary.tooltip" />
                                     </tooltip>
