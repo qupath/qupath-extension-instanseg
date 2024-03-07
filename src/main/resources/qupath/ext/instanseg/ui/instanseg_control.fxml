@@ -86,7 +86,6 @@
             <TitledPane animated="false" maxHeight="Infinity" text="%ui.options.pane" VBox.vgrow="NEVER">
                 <VBox alignment="TOP_CENTER" spacing="7.5" styleClass="standard-padding">
                     <children>
-        <!--            Device Selection-->
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.device" />
@@ -95,7 +94,6 @@
                                 </ChoiceBox>
                             </children>
                         </HBox>
-        <!--            Thread Selection-->
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.threads" />
@@ -109,7 +107,14 @@
                                 </Spinner>
                             </children>
                         </HBox>
-        <!--            Tile Size Selection-->
+                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                            <children>
+                                <Label styleClass="regular" text="%ui.options.nucleus-only" />
+                                <CheckBox fx:id="nucleusOnly">
+                                    <tooltip><Tooltip text="%ui.options.nucleus-only.tooltip" /></tooltip>
+                                </CheckBox>
+                            </children>
+                        </HBox>
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.tilesize" />
@@ -150,7 +155,6 @@
                                 </Slider>
                             </children>
                         </HBox>
-                        <!--            Channel Selection-->
                         <HBox alignment="CENTER" styleClass="standard-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.channel" />
@@ -162,8 +166,6 @@
                             </children>
                         </HBox>
                         <Separator prefWidth="200.0" />
-
-        <!--            Model Directory Selection-->
                         <VBox alignment="CENTER" styleClass="standard-vertical-spacing">
                             <children>
                                 <Label styleClass="regular" text="%ui.options.directory" />

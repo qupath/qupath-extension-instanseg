@@ -13,11 +13,14 @@ import qupath.opencv.tools.OpenCVTools;
 import java.util.ArrayList;
 import java.util.List;
 
-import static qupath.lib.scripting.QP.makeRGB;
-
-class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
+class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
     private OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> converter = OpenCVProcessor.createDetectionConverter();
+    private final boolean nucleusOnly;
+
+    public OutputToObjectConverter(boolean nucleusOnly) {
+        this.nucleusOnly = nucleusOnly;
+    }
 
     @Override
     public List<PathObject> convertToObjects(Parameters params, Mat output) {
@@ -26,9 +29,12 @@ class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat
         for (var mat : OpenCVTools.splitChannels(output)) {
             List<PathObject> pathObjects = converter.convertToObjects(params, mat);
             if (output.channels() > 1) {
-                PathClass pathClass = QP.getPathClass("Cell5", QP.makeRGB(90, 220, 90));
-                if (channelCount == 0)
-                    pathClass = QP.getPathClass("Nucleus3", QP.makeRGB(200, 70, 70));
+                PathClass pathClass = QP.getPathClass("Cell", QP.makeRGB(90, 220, 90));
+                if (channelCount == 0) {
+                    pathClass = QP.getPathClass("Nucleus", QP.makeRGB(200, 70, 70));
+                } else if (nucleusOnly) {
+                    continue;
+                }
                 for (var p: pathObjects) {
                     p.setPathClass(pathClass);
                 }

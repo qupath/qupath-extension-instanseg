@@ -15,6 +15,7 @@ import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -102,6 +103,8 @@ public class InstanSegController extends BorderPane {
     private Slider boundarySlider;
     @FXML
     private Slider toleranceSlider;
+    @FXML
+    private CheckBox nucleusOnly;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("wsinfer", true));
     private final QuPathGUI qupath = QuPathGUI.getInstance();
@@ -439,8 +442,8 @@ public class InstanSegController extends BorderPane {
                 .deviceName(deviceChoices.getSelectionModel().getSelectedItem())
                 .padding(paddingChoiceBox.getValue())
                 .boundaryThreshold(boundarySlider.getValue())
-                .overlapTolerance(toleranceSlider.getValue()
-                );
+                .overlapTolerance(toleranceSlider.getValue())
+                .nucleusOnly(nucleusOnly.isSelected());
         pendingTask.set(task);
         // Reset the pending task when it completes (either successfully or not)
         task.stateProperty().addListener((observable, oldValue, newValue) -> {

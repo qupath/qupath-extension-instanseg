@@ -18,8 +18,10 @@ import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
 import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.Tiler;
+import qupath.lib.regions.RegionRequest;
 import qupath.lib.scripting.QP;
 import qupath.opencv.ops.ImageOps;
+import qupath.opencv.tools.OpenCVTools;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -28,6 +30,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
+import static qupath.lib.scripting.QP.getCurrentImageData;
 
 public class InstanSegTask extends Task<Void> {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
@@ -39,6 +42,7 @@ public class InstanSegTask extends Task<Void> {
     private String deviceName;
     private double boundaryThreshold;
     private double overlapTolerance;
+    private boolean nucleusOnly;
 
     public InstanSegTask(Path modelPath) {
         this.modelPath = modelPath;
@@ -84,10 +88,10 @@ public class InstanSegTask extends Task<Void> {
         return this;
     }
 
-
-
-
-
+    public InstanSegTask nucleusOnly(boolean nucleusOnly) {
+        this.nucleusOnly = nucleusOnly;
+        return this;
+    }
     private static void printResourceCount(String title, BaseNDManager manager) {
         logger.info(title);
         manager.debugDump(2);
@@ -138,12 +142,27 @@ public class InstanSegTask extends Task<Void> {
 
                     printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
 
-                    ;
+                    double min = Double.MAX_VALUE, max = Double.MIN_VALUE;
+                    double downsample = getCurrentImageData().getServer().getDownsampleForResolution(0);
+                    var rr = RegionRequest.createInstance(getCurrentImageData().getServer());
+                    try (var mat = ImageOps.buildImageDataOp(channels).apply(getCurrentImageData(), rr)) {
+                        for (var channel: OpenCVTools.splitChannels(mat)) {
+                            double min1 = OpenCVTools.minimum(channel);
+                            double max1 = OpenCVTools.maximum(channel);
+                            if (min1 < min) {
+                                min = min1;
+                            }
+                            if (max1 > max) {
+                                max = max1;
+                            }
+                        }
+                    }
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
 //                            , // todo
-                            // ImageOps.Core.divide(255.0)
-                            ImageOps.Normalize.percentile(1, 99, true, 1e-6)
+//                             ImageOps.Core.divide(255.0)
+                            // ImageOps.Normalize.percentile(1, 99, true, 1e-6)
+                            ImageOps.Normalize.minMax(min, max)
                     );
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
@@ -155,7 +174,7 @@ public class InstanSegTask extends Task<Void> {
                                     .cropTiles(false)
                                     .build()
                             )
-                            .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConvert()))
+                            .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConverter(nucleusOnly)))
                             .padding(padding)
                             .merger(ObjectMerger.createSharedTileBoundaryMerger(boundaryThreshold, overlapTolerance))
                             // .mergeSharedBoundaries(0.25)
