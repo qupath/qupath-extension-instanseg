@@ -142,27 +142,22 @@ public class InstanSegTask extends Task<Void> {
 
                     printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
 
-                    double min = Double.MAX_VALUE, max = Double.MIN_VALUE;
-                    double downsample = getCurrentImageData().getServer().getDownsampleForResolution(0);
-                    var rr = RegionRequest.createInstance(getCurrentImageData().getServer());
-                    try (var mat = ImageOps.buildImageDataOp(channels).apply(getCurrentImageData(), rr)) {
-                        for (var channel: OpenCVTools.splitChannels(mat)) {
-                            double min1 = OpenCVTools.minimum(channel);
-                            double max1 = OpenCVTools.maximum(channel);
-                            if (min1 < min) {
-                                min = min1;
-                            }
-                            if (max1 > max) {
-                                max = max1;
-                            }
-                        }
-                    }
+                    // double min = Double.MAX_VALUE, max = Double.MIN_VALUE;
+                    // var rr = RegionRequest.createInstance(getCurrentImageData().getServer());
+                    // try (var mat = ImageOps.buildImageDataOp(channels).apply(getCurrentImageData(), rr)) {
+                    //     for (var channel: OpenCVTools.splitChannels(mat)) {
+                    //         double max1 = OpenCVTools.maximum(channel);
+                    //         if (max1 > max) {
+                    //             max = max1;
+                    //         }
+                    //     }
+                    // }
+
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
-//                            , // todo
 //                             ImageOps.Core.divide(255.0)
-                            // ImageOps.Normalize.percentile(1, 99, true, 1e-6)
-                            ImageOps.Normalize.minMax(min, max)
+                            ImageOps.Normalize.percentile(1, 99, true, 1e-6)
+                            // ImageOps.Core.divide(max)
                     );
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);

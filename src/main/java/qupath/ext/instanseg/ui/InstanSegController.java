@@ -19,6 +19,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Slider;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
@@ -33,6 +34,7 @@ import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.ext.instanseg.core.InstanSegTask;
 import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
+import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
@@ -144,6 +146,33 @@ public class InstanSegController extends BorderPane {
         comboChannels.titleProperty().bind(Bindings.createStringBinding(() -> getTitle(comboChannels),
                 comboChannels.getCheckModel().getCheckedItems()));
         FXUtils.installSelectAllOrNoneMenu(comboChannels);
+        addSetFromVisible(comboChannels);
+    }
+
+    private void addSetFromVisible(CheckComboBox<ColorTransforms.ColorTransform> comboChannels) {
+        var mi = new MenuItem();
+        mi.setText("Set from visible");
+        mi.setOnAction(e -> {
+            comboChannels.getCheckModel().clearChecks();
+            var activeChannels = QuPathGUI.getInstance().getViewer().getImageDisplay().selectedChannels();
+            var channelNames = activeChannels.stream().map(ChannelDisplayInfo::getName).toList();
+            var comboItems = comboChannels.getItems();
+            for (int i = 0; i < comboItems.size(); i++) {
+                if (channelNames.contains(comboItems.get(i).getName() + " (C" + (i+1) + ")")) {
+                    comboChannels.getCheckModel().check(i);
+                }
+            }
+        });
+        qupath.imageDataProperty().addListener((v, o, n) -> {
+            if (n == null) {
+                return;
+            }
+            mi.setDisable(n.isBrightfield());
+        });
+        if (qupath.getImageData() != null) {
+            mi.setDisable(qupath.getImageData().isBrightfield());
+        }
+        comboChannels.getContextMenu().getItems().add(mi);
     }
 
     private void updateChannelPicker(ImageData<BufferedImage> imageData) {
