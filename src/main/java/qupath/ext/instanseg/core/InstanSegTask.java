@@ -101,18 +101,14 @@ public class InstanSegTask extends Task<Void> {
 
                     printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
 
-                    ;
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
-//                            , // todo
-                            // ImageOps.Core.divide(255.0)
                             ImageOps.Normalize.percentile(1, 99, true, 1e-6)
                     );
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
                     var processor = OpenCVProcessor.builder(predictionProcessor)
                             .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
-                            // .tiler(Tiler.builder(inputWidth-padding*2, inputHeight-padding*2)
                             .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
                                     .alignTopLeft()
                                     .cropTiles(false)
