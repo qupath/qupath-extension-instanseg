@@ -39,4 +39,3 @@ dependencyResolutionManagement {
 
     }
 }
-includeFlat 'qupath-extension-djl'
