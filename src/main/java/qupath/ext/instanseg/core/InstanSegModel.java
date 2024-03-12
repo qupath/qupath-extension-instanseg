@@ -55,6 +55,7 @@ public class InstanSegModel {
     }
 
     private Map<String, Double> getPixelSize() {
+        // todo: this code is horrendous
         var map = new HashMap<String, Double>();
         var config = (LinkedTreeMap)getModel().getConfig().get("qupath");
         var axes = (ArrayList)config.get("axes");
@@ -71,7 +72,7 @@ public class InstanSegModel {
     }
 
     private static void downloadAndUnzip(URL url, Path localDirectory) throws IOException {
-        // todo
+        // todo: implement
     }
 
 
