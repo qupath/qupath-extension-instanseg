@@ -44,6 +44,7 @@ dependencies {
 
     // For logging - the version comes from QuPath's version catalog at
     // https://github.com/qupath/qupath/blob/main/gradle/libs.versions.toml
+
     // See https://docs.gradle.org/current/userguide/platforms.html
     shadow libs.slf4j
 
@@ -51,6 +52,7 @@ dependencies {
     shadow libs.deepJavaLibrary
     shadow libs.qupath.fxtras
     shadow libs.bioimageio.spec
+    implementation 'io.github.qupath:qupath-extension-djl:0.3.0'
 
     testImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     testImplementation libs.junit
