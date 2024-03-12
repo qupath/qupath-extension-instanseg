@@ -4,19 +4,13 @@ import com.google.gson.internal.LinkedTreeMap;
 import qupath.bioimageio.spec.BioimageIoSpec;
 import qupath.lib.gui.UserDirectoryManager;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 public class InstanSegModel {
 
@@ -37,11 +31,6 @@ public class InstanSegModel {
     }
 
     public static InstanSegModel createModel(Path path) throws IOException {
-        if (path.toString().endsWith(".zip")) {
-            var outfile = path.getParent().resolve(path.toString().replace(".zip", ""));
-            unzip(path, outfile);
-            path = outfile;
-        }
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
     }
 
@@ -82,37 +71,9 @@ public class InstanSegModel {
     }
 
     private static void downloadAndUnzip(URL url, Path localDirectory) throws IOException {
-        try (BufferedInputStream in = new BufferedInputStream(url.openStream())) {
-            String fileName = url.toString().substring(url.toString().lastIndexOf('/') + 1);
-            Path localFilePath = localDirectory.resolve(fileName);
-            Files.copy(in, localFilePath, StandardCopyOption.REPLACE_EXISTING);
-            // todo: option?
-            Path outdir = localDirectory.resolve(fileName.replace(".zip", ""));
-            unzip(localFilePath, outdir);
-        }
+        // todo
     }
 
-    private static void unzip(Path zipFilePath, Path destDirectory) throws IOException {
-        if (!Files.exists(destDirectory)) {
-            Files.createDirectory(destDirectory); // todo: check if existing? rename if so?
-        }
-        try (ZipFile zipFile = new ZipFile(String.valueOf(zipFilePath))) {
-            Enumeration<? extends ZipEntry> entries = zipFile.entries();
-
-            while (entries.hasMoreElements()) {
-                ZipEntry zipEntry = entries.nextElement();
-                String entryName = zipEntry.getName();
-                Path entryPath = destDirectory.resolve(entryName);
-
-                if (zipEntry.isDirectory()) {
-                    Files.createDirectories(entryPath);
-                } else {
-                    Files.createDirectories(entryPath.getParent());
-                    Files.copy(zipFile.getInputStream(zipEntry), entryPath, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        }
-    }
 
     private static Path getUserDir() {
         Path userPath = UserDirectoryManager.getInstance().getUserPath();
