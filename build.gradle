@@ -35,12 +35,11 @@ ext.qupathJavaVersion = 17
  *   but shouldn't be bundled up for use in the extension.
  */
 dependencies {
-    implementation project(path: ':qupath-core-processing')
-    implementation project(path: ':qupath-extension-djl')
 
     // Main QuPath user interface jar.
     // Automatically includes other QuPath jars as subdependencies.
     shadow "io.github.qupath:qupath-gui-fx:${qupathVersion}"
+//    shadow "io.github.qupath:qupath-core-processing:${qupathVersion}"
 
     // For logging - the version comes from QuPath's version catalog at
     // https://github.com/qupath/qupath/blob/main/gradle/libs.versions.toml
