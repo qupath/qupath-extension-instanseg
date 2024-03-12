@@ -102,11 +102,8 @@ public class InstanSegTask extends Task<Void> {
             logger.info("Using $nThreads threads");
             int nPredictors = 1;
 
-            // TODO: Set path!
+            // TODO: Set path! (unsure what path this comment refers to, so not removing...)
             var imageData = QP.getCurrentImageData();
-
-            // todo: based on pixel size
-            // double downsample = 0.5 / imageData.getServer().getPixelCalibration().getAveragedPixelSize().doubleValue();
 
             int inputWidth = tileSize;
             // int inputWidth = 256;
@@ -115,7 +112,7 @@ public class InstanSegTask extends Task<Void> {
             boolean padToInputSize = true;
             String layout = "CHW";
 
-            // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt)
+            // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
             String layoutOutput = "CHW";
 
             var device = Device.fromName(deviceName);
@@ -155,15 +152,12 @@ public class InstanSegTask extends Task<Void> {
 
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
-//                             ImageOps.Core.divide(255.0)
                             ImageOps.Normalize.percentile(1, 99, true, 1e-6)
-                            // ImageOps.Core.divide(max)
                     );
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
                     var processor = OpenCVProcessor.builder(predictionProcessor)
                             .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
-                            // .tiler(Tiler.builder(inputWidth-padding*2, inputHeight-padding*2)
                             .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
                                     .alignTopLeft()
                                     .cropTiles(false)
