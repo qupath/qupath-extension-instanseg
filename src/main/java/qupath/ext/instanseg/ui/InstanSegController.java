@@ -447,12 +447,10 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private void runInstanSeg() {
-        // todo: pixel size
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
         var selectedChannels = comboChannels.getCheckModel().getCheckedItems();
         var task = new InstanSegTask(
-                // todo: get weights from inside zipped models
                 model.getPath().resolve("instanseg.pt"),
                 selectedChannels,
                 InstanSegPreferences.tileSizeProperty().get(),
