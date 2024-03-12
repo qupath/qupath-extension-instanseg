@@ -32,7 +32,7 @@ public class InstanSegTask extends Task<Void> {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
     private final int tileSize, nThreads;
     private final List<ColorTransforms.ColorTransform> channels;
-    private double downsample;
+    private final double downsample;
     private final Path modelPath;
     private final String deviceName;
 
