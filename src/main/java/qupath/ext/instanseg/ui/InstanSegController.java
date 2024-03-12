@@ -16,21 +16,27 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.VBox;
-import javafx.util.StringConverter;
+import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.ext.instanseg.core.InstanSegTask;
+import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
+import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.images.ImageData;
+import qupath.lib.images.servers.ColorTransforms;
+import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
@@ -44,13 +50,17 @@ import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
@@ -64,18 +74,15 @@ public class InstanSegController extends BorderPane {
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
 
     @FXML
-    private VBox vBox;
+    private CheckComboBox<ColorTransforms.ColorTransform> comboChannels;
+
     private final Watcher watcher = new Watcher();
     private ExecutorService executor;
-
-    public VBox getVBox() {
-        return vBox;
-    }
 
     @FXML
     private TextField tfModelDirectory;
     @FXML
-    private SearchableComboBox<Path> modelChoiceBox;
+    private SearchableComboBox<InstanSegModel> modelChoiceBox;
     @FXML
     private Button runButton;
     @FXML
@@ -106,16 +113,143 @@ public class InstanSegController extends BorderPane {
         loader.setRoot(this);
         loader.setController(this);
         loader.load();
+
         configureMessageLabel();
         configureTileSizes();
-        addListeners();
         configureDeviceChoices();
+        configureModelChoices();
         configureSelectButtons();
+        configureRunning();
+        configureThreadSpinner();
+
+        var imageData = qupath.getImageData();
+        configureChannelPicker();
+        if (imageData != null) {
+            updateChannelPicker(imageData);
+        }
+    }
+
+    private void configureChannelPicker() {
+        updateChannelPicker(qupath.getImageData());
+        qupath.imageDataProperty().addListener((v, o, n) -> updateChannelPicker(n));
+        comboChannels.disableProperty().bind(qupath.imageDataProperty().isNull());
+        comboChannels.titleProperty().bind(Bindings.createStringBinding(() -> getTitle(comboChannels),
+                comboChannels.getCheckModel().getCheckedItems()));
+        FXUtils.installSelectAllOrNoneMenu(comboChannels);
+        addSetFromVisible(comboChannels);
+    }
+
+    private void addSetFromVisible(CheckComboBox<ColorTransforms.ColorTransform> comboChannels) {
+        var mi = new MenuItem();
+        mi.setText("Set from visible");
+        mi.setOnAction(e -> {
+            comboChannels.getCheckModel().clearChecks();
+            var activeChannels = QuPathGUI.getInstance().getViewer().getImageDisplay().selectedChannels();
+            var channelNames = activeChannels.stream().map(ChannelDisplayInfo::getName).toList();
+            var comboItems = comboChannels.getItems();
+            for (int i = 0; i < comboItems.size(); i++) {
+                if (channelNames.contains(comboItems.get(i).getName() + " (C" + (i+1) + ")")) {
+                    comboChannels.getCheckModel().check(i);
+                }
+            }
+        });
+        qupath.imageDataProperty().addListener((v, o, n) -> {
+            if (n == null) {
+                return;
+            }
+            mi.setDisable(n.isBrightfield());
+        });
+        if (qupath.getImageData() != null) {
+            mi.setDisable(qupath.getImageData().isBrightfield());
+        }
+        comboChannels.getContextMenu().getItems().add(mi);
+    }
+
+    private void updateChannelPicker(ImageData<BufferedImage> imageData) {
+        if (imageData == null) return;
+        comboChannels.getItems().setAll(getAvailableChannels(imageData));
+        comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+    }
+
+    private static Collection<ColorTransforms.ColorTransform> getAvailableChannels(ImageData<?> imageData) {
+        List<ColorTransforms.ColorTransform> list = new ArrayList<>();
+        for (var name : getAvailableUniqueChannelNames(imageData.getServer()))
+            list.add(ColorTransforms.createChannelExtractor(name));
+        var stains = imageData.getColorDeconvolutionStains();
+        if (stains != null) {
+            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 1));
+            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 2));
+            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 3));
+        }
+        return list;
+    }
+
+    /**
+     * Create a collection representing available unique channel names, logging a warning if a channel name is duplicated
+     * @param server server containing channels
+     * @return set of channel names
+     */
+    private static Collection<String> getAvailableUniqueChannelNames(ImageServer<?> server) {
+        var set = new LinkedHashSet<String>();
+        int i = 1;
+        for (var c : server.getMetadata().getChannels()) {
+            var name = c.getName();
+            if (!set.contains(name))
+                set.add(name);
+            else
+                logger.warn("Found duplicate channel name! Will skip channel " + i + " (name '" + name + "')");
+            i++;
+        }
+        return set;
+    }
+
+
+
+    private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
+        int n = comboBox.getCheckModel().getCheckedItems().size();
+        if (n == 0)
+            return "No channels selected!";
+        if (n == 1)
+            return "1 channel selected";
+        return n + " channels selected";
+    }
+
+    private void configureThreadSpinner() {
+        SpinnerValueFactory.IntegerSpinnerValueFactory factory = (SpinnerValueFactory.IntegerSpinnerValueFactory) threadSpinner.getValueFactory();
+        factory.setMax(Runtime.getRuntime().availableProcessors());
+        threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty());
+    }
+
+    private void configureRunning() {
+        runButton.disableProperty().bind(
+                qupath.imageDataProperty().isNull()
+                        .or(pendingTask.isNotNull())
+                        .or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
+                        .or(messageTextHelper.warningText.isNotEmpty())
+                        .or(deviceChoices.getSelectionModel().selectedItemProperty().isNull())
+        );
+        pendingTask.addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                pool.execute(newValue);
+            }
+        });
+    }
+
+    private void configureModelChoices() {
+        addRemoteModels(modelChoiceBox);
+        tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
+        handleModelDirectory(tfModelDirectory.getText());
+        tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
+    }
+
+    private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {
+        // todo: list models from eg a JSON file
     }
 
     private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
+        InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
     }
 
     private void configureSelectButtons() {
@@ -136,25 +270,6 @@ public class InstanSegController extends BorderPane {
     }
 
     private void addListeners() {
-        tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
-        handleModelDirectory(tfModelDirectory.getText());
-        tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
-        runButton.disableProperty().bind(
-            qupath.imageDataProperty().isNull()
-                    .or(pendingTask.isNotNull())
-                    .or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
-                    .or(messageTextHelper.warningText.isNotEmpty())
-                    .or(deviceChoices.getSelectionModel().selectedItemProperty().isNull())
-        );
-        pendingTask.addListener((observable, oldValue, newValue) -> {
-            if (newValue != null) {
-                pool.execute(newValue);
-            }
-        });
-        SpinnerValueFactory.IntegerSpinnerValueFactory factory = (SpinnerValueFactory.IntegerSpinnerValueFactory) threadSpinner.getValueFactory();
-        factory.setMax(Runtime.getRuntime().availableProcessors());
-        threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty());
-        InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
     }
 
     private void handleModelDirectory(String n) {
@@ -167,7 +282,7 @@ public class InstanSegController extends BorderPane {
                 logger.error("Unable to watch directory", e);
             }
         }
-        tryToPopulateChoiceBox(n);
+        addModelsFromPath(n, modelChoiceBox);
     }
 
     private void configureDeviceChoices() {
@@ -183,18 +298,7 @@ public class InstanSegController extends BorderPane {
         // changed elsewhere
         deviceChoices.getSelectionModel().selectedItemProperty().addListener(
                 (value, oldValue, newValue) -> InstanSegPreferences.preferredDeviceProperty().set(newValue));
-        modelChoiceBox.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(Path object) {
-                if (object == null) return null;
-                return object.getFileName().toString();
-            }
 
-            @Override
-            public Path fromString(String string) {
-                return Path.of(InstanSegPreferences.modelDirectoryProperty().get(), string);
-            }
-        });
     }
 
     private void configureMessageLabel() {
@@ -214,15 +318,15 @@ public class InstanSegController extends BorderPane {
     }
 
 
-    void tryToPopulateChoiceBox(String dir) {
+    static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
         if (dir == null || dir.isEmpty()) return;
-        modelChoiceBox.getItems().clear();
+        box.getItems().clear();
         var path = Path.of(dir);
         if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {
             for (var file: ps.toList()) {
-                if (file.toString().endsWith(".pt")) {
-                    modelChoiceBox.getItems().add(file);
+                if (isValidModel(file)) {
+                    box.getItems().add(InstanSegModel.createModel(file));
                 }
             }
         } catch (IOException e) {
@@ -301,11 +405,15 @@ public class InstanSegController extends BorderPane {
                     // print out event
                     logger.debug("{}: {}", event.kind().name(), child);
 
-                    if (kind == ENTRY_CREATE && name.toString().endsWith(".pt")) {
-                        modelChoiceBox.getItems().add(child);
+                    if (kind == ENTRY_CREATE && isValidModel(name)) {
+                        try {
+                            modelChoiceBox.getItems().add(InstanSegModel.createModel(child));
+                        } catch (IOException e) {
+                            logger.error("Unable to add model", e);
+                        }
                     }
-                    if (kind == ENTRY_DELETE && name.toString().endsWith(".pt")) {
-                        modelChoiceBox.getItems().remove(child);
+                    if (kind == ENTRY_DELETE && isValidModel(name)) {
+                        modelChoiceBox.getItems().removeIf(model -> model.getPath().equals(child));
                     }
 
                 }
@@ -328,13 +436,26 @@ public class InstanSegController extends BorderPane {
         }
     }
 
+    private static boolean isValidModel(Path path) {
+        // return path.toString().endsWith(".pt"); // if just looking at pt files
+        if (Files.isDirectory(path)) {
+            return Files.exists(path.resolve("instanseg.pt")) && Files.exists(path.resolve("rdf.yaml"));
+        }
+        return false;
+    }
+
 
     @FXML
     private void runInstanSeg() {
+        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        ImageServer<?> server = qupath.getImageData().getServer();
+        var selectedChannels = comboChannels.getCheckModel().getCheckedItems();
         var task = new InstanSegTask(
-                modelChoiceBox.getSelectionModel().getSelectedItem(),
+                model.getPath().resolve("instanseg.pt"),
+                selectedChannels,
                 InstanSegPreferences.tileSizeProperty().get(),
                 InstanSegPreferences.numThreadsProperty().getValue(),
+                model.getPixelSizeX() / (double)server.getPixelCalibration().getAveragedPixelSize(),
                 deviceChoices.getSelectionModel().getSelectedItem());
         pendingTask.set(task);
         // Reset the pending task when it completes (either successfully or not)

@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import qupath.fx.dialogs.Dialogs;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
+import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
 import qupath.lib.objects.utils.Tiler;
 import qupath.lib.scripting.QP;
@@ -21,6 +22,7 @@ import qupath.opencv.ops.ImageOps;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -29,31 +31,37 @@ import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
 public class InstanSegTask extends Task<Void> {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
     private final int tileSize, nThreads;
+    private final List<ColorTransforms.ColorTransform> channels;
+    private final double downsample;
     private final Path modelPath;
     private final String deviceName;
 
-    public InstanSegTask(Path modelPath, int tileSize, int nThreads, String deviceName) {
+    public InstanSegTask(Path modelPath,
+                         List<ColorTransforms.ColorTransform> channels,
+                         int tileSize,
+                         int nThreads,
+                         double downsample,
+                         String deviceName) {
         this.modelPath = modelPath;
+        this.channels = channels;
         this.tileSize = tileSize;
         this.nThreads = nThreads;
+        this.downsample = downsample;
         this.deviceName = deviceName;
     }
 
     private static void printResourceCount(String title, BaseNDManager manager) {
+        logger.info(title);
         manager.debugDump(2);
     }
 
     @Override
     protected Void call() throws Exception {
-            // May need to reduce threads to avoid trouble (especially if using mps/cuda)
-            // int nThreads = qupath.lib.common.ThreadTools.getParallelism()
             logger.info("Using $nThreads threads");
             int nPredictors = 1;
 
-            // TODO: Set path!
+            // TODO: Set path! (unsure what path this comment refers to, so not removing...)
             var imageData = QP.getCurrentImageData();
-
-            double downsample = 0.5 / imageData.getServer().getPixelCalibration().getAveragedPixelSize().doubleValue();
 
             int inputWidth = tileSize;
             // int inputWidth = 256;
@@ -63,7 +71,7 @@ public class InstanSegTask extends Task<Void> {
             boolean padToInputSize = true;
             String layout = "CHW";
 
-            // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt)
+            // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
             String layoutOutput = "CHW";
 
             var device = Device.fromName(deviceName);
@@ -92,13 +100,12 @@ public class InstanSegTask extends Task<Void> {
 
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
-                            // ImageOps.Core.divide(255.0)
                             ImageOps.Normalize.percentile(1, 99, true, 1e-6)
                     );
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
                     var processor = OpenCVProcessor.builder(predictionProcessor)
-                            // .tiler(Tiler.builder(inputWidth-padding*2, inputHeight-padding*2)
+                            .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
                             .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
                                     .alignTopLeft()
                                     .cropTiles(false)
