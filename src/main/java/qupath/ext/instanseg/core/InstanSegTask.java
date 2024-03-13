@@ -57,7 +57,6 @@ public class InstanSegTask extends Task<Void> {
 
     @Override
     protected Void call() throws Exception {
-            logger.info("Using $nThreads threads");
             int nPredictors = 1;
 
             // TODO: Set path! (unsure what path this comment refers to, so not removing...)
