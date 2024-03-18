@@ -1,6 +1,5 @@
 package qupath.ext.instanseg.core;
 
-
 import org.bytedeco.opencv.opencv_core.Mat;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
@@ -13,7 +12,6 @@ import qupath.opencv.tools.OpenCVTools;
 import java.util.ArrayList;
 import java.util.List;
 
-import static qupath.lib.scripting.QP.makeRGB;
 
 class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 

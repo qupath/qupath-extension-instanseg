@@ -16,9 +16,9 @@
                         <Label styleClass="regular" text="%ui.model" />
                         <HBox alignment="CENTER">
                             <children>
-                                <SearchableComboBox fx:id="modelChoiceBox" prefWidth="344.0">
+                                <ComboBox fx:id="modelChoiceBox" prefWidth="344.0">
                                     <tooltip><Tooltip text="%ui.model.tooltip" /></tooltip>
-                                </SearchableComboBox>
+                                </ComboBox>
                                 <Button fx:id="downloadButton" disable="true" mnemonicParsing="false">
                                     <tooltip>
                                         <Tooltip text="%ui.model.download.tooltip" />
@@ -144,7 +144,7 @@
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>
                                         </TextField>
-                                        <Button fx:id="modelDirButton" mnemonicParsing="false">
+                                        <Button fx:id="modelDirButton" mnemonicParsing="false" onAction="#promptForModelDirectory">
                                             <tooltip>
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>
