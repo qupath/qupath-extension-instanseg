@@ -10,6 +10,7 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
@@ -249,7 +250,8 @@ public class InstanSegController extends BorderPane {
     private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
-        InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
+        tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
+        tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
     }
 
     private void configureSelectButtons() {
@@ -320,7 +322,7 @@ public class InstanSegController extends BorderPane {
 
     static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
         if (dir == null || dir.isEmpty()) return;
-        box.getItems().clear();
+        box.setItems(FXCollections.observableArrayList());
         var path = Path.of(dir);
         if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {

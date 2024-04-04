@@ -13,14 +13,13 @@ import qupath.opencv.tools.OpenCVTools;
 import java.util.ArrayList;
 import java.util.List;
 
-import static qupath.lib.scripting.QP.makeRGB;
-
-class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
+class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
     private OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> converter = OpenCVProcessor.createDetectionConverter();
 
     @Override
     public List<PathObject> convertToObjects(Parameters params, Mat output) {
+//        params.getMask() // todo: intersect with this?
         List<PathObject> detections = new ArrayList<>();
         int channelCount = 0;
         for (var mat : OpenCVTools.splitChannels(output)) {

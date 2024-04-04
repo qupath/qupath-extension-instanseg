@@ -16,6 +16,7 @@ import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
+import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.Tiler;
 import qupath.lib.scripting.QP;
 import qupath.opencv.ops.ImageOps;
@@ -57,7 +58,6 @@ public class InstanSegTask extends Task<Void> {
 
     @Override
     protected Void call() throws Exception {
-            logger.info("Using $nThreads threads");
             int nPredictors = 1;
 
             // TODO: Set path! (unsure what path this comment refers to, so not removing...)
@@ -66,7 +66,7 @@ public class InstanSegTask extends Task<Void> {
             int inputWidth = tileSize;
             // int inputWidth = 256;
             int inputHeight = inputWidth;
-            int padding = 16;
+            int padding = 80;
             // Optionally pad images to the required size
             boolean padToInputSize = true;
             String layout = "CHW";
@@ -98,10 +98,14 @@ public class InstanSegTask extends Task<Void> {
 
                     printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
 
+                    var norm = InstanSegUtils.getNormalization(imageData);
+                    System.out.println(norm);
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
-                            ImageOps.Normalize.percentile(1, 99, true, 1e-6)
+                            norm
+                            // ImageOps.Normalize.percentile(1, 99, true, 1e-6)
                     );
+
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
                     var processor = OpenCVProcessor.builder(predictionProcessor)
@@ -111,9 +115,11 @@ public class InstanSegTask extends Task<Void> {
                                     .cropTiles(false)
                                     .build()
                             )
-                            .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConvert()))
+                            .outputHandler(OutputHandler.createUnmaskedObjectOutputHandler(new OutputToObjectConverter()))
+                            // .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConverter()))
                             .padding(padding)
-                            .mergeSharedBoundaries(0.25)
+                            // .merger(ObjectMerger.createIOUMerger(0.1))
+                            .merger(ObjectMerger.createSharedTileBoundaryMerger(0.3, 1))
                             .downsample(downsample)
                             .build();
                     var runner = createTaskRunner(nThreads);
