@@ -669,6 +669,7 @@ public class InstanSegController extends BorderPane {
             logger.debug("Can't browse directory for {}", file);
     }
 
+    @FXML
     public void promptForModelDirectory() {
         promptToUpdateDirectory(InstanSegPreferences.modelDirectoryProperty());
     }
