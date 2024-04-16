@@ -136,7 +136,7 @@
         <!--            Model Directory Selection-->
                         <VBox alignment="CENTER" styleClass="standard-vertical-spacing">
                             <children>
-                                <Label styleClass="regular" text="%ui.options.directory" />
+                                <Label onMouseClicked="#handleModelDirectoryLabelClick" styleClass="regular" text="%ui.options.directory" />
                                 <HBox styleClass="standard-spacing">
                                     <children>
                                         <TextField fx:id="tfModelDirectory" HBox.hgrow="ALWAYS">
@@ -144,7 +144,7 @@
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>
                                         </TextField>
-                                        <Button fx:id="modelDirButton" mnemonicParsing="false">
+                                        <Button fx:id="modelDirButton" mnemonicParsing="false" onAction="#promptForModelDirectory">
                                             <tooltip>
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>
