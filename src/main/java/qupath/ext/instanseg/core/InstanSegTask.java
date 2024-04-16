@@ -98,12 +98,12 @@ public class InstanSegTask extends Task<Void> {
 
                     printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
 
+                    // todo: read the bounding box of the current object
+                    // todo: if larger than max allowed size, then downsample
                     var norm = InstanSegUtils.getNormalization(imageData);
-                    System.out.println(norm);
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
                             norm
-                            // ImageOps.Normalize.percentile(1, 99, true, 1e-6)
                     );
 
                     var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
