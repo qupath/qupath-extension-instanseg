@@ -655,6 +655,7 @@ public class InstanSegController extends BorderPane {
      * Open the model directory in the system file browser when double-clicked.
      * @param event
      */
+    @FXML
     public void handleModelDirectoryLabelClick(MouseEvent event) {
         if (event.getClickCount() != 2)
             return;
