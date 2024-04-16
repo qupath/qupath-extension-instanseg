@@ -9,8 +9,8 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.StringProperty;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
@@ -85,7 +85,7 @@ public class InstanSegController extends BorderPane {
     @FXML
     private TextField tfModelDirectory;
     @FXML
-    private ComboBox<InstanSegModel> modelChoiceBox;
+    private SearchableComboBox<InstanSegModel> modelChoiceBox;
     @FXML
     private Button runButton;
     @FXML
@@ -252,7 +252,7 @@ public class InstanSegController extends BorderPane {
     private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
-        InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
+        tileSizeChoiceBox.valueProperty().bindBidirectional(InstanSegPreferences.tileSizeProperty().asObject());
     }
 
     private void configureSelectButtons() {
@@ -281,11 +281,11 @@ public class InstanSegController extends BorderPane {
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
                 watcher.register(path); // todo: unregister
+                addModelsFromPath(n, modelChoiceBox);
             } catch (IOException e) {
                 logger.error("Unable to watch directory", e);
             }
         }
-        addModelsFromPath(n, modelChoiceBox);
     }
 
     private void configureDeviceChoices() {
@@ -323,7 +323,8 @@ public class InstanSegController extends BorderPane {
 
     static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
         if (dir == null || dir.isEmpty()) return;
-        box.getItems().clear();
+        // See https://github.com/controlsfx/controlsfx/issues/1320
+        box.setItems(FXCollections.observableArrayList());
         var path = Path.of(dir);
         if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {

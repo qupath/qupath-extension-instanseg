@@ -16,9 +16,9 @@
                         <Label styleClass="regular" text="%ui.model" />
                         <HBox alignment="CENTER">
                             <children>
-                                <ComboBox fx:id="modelChoiceBox" prefWidth="344.0">
+                                <SearchableComboBox fx:id="modelChoiceBox" prefWidth="344.0">
                                     <tooltip><Tooltip text="%ui.model.tooltip" /></tooltip>
-                                </ComboBox>
+                                </SearchableComboBox>
                                 <Button fx:id="downloadButton" disable="true" mnemonicParsing="false">
                                     <tooltip>
                                         <Tooltip text="%ui.model.download.tooltip" />

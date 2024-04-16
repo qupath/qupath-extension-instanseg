@@ -63,9 +63,8 @@ public class InstanSegTask extends Task<Void> {
             var imageData = QP.getCurrentImageData();
 
             int inputWidth = tileSize;
-            // int inputWidth = 256;
             int inputHeight = inputWidth;
-            int padding = 16;
+            int padding = 80; // todo
             // Optionally pad images to the required size
             boolean padToInputSize = true;
             String layout = "CHW";
