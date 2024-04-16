@@ -42,7 +42,9 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
 import qupath.lib.scripting.QP;
+import qupath.fx.dialogs.FileChoosers;
 
+import java.io.File;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -279,12 +281,12 @@ public class InstanSegController extends BorderPane {
         var path = Path.of(n);
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
-                watcher.register(path);
+                watcher.register(path); // todo: unregister
+                addModelsFromPath(n, modelChoiceBox);
             } catch (IOException e) {
                 logger.error("Unable to watch directory", e);
             }
         }
-        addModelsFromPath(n, modelChoiceBox);
     }
 
     private void configureDeviceChoices() {
@@ -322,6 +324,7 @@ public class InstanSegController extends BorderPane {
 
     static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
         if (dir == null || dir.isEmpty()) return;
+        // See https://github.com/controlsfx/controlsfx/issues/1320
         box.setItems(FXCollections.observableArrayList());
         var path = Path.of(dir);
         if (!Files.exists(path)) return;
@@ -652,5 +655,22 @@ public class InstanSegController extends BorderPane {
 
     }
 
-
+    @FXML
+    public void promptForModelDirectory() {
+        var modelDirPath = InstanSegPreferences.modelDirectoryProperty().get();
+        var dir = modelDirPath == null || modelDirPath.isEmpty() ? null : new File(modelDirPath);
+        if (dir != null) {
+            if (dir.isFile())
+                dir = dir.getParentFile();
+            else if (!dir.exists())
+                dir = null;
+        }
+        var newDir = FileChoosers.promptForDirectory(
+                FXUtils.getWindow(tfModelDirectory), // Get window from any node here
+                resources.getString("ui.model-directory.choose-directory"),
+                dir);
+        if (newDir == null)
+            return;
+        InstanSegPreferences.modelDirectoryProperty().set(newDir.getAbsolutePath());
+    }
 }

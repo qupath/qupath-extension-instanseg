@@ -2,7 +2,6 @@ package qupath.ext.instanseg.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.lib.analysis.stats.Histogram;
 import qupath.lib.experimental.pixels.MeasurementProcessor;
 import qupath.lib.images.ImageData;
 import qupath.opencv.ops.ImageOp;
@@ -10,7 +9,6 @@ import qupath.opencv.ops.ImageOps;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;

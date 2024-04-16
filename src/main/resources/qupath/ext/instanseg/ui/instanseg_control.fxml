@@ -144,7 +144,7 @@
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>
                                         </TextField>
-                                        <Button fx:id="modelDirButton" mnemonicParsing="false">
+                                        <Button fx:id="modelDirButton" mnemonicParsing="false" onAction="#promptForModelDirectory">
                                             <tooltip>
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>

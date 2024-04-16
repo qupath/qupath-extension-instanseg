@@ -1,6 +1,5 @@
 package qupath.ext.instanseg.core;
 
-
 import org.bytedeco.opencv.opencv_core.Mat;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
