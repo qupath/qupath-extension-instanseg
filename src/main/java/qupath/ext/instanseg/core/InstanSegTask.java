@@ -23,6 +23,7 @@ import qupath.opencv.ops.ImageOps;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -86,51 +87,59 @@ public class InstanSegTask extends Task<Void> {
 
                 BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
 
-                printResourceCount("Resource count before prediction", (BaseNDManager)baseManager.getParentManager());
+                printResourceCount("Resource count before prediction",
+                        (BaseNDManager)baseManager.getParentManager());
                 baseManager.debugDump(2);
 
                 BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
 
                 try {
-                    for (int i = 0; i < nPredictors; i++)
+                    for (int i = 0; i < nPredictors; i++) {
                         predictors.put(model.newPredictor());
+                    }
 
-                    printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
+                    printResourceCount("Resource count after creating predictors",
+                            (BaseNDManager)baseManager.getParentManager());
 
-                    // todo: read the bounding box of the current object
-                    // todo: if larger than max allowed size, then downsample
-                    var norm = InstanSegUtils.getNormalization(imageData);
-                    var preprocessing = ImageOps.Core.sequential(
-                            ImageOps.Core.ensureType(PixelType.FLOAT32),
-                            norm
-                    );
+                    for (var object: QP.getSelectedObjects()) {
+                        var norm = ImageOps.Normalize.percentile(1, 99);
+                        if (imageData.isFluorescence()) {
+                            norm = InstanSegUtils.getNormalization(imageData, object, channels);
+                        }
+                        var preprocessing = ImageOps.Core.sequential(
+                                ImageOps.Core.ensureType(PixelType.FLOAT32),
+                                norm,
+                                ImageOps.Core.clip(-0.5, 1.5)
+                        );
 
-                    var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                            layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
-                    var processor = OpenCVProcessor.builder(predictionProcessor)
-                            .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
-                            .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
-                                    .alignTopLeft()
-                                    .cropTiles(false)
-                                    .build()
-                            )
-                            .outputHandler(OutputHandler.createUnmaskedObjectOutputHandler(new OutputToObjectConverter()))
-                            // .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConverter()))
-                            .padding(padding)
-                            // .merger(ObjectMerger.createIOUMerger(0.1))
-                            .merger(ObjectMerger.createSharedTileBoundaryMerger(0.3, 1))
-                            .downsample(downsample)
-                            .build();
-                    var runner = createTaskRunner(nThreads);
-                    processor.processObjects(runner, imageData, QP.getSelectedObjects());
+                        var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
+                                layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
+                        var processor = OpenCVProcessor.builder(predictionProcessor)
+                                .imageSupplier((parameters) ->
+                                        ImageOps.buildImageDataOp(channels)
+                                                .apply(parameters.getImageData(), parameters.getRegionRequest()))
+                                .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
+                                        .alignTopLeft()
+                                        .cropTiles(false)
+                                        .build()
+                                )
+                                // .outputHandler(OutputHandler.createUnmaskedObjectOutputHandler(new OutputToObjectConverter()))
+                                .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConverter()))
+                                .padding(padding)
+                                // .merger(ObjectMerger.createIOUMerger(0.1))
+                                .merger(ObjectMerger.createSharedTileBoundaryMerger(0.3, 1))
+                                .downsample(downsample)
+                                .build();
+                        var runner = createTaskRunner(nThreads);
+                        processor.processObjects(runner, imageData, Collections.singleton(object));
+                    }
                 } finally {
                     for (var predictor: predictors) {
                         predictor.close();
                     }
                 }
                 printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
-            } catch (ModelNotFoundException | MalformedModelException |
-                     IOException | InterruptedException ex) {
+            } catch (ModelNotFoundException | MalformedModelException | IOException ex) {
                 Dialogs.showErrorMessage("Unable to run InstanSeg", ex);
                 logger.error("Unable to run InstanSeg", ex);
             }
