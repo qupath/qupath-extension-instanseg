@@ -76,6 +76,7 @@ public class InstanSegTask extends Task<Void> {
 
             var device = Device.fromName(deviceName);
 
+
             try (var model = Criteria.builder()
                     .setTypes(Mat.class, Mat.class)
                     .optModelUrls(String.valueOf(modelPath))
@@ -86,11 +87,9 @@ public class InstanSegTask extends Task<Void> {
                     .loadModel()) {
 
                 BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
-
                 printResourceCount("Resource count before prediction",
                         (BaseNDManager)baseManager.getParentManager());
                 baseManager.debugDump(2);
-
                 BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
 
                 try {
@@ -103,6 +102,7 @@ public class InstanSegTask extends Task<Void> {
 
                     for (var object: QP.getSelectedObjects()) {
                         var norm = ImageOps.Normalize.percentile(1, 99);
+
                         if (imageData.isFluorescence()) {
                             norm = InstanSegUtils.getNormalization(imageData, object, channels);
                         }
@@ -139,7 +139,8 @@ public class InstanSegTask extends Task<Void> {
                     }
                 }
                 printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
-            } catch (ModelNotFoundException | MalformedModelException | IOException ex) {
+            } catch (ModelNotFoundException | MalformedModelException |
+                     IOException ex) {
                 Dialogs.showErrorMessage("Unable to run InstanSeg", ex);
                 logger.error("Unable to run InstanSeg", ex);
             }

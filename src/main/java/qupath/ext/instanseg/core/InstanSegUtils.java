@@ -37,7 +37,9 @@ public class InstanSegUtils {
      */
     static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
         var defaults = ImageOps.Normalize.percentile(1, 99, true, 1e-6);
-        // return defaults;
+        // this is just a reimplementation of percentile norm using the untiled
+        // bounding box at the lowest downsample we can get while being less
+        // than 1M pixels
         try {
             // read the bounding box of the current object
             var roi = pathObject.getROI();
@@ -66,14 +68,13 @@ public class InstanSegUtils {
                 } else {
                     scales[i] = 1.0 / (hi - lo + eps);
                 }
-                offsets[i] = -lo;
-                System.out.println(scales[i]);
-                System.out.println(offsets[i]);
+                offsets[i] = -lo * scales[i];
             }
             return ImageOps.Core.sequential(
                     ImageOps.Core.multiply(scales),
                     ImageOps.Core.add(offsets)
             );
+
         } catch (Exception e) {
             logger.error("Error reading thumbnail", e);
         }
