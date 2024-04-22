@@ -123,10 +123,8 @@ public class InstanSegTask extends Task<Void> {
                                         .cropTiles(false)
                                         .build()
                                 )
-                                // .outputHandler(OutputHandler.createUnmaskedObjectOutputHandler(new OutputToObjectConverter()))
                                 .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConverter()))
                                 .padding(padding)
-                                // .merger(ObjectMerger.createIOUMerger(0.1))
                                 .merger(ObjectMerger.createSharedTileBoundaryMerger(0.3, 1))
                                 .downsample(downsample)
                                 .build();
