@@ -137,8 +137,7 @@ public class InstanSegTask extends Task<Void> {
                     }
                 }
                 printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
-            } catch (ModelNotFoundException | MalformedModelException |
-                     IOException ex) {
+            } catch (ModelNotFoundException | MalformedModelException | IOException ex) {
                 Dialogs.showErrorMessage("Unable to run InstanSeg", ex);
                 logger.error("Unable to run InstanSeg", ex);
             }
