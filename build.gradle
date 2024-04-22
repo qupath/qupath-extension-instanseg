@@ -54,7 +54,7 @@ dependencies {
 
     implementation 'io.github.qupath:qupath-extension-djl:0.3.0'
 
-//    testImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
+    testImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     testImplementation libs.junit
 }
 
