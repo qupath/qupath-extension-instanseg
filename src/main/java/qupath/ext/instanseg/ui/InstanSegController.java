@@ -661,16 +661,19 @@ public class InstanSegController extends BorderPane {
      */
     @FXML
     public void handleModelDirectoryLabelClick(MouseEvent event) {
-        if (event.getClickCount() != 2)
+        if (event.getClickCount() != 2) {
             return;
+        }
         var path = InstanSegPreferences.modelDirectoryProperty().get();
-        if (path == null || path.isEmpty())
+        if (path == null || path.isEmpty()) {
             return;
+        }
         var file = new File(path);
-        if (file.exists())
+        if (file.exists()) {
             GuiTools.browseDirectory(file);
-        else
+        } else {
             logger.debug("Can't browse directory for {}", file);
+        }
     }
 
     @FXML
