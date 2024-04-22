@@ -9,6 +9,7 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.StringProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
@@ -24,6 +25,7 @@ import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
@@ -31,10 +33,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.ext.instanseg.core.InstanSegTask;
+import qupath.fx.dialogs.FileChoosers;
 import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.ImageServer;
@@ -42,10 +46,9 @@ import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
 import qupath.lib.scripting.QP;
-import qupath.fx.dialogs.FileChoosers;
 
-import java.io.File;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -207,7 +210,6 @@ public class InstanSegController extends BorderPane {
     }
 
 
-
     private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
         int n = comboBox.getCheckModel().getCheckedItems().size();
         if (n == 0)
@@ -302,7 +304,6 @@ public class InstanSegController extends BorderPane {
         // changed elsewhere
         deviceChoices.getSelectionModel().selectedItemProperty().addListener(
                 (value, oldValue, newValue) -> InstanSegPreferences.preferredDeviceProperty().set(newValue));
-
     }
 
     private void configureMessageLabel() {
@@ -320,7 +321,6 @@ public class InstanSegController extends BorderPane {
                 labelMessage.getStyleClass().setAll("standard-message");
         });
     }
-
 
     static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
         if (dir == null || dir.isEmpty()) return;
@@ -655,9 +655,31 @@ public class InstanSegController extends BorderPane {
 
     }
 
+    /**
+     * Open the model directory in the system file browser when double-clicked.
+     * @param event
+     */
+    @FXML
+    public void handleModelDirectoryLabelClick(MouseEvent event) {
+        if (event.getClickCount() != 2)
+            return;
+        var path = InstanSegPreferences.modelDirectoryProperty().get();
+        if (path == null || path.isEmpty())
+            return;
+        var file = new File(path);
+        if (file.exists())
+            GuiTools.browseDirectory(file);
+        else
+            logger.debug("Can't browse directory for {}", file);
+    }
+
     @FXML
     public void promptForModelDirectory() {
-        var modelDirPath = InstanSegPreferences.modelDirectoryProperty().get();
+        promptToUpdateDirectory(InstanSegPreferences.modelDirectoryProperty());
+    }
+
+    private void promptToUpdateDirectory(StringProperty dirPath) {
+        var modelDirPath = dirPath.get();
         var dir = modelDirPath == null || modelDirPath.isEmpty() ? null : new File(modelDirPath);
         if (dir != null) {
             if (dir.isFile())
@@ -671,6 +693,6 @@ public class InstanSegController extends BorderPane {
                 dir);
         if (newDir == null)
             return;
-        InstanSegPreferences.modelDirectoryProperty().set(newDir.getAbsolutePath());
+        dirPath.set(newDir.getAbsolutePath());
     }
 }
