@@ -18,7 +18,6 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
 
     @Override
     public List<PathObject> convertToObjects(Parameters params, Mat output) {
-//        params.getMask() // todo: intersect with this?
         List<PathObject> detections = new ArrayList<>();
         int channelCount = 0;
         for (var mat : OpenCVTools.splitChannels(output)) {
