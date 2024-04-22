@@ -57,7 +57,6 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -153,7 +152,7 @@ public class InstanSegController extends BorderPane {
             var channelNames = activeChannels.stream().map(ChannelDisplayInfo::getName).toList();
             var comboItems = comboChannels.getItems();
             for (int i = 0; i < comboItems.size(); i++) {
-                if (channelNames.contains(comboItems.get(i).getName() + " (C" + (i+1) + ")")) {
+                if (channelNames.contains(comboItems.get(i).getName())) {
                     comboChannels.getCheckModel().check(i);
                 }
             }
@@ -178,7 +177,7 @@ public class InstanSegController extends BorderPane {
 
     private static Collection<ColorTransforms.ColorTransform> getAvailableChannels(ImageData<?> imageData) {
         List<ColorTransforms.ColorTransform> list = new ArrayList<>();
-        for (var name : getAvailableUniqueChannelNames(imageData.getServer()))
+        for (var name : getAvailableChannelNames(imageData))
             list.add(ColorTransforms.createChannelExtractor(name));
         var stains = imageData.getColorDeconvolutionStains();
         if (stains != null) {
@@ -190,19 +189,23 @@ public class InstanSegController extends BorderPane {
     }
 
     /**
-     * Create a collection representing available unique channel names, logging a warning if a channel name is duplicated
-     * @param server server containing channels
-     * @return set of channel names
+     * Create a collection representing available (possibly duplicate)
+     * channel names, logging a warning if a channel name is duplicated.
+     * @param imageData ImageData containing server that contains channels
+     * @return Collection of channel names
      */
-    private static Collection<String> getAvailableUniqueChannelNames(ImageServer<?> server) {
-        var set = new LinkedHashSet<String>();
+    private static Collection<String> getAvailableChannelNames(ImageData<?> imageData) {
+        var set = new ArrayList<String>();
         int i = 1;
-        for (var c : server.getMetadata().getChannels()) {
+        for (var c : imageData.getServer().getMetadata().getChannels()) {
             var name = c.getName();
-            if (!set.contains(name))
-                set.add(name);
-            else
-                logger.warn("Found duplicate channel name! Will skip channel " + i + " (name '" + name + "')");
+            if (imageData.isFluorescence()) {
+                name += "(C" + i + ")";
+            }
+            set.add(name);
+            if (set.contains(name)) {
+                logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "')");
+            }
             i++;
         }
         return set;
