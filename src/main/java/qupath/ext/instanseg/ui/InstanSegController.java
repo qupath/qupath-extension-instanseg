@@ -177,7 +177,7 @@ public class InstanSegController extends BorderPane {
 
     private static Collection<ColorTransforms.ColorTransform> getAvailableChannels(ImageData<?> imageData) {
         List<ColorTransforms.ColorTransform> list = new ArrayList<>();
-        for (var name : getAvailableChannelNames(imageData))
+        for (var name : getAvailableChannelNames(imageData.getServer()))
             list.add(ColorTransforms.createChannelExtractor(name));
         var stains = imageData.getColorDeconvolutionStains();
         if (stains != null) {
@@ -191,15 +191,15 @@ public class InstanSegController extends BorderPane {
     /**
      * Create a collection representing available (possibly duplicate)
      * channel names, logging a warning if a channel name is duplicated.
-     * @param imageData ImageData containing server that contains channels
+     * @param server server that contains channels
      * @return Collection of channel names
      */
-    private static Collection<String> getAvailableChannelNames(ImageData<?> imageData) {
+    private static Collection<String> getAvailableChannelNames(ImageServer<?> server) {
         var set = new ArrayList<String>();
         int i = 1;
-        for (var c : imageData.getServer().getMetadata().getChannels()) {
+        for (var c : server.getMetadata().getChannels()) {
             var name = c.getName();
-            if (imageData.isFluorescence()) {
+            if (server.isRGB()) {
                 name += "(C" + i + ")";
             }
             set.add(name);
