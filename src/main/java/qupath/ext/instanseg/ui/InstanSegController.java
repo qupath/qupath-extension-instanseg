@@ -199,7 +199,7 @@ public class InstanSegController extends BorderPane {
         int i = 1;
         for (var c : server.getMetadata().getChannels()) {
             var name = c.getName();
-            if (server.isRGB()) {
+            if (!server.isRGB()) {
                 name += "(C" + i + ")";
             }
             set.add(name);
