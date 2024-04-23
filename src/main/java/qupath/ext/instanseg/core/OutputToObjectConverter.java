@@ -26,7 +26,6 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         for (var mat : OpenCVTools.splitChannels(output)) {
             List<PathObject> pathObjects = converter.convertToObjects(params, mat);
             if (output.channels() > 1) {
-                if (channelCount == 1) continue;
                 PathClass pathClass = QP.getPathClass("Cell5", QP.makeRGB(90, 220, 90));
                 if (channelCount == 0)
                     pathClass = QP.getPathClass("Nucleus3", QP.makeRGB(200, 70, 70));
