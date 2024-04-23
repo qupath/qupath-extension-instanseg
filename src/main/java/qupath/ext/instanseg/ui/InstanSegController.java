@@ -11,6 +11,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
@@ -253,7 +254,8 @@ public class InstanSegController extends BorderPane {
     private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
-        InstanSegPreferences.tileSizeProperty().bind(tileSizeChoiceBox.valueProperty());
+        tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
+        tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
     }
 
     private void configureSelectButtons() {
@@ -281,12 +283,12 @@ public class InstanSegController extends BorderPane {
         var path = Path.of(n);
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
-                watcher.register(path);
+                watcher.register(path); // todo: unregister
+                addModelsFromPath(n, modelChoiceBox);
             } catch (IOException e) {
                 logger.error("Unable to watch directory", e);
             }
         }
-        addModelsFromPath(n, modelChoiceBox);
     }
 
     private void configureDeviceChoices() {
@@ -322,7 +324,8 @@ public class InstanSegController extends BorderPane {
 
     static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
         if (dir == null || dir.isEmpty()) return;
-        box.getItems().clear();
+        // See https://github.com/controlsfx/controlsfx/issues/1320
+        box.setItems(FXCollections.observableArrayList());
         var path = Path.of(dir);
         if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {
@@ -658,16 +661,19 @@ public class InstanSegController extends BorderPane {
      */
     @FXML
     public void handleModelDirectoryLabelClick(MouseEvent event) {
-        if (event.getClickCount() != 2)
+        if (event.getClickCount() != 2) {
             return;
+        }
         var path = InstanSegPreferences.modelDirectoryProperty().get();
-        if (path == null || path.isEmpty())
+        if (path == null || path.isEmpty()) {
             return;
+        }
         var file = new File(path);
-        if (file.exists())
+        if (file.exists()) {
             GuiTools.browseDirectory(file);
-        else
+        } else {
             logger.debug("Can't browse directory for {}", file);
+        }
     }
 
     @FXML

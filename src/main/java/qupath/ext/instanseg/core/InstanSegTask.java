@@ -22,6 +22,7 @@ import qupath.opencv.ops.ImageOps;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -57,16 +58,16 @@ public class InstanSegTask extends Task<Void> {
 
     @Override
     protected Void call() throws Exception {
-            logger.info("Using $nThreads threads");
             int nPredictors = 1;
 
             // TODO: Set path! (unsure what path this comment refers to, so not removing...)
             var imageData = QP.getCurrentImageData();
 
             int inputWidth = tileSize;
-            // int inputWidth = 256;
             int inputHeight = inputWidth;
-            int padding = 80;
+
+            int padding = 80; // todo: setting? or just based on tile size. Plus relate to prune later on
+
             // Optionally pad images to the required size
             boolean padToInputSize = true;
             String layout = "CHW";
@@ -75,6 +76,7 @@ public class InstanSegTask extends Task<Void> {
             String layoutOutput = "CHW";
 
             var device = Device.fromName(deviceName);
+
 
             try (var model = Criteria.builder()
                     .setTypes(Mat.class, Mat.class)
@@ -86,46 +88,56 @@ public class InstanSegTask extends Task<Void> {
                     .loadModel()) {
 
                 BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
-
-                printResourceCount("Resource count before prediction", (BaseNDManager)baseManager.getParentManager());
+                printResourceCount("Resource count before prediction",
+                        (BaseNDManager)baseManager.getParentManager());
                 baseManager.debugDump(2);
-
                 BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
 
                 try {
-                    for (int i = 0; i < nPredictors; i++)
+                    for (int i = 0; i < nPredictors; i++) {
                         predictors.put(model.newPredictor());
+                    }
 
-                    printResourceCount("Resource count after creating predictors", (BaseNDManager)baseManager.getParentManager());
+                    printResourceCount("Resource count after creating predictors",
+                            (BaseNDManager)baseManager.getParentManager());
 
-                    var preprocessing = ImageOps.Core.sequential(
-                            ImageOps.Core.ensureType(PixelType.FLOAT32),
-                            ImageOps.Normalize.percentile(1, 99, true, 1e-6)
-                    );
-                    var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                            layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
-                    var processor = OpenCVProcessor.builder(predictionProcessor)
-                            .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
-                            .tiler(Tiler.builder((int)(downsample * inputWidth), (int)(downsample * (inputHeight)))
-                                    .alignCenter()
-                                    .cropTiles(false)
-                                    .build()
-                            )
-                            .outputHandler(new OutputToObjectConvert.PruneObjectOutputHandler(new OutputToObjectConvert(), true))
-                            .padding(padding)
-                            .merger(ObjectMerger.createIOUMerger(0.5))
-                            .downsample(downsample)
-                            .build();
-                    var runner = createTaskRunner(nThreads);
-                    processor.processObjects(runner, imageData, QP.getSelectedObjects());
+
+                    for (var object: QP.getSelectedObjects()) {
+                        var norm = ImageOps.Normalize.percentile(1, 99);
+
+                        if (imageData.isFluorescence()) {
+                            norm = InstanSegUtils.getNormalization(imageData, object, channels);
+                        }
+                        var preprocessing = ImageOps.Core.sequential(
+                                ImageOps.Core.ensureType(PixelType.FLOAT32),
+                                norm,
+                                ImageOps.Core.clip(-0.5, 1.5)
+                        );
+
+                        var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
+                                layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
+                        var processor = OpenCVProcessor.builder(predictionProcessor)
+                                .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
+                                .tiler(Tiler.builder((int)(downsample * inputWidth), (int)(downsample * (inputHeight)))
+                                        .alignCenter()
+                                        .cropTiles(false)
+                                        .build()
+                                )
+                                .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler(new OutputToObjectConverter(), 25))
+                                .padding(padding)
+                                .merger(ObjectMerger.createIOUMerger(0.5, object))
+                                .downsample(downsample)
+                                .build();
+                        var runner = createTaskRunner(nThreads);
+                        processor.processObjects(runner, imageData, Collections.singleton(object));
+                    }
                 } finally {
                     for (var predictor: predictors) {
                         predictor.close();
                     }
                 }
                 printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
-            } catch (ModelNotFoundException | MalformedModelException |
-                     IOException | InterruptedException ex) {
+            } catch (ModelNotFoundException | MalformedModelException | IOException ex) {
                 Dialogs.showErrorMessage("Unable to run InstanSeg", ex);
                 logger.error("Unable to run InstanSeg", ex);
             }

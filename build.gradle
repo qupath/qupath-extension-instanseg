@@ -40,6 +40,8 @@ dependencies {
     // Main QuPath user interface jar.
     // Automatically includes other QuPath jars as subdependencies.
     shadow "io.github.qupath:qupath-gui-fx:${qupathVersion}"
+    // used for co-development, should generally be left out
+//    implementation project(":qupath-gui-fx")
 
     // For logging - the version comes from QuPath's version catalog at
     // https://github.com/qupath/qupath/blob/main/gradle/libs.versions.toml
@@ -48,9 +50,9 @@ dependencies {
     shadow libs.slf4j
 
     // If you aren't using Groovy, this can be removed
-    shadow libs.deepJavaLibrary
     shadow libs.qupath.fxtras
     shadow libs.bioimageio.spec
+    shadow libs.deepJavaLibrary
 
     implementation 'io.github.qupath:qupath-extension-djl:0.3.0'
 

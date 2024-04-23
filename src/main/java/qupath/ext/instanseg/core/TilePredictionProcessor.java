@@ -4,12 +4,11 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
 import org.bytedeco.opencv.global.opencv_core;
+import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.lib.experimental.pixels.Processor;
-import org.bytedeco.opencv.opencv_core.Mat;
 import qupath.lib.experimental.pixels.Parameters;
-import qupath.lib.plugins.objects.SmoothFeaturesPlugin;
+import qupath.lib.experimental.pixels.Processor;
 import qupath.lib.regions.Padding;
 import qupath.opencv.ops.ImageOp;
 import qupath.opencv.tools.OpenCVTools;
@@ -48,8 +47,8 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
 
         var mat = params.getImage();
         mat = preprocessing.apply(mat);
+
         Padding padding = null;
-//        OpenCVTools.matToImagePlus(params.getRegionRequest().toString(), mat).show()
         if (doPadding && inputHeight > 0 && inputWidth > 0 && (mat.rows() < inputHeight || mat.cols() < inputWidth)) {
             padding = Padding.getPadding(0, Math.max(0, inputWidth - mat.cols()), 0, Math.max(0, inputHeight - mat.rows()));
             var mat2 = new Mat();
@@ -62,12 +61,9 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
             predictor = predictors.take();
             var matOutput = predictor.predict(mat);
 
-            // getLogger().info("Mat: {}", mat)
             matOutput.convertTo(matOutput, opencv_core.CV_32S);
-            // OpenCVTools.matToImagePlus("Before", matOutput).show()
             if (padding != null)
                 matOutput = OpenCVTools.crop(matOutput, padding);
-                // OpenCVTools.matToImagePlus("After", matOutput).show()
             return matOutput;
         } catch (TranslateException | InterruptedException e) {
             // todo: deal with exception

@@ -1,26 +1,21 @@
 package qupath.ext.instanseg.core;
 
-
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Envelope;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
+import qupath.lib.experimental.pixels.PixelProcessorUtils;
 import qupath.lib.objects.PathObject;
-import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.classes.PathClass;
-import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.GeometryTools;
-import qupath.lib.roi.RoiTools;
-import qupath.lib.roi.interfaces.ROI;
 import qupath.lib.scripting.QP;
 import qupath.opencv.tools.OpenCVTools;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
-class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
+class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
     private OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> converter = OpenCVProcessor.createDetectionConverter();
 
@@ -47,18 +42,12 @@ class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat
 
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
 
-        enum MaskMode {
-            NONE,
-            MASK_ONLY,
-            MASK_AND_SPLIT
-        }
-
         private OutputToObjectConverter converter;
-        private boolean clearPreviousObjects;
+        private final double boundaryThresholdPixels;
 
-        PruneObjectOutputHandler(OutputToObjectConverter converter, boolean clearPreviousObjects) {
+        PruneObjectOutputHandler(OutputToObjectConverter converter, double boundaryThresholdPixels) {
             this.converter = converter;
-            this.clearPreviousObjects = clearPreviousObjects;
+            this.boundaryThresholdPixels = boundaryThresholdPixels;
         }
 
         @Override
@@ -73,28 +62,24 @@ class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat
                 // we want to remove things touching the tile boundary,
                 // then add the objects to the proxy rather than the parent
                 var parentOrProxy = params.getParentOrProxy();
-                if (clearPreviousObjects)
-                    parentOrProxy.clearChildObjects();
-                var rr = GeometryTools.createRectangle(
+                parentOrProxy.clearChildObjects();
+
+                // remove features within N pixels of the region request boundaries
+                var regionRequest = GeometryTools.createRectangle(
                         params.getRegionRequest().getX(), params.getRegionRequest().getY(),
                         params.getRegionRequest().getWidth(), params.getRegionRequest().getHeight());
 
-                QP.addObject(PathObjects.createAnnotationObject(GeometryTools.geometryToROI(rr, ImagePlane.getPlane(0, 0))));
-
                 newObjects = newObjects.stream()
-                        .filter(p -> !testIfTouching(p.getROI().getGeometry().getEnvelopeInternal(), rr.getEnvelopeInternal(), 30))
+                        .filter(p -> !testIfTouching(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThresholdPixels))
                         .toList();
 
-                // usually pixelprocessor crops here,
-                // but this means we can't later use an IoU merger...
-                // if (!newObjects.isEmpty()) {
-                //     // If we need to clip, then use the intersection of the 'real' parent and proxy
-                //     var parent = params.getParent();
-                //     var parentROI = intersection(parent.getROI(), parentOrProxy.getROI());
-                //     newObjects = newObjects.stream()
-                //             .flatMap(p -> PixelProcessorUtils.maskObject(parentROI, p).stream())
-                //             .toList();
-                // }
+                if (!newObjects.isEmpty()) {
+                    // since we're using IoU to merge objects, we want to keep anything that is within the overall object bounding box
+                    var parent = params.getParent().getROI();
+                    newObjects = newObjects.stream()
+                            .flatMap(p -> PixelProcessorUtils.maskObject(parent, p).stream())
+                            .toList();
+                }
                 parentOrProxy.addChildObjects(newObjects);
                 parentOrProxy.setLocked(true);
                 return true;
@@ -108,20 +93,6 @@ class OutputToObjectConvert implements OutputHandler.OutputToObjectConverter<Mat
                             || Math.abs(ann.getMaxX() - det.getMaxX()) < pixelOverlapTolerance
                             || Math.abs(det.getMinX() - ann.getMinX()) < pixelOverlapTolerance;
         }
-
-        private static ROI intersection(ROI roi1, ROI roi2) {
-            if (Objects.equals(roi1, roi2))
-                return roi1;
-            else if (roi1 == null)
-                return roi2;
-            else if (roi2 == null)
-                return roi1;
-            else
-                return RoiTools.intersection(roi1, roi2);
-        }
-
-
-
 
     }
 }
