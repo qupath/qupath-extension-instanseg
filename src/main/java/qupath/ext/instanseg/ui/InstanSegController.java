@@ -103,7 +103,7 @@ public class InstanSegController extends BorderPane {
     @FXML
     private ToggleButton selectAllTMACoresButton;
 
-    private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("wsinfer", true));
+    private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath = QuPathGUI.getInstance();
     private ObjectProperty<Task<?>> pendingTask = new SimpleObjectProperty<>();
     private MessageTextHelper messageTextHelper;

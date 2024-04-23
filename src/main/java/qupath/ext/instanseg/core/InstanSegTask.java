@@ -13,9 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.fx.dialogs.Dialogs;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
-import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
+import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.Tiler;
 import qupath.lib.scripting.QP;
 import qupath.opencv.ops.ImageOps;
@@ -66,7 +66,7 @@ public class InstanSegTask extends Task<Void> {
             int inputWidth = tileSize;
             // int inputWidth = 256;
             int inputHeight = inputWidth;
-            int padding = 16;
+            int padding = 80;
             // Optionally pad images to the required size
             boolean padToInputSize = true;
             String layout = "CHW";
@@ -106,14 +106,14 @@ public class InstanSegTask extends Task<Void> {
                             layout, layoutOutput, preprocessing, inputWidth, inputHeight, padToInputSize);
                     var processor = OpenCVProcessor.builder(predictionProcessor)
                             .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
-                            .tiler(Tiler.builder((int)(downsample * inputWidth-padding*2), (int)(downsample * inputHeight-padding*2))
-                                    .alignTopLeft()
+                            .tiler(Tiler.builder((int)(downsample * inputWidth), (int)(downsample * (inputHeight)))
+                                    .alignCenter()
                                     .cropTiles(false)
                                     .build()
                             )
-                            .outputHandler(OutputHandler.createObjectOutputHandler(new OutputToObjectConvert()))
+                            .outputHandler(new OutputToObjectConvert.PruneObjectOutputHandler(new OutputToObjectConvert(), true))
                             .padding(padding)
-                            .mergeSharedBoundaries(0.25)
+                            .merger(ObjectMerger.createIOUMerger(0.5))
                             .downsample(downsample)
                             .build();
                     var runner = createTaskRunner(nThreads);
