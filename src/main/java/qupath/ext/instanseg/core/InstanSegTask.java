@@ -125,7 +125,7 @@ public class InstanSegTask extends Task<Void> {
                                 )
                                 .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler(new OutputToObjectConverter(), 25))
                                 .padding(padding)
-                                .merger(ObjectMerger.createIOUMerger(0.5, object))
+                                .merger(ObjectMerger.createIoUMerger(0.5))
                                 .downsample(downsample)
                                 .build();
                         var runner = createTaskRunner(nThreads);
