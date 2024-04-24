@@ -45,7 +45,7 @@ public class InstanSegUtils {
             // read the bounding box of the current object
             var roi = pathObject.getROI();
             double nPix = roi.getBoundsWidth() * roi.getBoundsHeight();
-            // if larger than max allowed size, then downsample... I think?
+
             double downsample = Math.max(nPix / 1e7, 1);
             var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
             var image = imageData.getServer().readRegion(request);
