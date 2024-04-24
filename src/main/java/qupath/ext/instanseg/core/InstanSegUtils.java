@@ -41,9 +41,6 @@ public class InstanSegUtils {
      */
     static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
         var defaults = ImageOps.Normalize.percentile(1, 99, true, 1e-6);
-        // this is just a reimplementation of percentile norm using the untiled
-        // bounding box at the lowest downsample we can get while being less
-        // than 1M pixels
         try {
             // read the bounding box of the current object
             var roi = pathObject.getROI();

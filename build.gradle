@@ -40,7 +40,7 @@ dependencies {
     shadow "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     
     // used for co-development, should generally be left out
-    //  implementation project(":qupath-gui-fx")
+      implementation project(":qupath-gui-fx")
 
     // For logging - the version comes from QuPath's version catalog at
     // https://github.com/qupath/qupath/blob/main/gradle/libs.versions.toml
