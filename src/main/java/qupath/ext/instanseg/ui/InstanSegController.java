@@ -693,8 +693,8 @@ public class InstanSegController extends BorderPane {
     }
 
     static class ChannelSelectItem {
-        String name;
-        ColorTransforms.ColorTransform transform;
+        private String name;
+        private ColorTransforms.ColorTransform transform;
 
         ChannelSelectItem(String name) {
             this.name = name;
