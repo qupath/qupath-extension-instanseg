@@ -13,6 +13,8 @@ import qupath.opencv.ops.ImageOp;
 import qupath.opencv.ops.ImageOps;
 
 import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,6 +82,14 @@ public class InstanSegUtils {
             logger.error("Error reading thumbnail", e);
         }
         return defaults;
+    }
+
+    public static boolean isValidModel(Path path) {
+        // return path.toString().endsWith(".pt"); // if just looking at pt files
+        if (Files.isDirectory(path)) {
+            return Files.exists(path.resolve("instanseg.pt")) && Files.exists(path.resolve("rdf.yaml"));
+        }
+        return false;
     }
 
 }
