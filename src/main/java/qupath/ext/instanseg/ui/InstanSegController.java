@@ -66,6 +66,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
@@ -79,7 +80,7 @@ public class InstanSegController extends BorderPane {
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
 
     @FXML
-    private CheckComboBox<ColorTransforms.ColorTransform> comboChannels;
+    private CheckComboBox<ChannelSelectItem> comboChannels;
 
     private final Watcher watcher = new Watcher();
     private ExecutorService executor;
@@ -144,7 +145,7 @@ public class InstanSegController extends BorderPane {
         addSetFromVisible(comboChannels);
     }
 
-    private void addSetFromVisible(CheckComboBox<ColorTransforms.ColorTransform> comboChannels) {
+    private void addSetFromVisible(CheckComboBox<ChannelSelectItem> comboChannels) {
         var mi = new MenuItem();
         mi.setText("Set from visible");
         mi.setOnAction(e -> {
@@ -176,44 +177,37 @@ public class InstanSegController extends BorderPane {
         comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
     }
 
-    private static Collection<ColorTransforms.ColorTransform> getAvailableChannels(ImageData<?> imageData) {
-        List<ColorTransforms.ColorTransform> list = new ArrayList<>();
-        for (var name : getAvailableChannelNames(imageData.getServer()))
-            list.add(ColorTransforms.createChannelExtractor(name));
-        var stains = imageData.getColorDeconvolutionStains();
-        if (stains != null) {
-            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 1));
-            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 2));
-            list.add(ColorTransforms.createColorDeconvolvedChannel(stains, 3));
-        }
-        return list;
-    }
-
-    /**
-     * Create a collection representing available (possibly duplicate)
-     * channel names, logging a warning if a channel name is duplicated.
-     * @param server server that contains channels
-     * @return Collection of channel names
-     */
-    private static Collection<String> getAvailableChannelNames(ImageServer<?> server) {
-        var set = new ArrayList<String>();
+    private static Collection<ChannelSelectItem> getAvailableChannels(ImageData<?> imageData) {
+        List<ChannelSelectItem> list = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        var server = imageData.getServer();
         int i = 1;
-        for (var c : server.getMetadata().getChannels()) {
-            var name = c.getName();
+        for (var channel : server.getMetadata().getChannels()) {
+            var name = channel.getName();
+            var transform = ColorTransforms.createChannelExtractor(name);
             if (!server.isRGB()) {
-                name += "(C" + i + ")";
+                name += " (C" + i + ")";
             }
-            set.add(name);
-            if (set.contains(name)) {
+            list.add(new ChannelSelectItem(name, transform));
+            names.add(name);
+            if (names.contains(name)) {
                 logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "')");
             }
             i++;
         }
-        return set;
+        var stains = imageData.getColorDeconvolutionStains();
+        if (stains != null) {
+            for (i = 1; i < 4; i++) {
+                var transform = ColorTransforms.createColorDeconvolvedChannel(stains, i);
+                list.add(new ChannelSelectItem(transform.getName(), transform));
+            }
+        }
+        return list;
     }
 
 
-    private static String getTitle(CheckComboBox<ColorTransforms.ColorTransform> comboBox) {
+
+    private static String getTitle(CheckComboBox<ChannelSelectItem> comboBox) {
         int n = comboBox.getCheckModel().getCheckedItems().size();
         if (n == 0)
             return "No channels selected!";
@@ -457,7 +451,9 @@ public class InstanSegController extends BorderPane {
     private void runInstanSeg() {
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
-        var selectedChannels = comboChannels.getCheckModel().getCheckedItems();
+        List<ColorTransforms.ColorTransform> selectedChannels = comboChannels.getCheckModel().getCheckedItems().stream()
+                .map(ChannelSelectItem::getTransform)
+                .toList();
         var task = new InstanSegTask(
                 model.getPath().resolve("instanseg.pt"),
                 selectedChannels,
@@ -700,5 +696,33 @@ public class InstanSegController extends BorderPane {
         if (newDir == null)
             return;
         dirPath.set(newDir.getAbsolutePath());
+    }
+
+    static class ChannelSelectItem {
+        String name;
+        ColorTransforms.ColorTransform transform;
+
+        ChannelSelectItem(String name) {
+            this.name = name;
+            this.transform = ColorTransforms.createChannelExtractor(name);
+        }
+
+        ChannelSelectItem(String name, ColorTransforms.ColorTransform transform) {
+            this.name = name;
+            this.transform = transform;
+        }
+
+        @Override
+        public String toString() {
+            return this.name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public ColorTransforms.ColorTransform getTransform() {
+            return transform;
+        }
     }
 }
