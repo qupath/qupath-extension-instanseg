@@ -41,10 +41,10 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
 
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
 
-        private OutputToObjectConverter converter;
+        private OutputToObjectConverter<S, T, U> converter;
         private final double boundaryThresholdPixels;
 
-        PruneObjectOutputHandler(OutputToObjectConverter converter, double boundaryThresholdPixels) {
+        PruneObjectOutputHandler(OutputToObjectConverter<S, T, U> converter, double boundaryThresholdPixels) {
             this.converter = converter;
             this.boundaryThresholdPixels = boundaryThresholdPixels;
         }

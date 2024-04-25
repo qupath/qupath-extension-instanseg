@@ -123,7 +123,7 @@ public class InstanSegTask extends Task<Void> {
                                         .cropTiles(false)
                                         .build()
                                 )
-                                .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler(new OutputToObjectConverter(), 25))
+                                .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(), 25))
                                 .padding(padding)
                                 .merger(ObjectMerger.createIoUMerger(0.5))
                                 .downsample(downsample)
