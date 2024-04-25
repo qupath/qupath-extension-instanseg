@@ -1,13 +1,11 @@
 package qupath.ext.instanseg.core;
 
-import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.experimental.pixels.MeasurementProcessor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathObject;
-import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.regions.RegionRequest;
 import qupath.opencv.ops.ImageOp;
 import qupath.opencv.ops.ImageOps;
@@ -16,10 +14,6 @@ import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiPredicate;
-import java.util.stream.DoubleStream;
 
 public class InstanSegUtils {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegUtils.class);
