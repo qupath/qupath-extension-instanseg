@@ -68,8 +68,10 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                         params.getRegionRequest().getX(), params.getRegionRequest().getY(),
                         params.getRegionRequest().getWidth(), params.getRegionRequest().getHeight());
 
+                int maxX = params.getServer().getWidth();
+                int maxY = params.getServer().getHeight();
                 newObjects = newObjects.stream()
-                        .filter(p -> !testIfTouching(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThresholdPixels))
+                        .filter(p -> !testIfTouching(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThresholdPixels, maxX, maxY))
                         .toList();
 
                 if (!newObjects.isEmpty()) {
@@ -85,13 +87,18 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
             }
         }
 
-        private boolean testIfTouching(Envelope det, Envelope ann, double pixelOverlapTolerance) {
-            return
-                    Math.abs(ann.getMaxY() - det.getMaxY()) < pixelOverlapTolerance
-                            || Math.abs(det.getMinY() - ann.getMinY()) < pixelOverlapTolerance
-                            || Math.abs(ann.getMaxX() - det.getMaxX()) < pixelOverlapTolerance
-                            || Math.abs(det.getMinX() - ann.getMinX()) < pixelOverlapTolerance;
-        }
 
+        private boolean testIfTouching(Envelope det, Envelope ann, double pixelOverlapTolerance, int maxX, int maxY) {
+            if (det.getMinX() < pixelOverlapTolerance || det.getMinY() < pixelOverlapTolerance) {
+                return false;
+            }
+            if (maxX - det.getMaxX() < pixelOverlapTolerance || maxY - det.getMaxY() < pixelOverlapTolerance) {
+                return false;
+            }
+            return Math.abs(ann.getMaxY() - det.getMaxY()) < pixelOverlapTolerance
+                    || Math.abs(det.getMinY() - ann.getMinY()) < pixelOverlapTolerance
+                    || Math.abs(ann.getMaxX() - det.getMaxX()) < pixelOverlapTolerance
+                    || Math.abs(det.getMinX() - ann.getMinX()) < pixelOverlapTolerance;
+        }
     }
 }
