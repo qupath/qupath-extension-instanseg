@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -166,20 +167,26 @@ public class InstanSegController extends BorderPane {
 
     private static Collection<ChannelSelectItem> getAvailableChannels(ImageData<?> imageData) {
         List<ChannelSelectItem> list = new ArrayList<>();
-        List<String> names = new ArrayList<>();
+        Set<String> names = new HashSet<>();
         var server = imageData.getServer();
         int i = 1;
+        boolean hasDuplicates = false;
         for (var channel : server.getMetadata().getChannels()) {
             var name = channel.getName();
-            var transform = ColorTransforms.createChannelExtractor(i - 1);
+            var transform = ColorTransforms.createChannelExtractor(name);
+            if (names.contains(name)) {
+                logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "').");
+                logger.warn("Using channel indices instead of names because of duplicated channel names.");
+                hasDuplicates = true;
+            }
+            names.add(name);
+            if (hasDuplicates) {
+                transform = ColorTransforms.createChannelExtractor(i - 1);
+            }
             if (!server.isRGB()) {
                 name += " (C" + i + ")";
             }
             list.add(new ChannelSelectItem(name, transform));
-            names.add(name);
-            if (names.contains(name)) {
-                logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "')");
-            }
             i++;
         }
         var stains = imageData.getColorDeconvolutionStains();
