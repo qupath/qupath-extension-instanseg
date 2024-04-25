@@ -4,7 +4,6 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
-import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
@@ -172,17 +171,17 @@ public class InstanSegController extends BorderPane {
         Set<String> names = new HashSet<>();
         var server = imageData.getServer();
         int i = 1;
-        boolean duplicates = false;
+        boolean hasDuplicates = false;
         for (var channel : server.getMetadata().getChannels()) {
             var name = channel.getName();
             var transform = ColorTransforms.createChannelExtractor(name);
             if (names.contains(name)) {
                 logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "').");
                 logger.warn("Using channel indices instead of names because of duplicated channel names.");
-                duplicates = true;
+                hasDuplicates = true;
             }
             names.add(name);
-            if (duplicates) {
+            if (hasDuplicates) {
                 transform = ColorTransforms.createChannelExtractor(i - 1);
             }
             if (!server.isRGB()) {
@@ -400,6 +399,5 @@ public class InstanSegController extends BorderPane {
             return;
         dirPath.set(newDir.getAbsolutePath());
     }
-
 
 }
