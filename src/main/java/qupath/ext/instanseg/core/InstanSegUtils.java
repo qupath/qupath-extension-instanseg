@@ -40,36 +40,42 @@ public class InstanSegUtils {
         try {
             // read the bounding box of the current object
             var roi = pathObject.getROI();
-            double nPix = roi.getBoundsWidth() * roi.getBoundsHeight();
+            double nPix = roi.getBoundsWidth() * roi.getBoundsHeight() * channels.size();
 
-            double downsample = Math.max(nPix / 1e7, 1);
-            var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
-            var image = imageData.getServer().readRegion(request);
+            BufferedImage image;
+            if (imageData.getServer().nResolutions() > 1) {
+                // if there's more than one resolution, pray that the thumbnail is reasonable size
+                image = imageData.getServer().getDefaultThumbnail(0, 0);
+            } else {
+                double downsample = Math.max(nPix / 5e7, 1);
+                var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
+                image = imageData.getServer().readRegion(request);
+            }
 
             double eps = 1e-6;
-            double[] offsets = new double[channels.size()];
-            double[] scales = new double[channels.size()];
-
-            for (int i = 0; i < channels.size(); i++) {
-                var channel = channels.get(i);
-                float[] fpix = channel.extractChannel(imageData.getServer(), image, null);
+            var params = channels.stream().map(colorTransform -> {
+                float[] fpix = colorTransform.extractChannel(imageData.getServer(), image, null);
                 double[] pixels = new double[fpix.length];
+                double offset;
+                double scale;
                 for (int j = 0; j < pixels.length; j++) {
-                    pixels[j] = (double)fpix[j];
+                    pixels[j] = (double) fpix[j];
                 }
                 var lo = MeasurementProcessor.Functions.percentile(1).apply(pixels);
                 var hi = MeasurementProcessor.Functions.percentile(99).apply(pixels);
                 if (hi == lo && eps == 0.0) {
                     logger.warn("Normalization percentiles give the same value ({}), scale will be Infinity", lo);
-                    scales[i] = Double.POSITIVE_INFINITY;
+                    scale = Double.POSITIVE_INFINITY;
                 } else {
-                    scales[i] = 1.0 / (hi - lo + eps);
+                    scale = 1.0 / (hi - lo + eps);
                 }
-                offsets[i] = -lo * scales[i];
-            }
+                offset = -lo * scale;
+                return new double[]{offset, scale};
+            }).toList();
+
             return ImageOps.Core.sequential(
-                    ImageOps.Core.multiply(scales),
-                    ImageOps.Core.add(offsets)
+                    ImageOps.Core.multiply(params.stream().mapToDouble(e -> e[1]).toArray()),
+                    ImageOps.Core.add(params.stream().mapToDouble(e -> e[0]).toArray())
             );
 
         } catch (Exception e) {
