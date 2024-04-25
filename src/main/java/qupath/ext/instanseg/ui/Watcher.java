@@ -4,6 +4,7 @@ import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSegModel;
+import qupath.ext.instanseg.core.InstanSegUtils;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;

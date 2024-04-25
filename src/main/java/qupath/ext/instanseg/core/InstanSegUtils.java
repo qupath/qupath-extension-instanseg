@@ -1,8 +1,6 @@
-package qupath.ext.instanseg.ui;
-
 package qupath.ext.instanseg.core;
 
-import org.controlsfx.control.CheckComboBox;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
