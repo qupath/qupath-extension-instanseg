@@ -44,11 +44,11 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
 
         private final OutputToObjectConverter<S, T, U> converter;
-        private final double boundaryThresholdPixels;
+        private final int boundaryThreshold;
 
-        PruneObjectOutputHandler(OutputToObjectConverter<S, T, U> converter, double boundaryThresholdPixels) {
+        PruneObjectOutputHandler(OutputToObjectConverter<S, T, U> converter, int boundaryThreshold) {
             this.converter = converter;
-            this.boundaryThresholdPixels = boundaryThresholdPixels;
+            this.boundaryThreshold = boundaryThreshold;
         }
 
         @Override
@@ -72,8 +72,11 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
 
                 int maxX = params.getServer().getWidth();
                 int maxY = params.getServer().getHeight();
+
+                // QP.addObject(PathObjects.createAnnotationObject(GeometryTools.geometryToROI(regionRequest, ImagePlane.getPlane(0,0))));
+
                 newObjects = newObjects.parallelStream()
-                        .filter(p -> !testIfTouching(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThresholdPixels, maxX, maxY))
+                        .filter(p -> doesntTouchBoundaries(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThreshold, maxX, maxY))
                         .toList();
 
                 if (!newObjects.isEmpty()) {
@@ -90,18 +93,93 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         }
 
 
-        private boolean testIfTouching(Envelope det, Envelope ann, double pixelOverlapTolerance, int maxX, int maxY) {
-            // keep any objects at the boundary of the image (should maybe use the overall roi, not the image...)
-            if (det.getMinX() < pixelOverlapTolerance || det.getMinY() < pixelOverlapTolerance) {
-                return false;
+        /**
+         * Tests if a detection is near the boundary of a parent region.
+         * It first checks if the detection is on the edge of the overall image, in which case it should be kept,
+         * unless it is at the edge of the image <b>and</b> the perpendicular edge of the parent region.
+         * For example, on the left side of the image, but on the top/bottom edge of the parent region.
+         * Then, it checks if the detection is on the boundary of the parent region.
+         * @param det The detection object.
+         * @param region The region containing all detection objects.
+         * @param boundaryPixels The size of the boundary, in pixels, to use for removing object.
+         * @param imageWidth The width of the image, in pixels.
+         * @param imageHeight The height of the image, in pixels.
+         * @return Whether the detection object should be removed, based on these criteria.
+         */
+        private boolean doesntTouchBoundaries(Envelope det, Envelope region, int boundaryPixels, int imageWidth, int imageHeight) {
+            // keep any objects at the boundary of the annotation, except the stuff around region boundaries
+            if (touchesLeftOfImage(det, boundaryPixels)) {
+                if (touchesTopOfImage(det, boundaryPixels) || touchesBottomOfImage(det, imageHeight, boundaryPixels)) {
+                    return true;
+                }
+                if (!(touchesBottomOfRegion(det, region, boundaryPixels) || touchesTopOfRegion(det, region, boundaryPixels))) {
+                    return true;
+                }
             }
-            if (maxX - det.getMaxX() < pixelOverlapTolerance || maxY - det.getMaxY() < pixelOverlapTolerance) {
-                return false;
+            if (touchesTopOfImage(det, boundaryPixels)) {
+                if (touchesLeftOfImage(det, boundaryPixels) || touchesRightOfImage(det, imageWidth, boundaryPixels)) {
+                    return true;
+                }
+                if (!(touchesLeftOfRegion(det, region, boundaryPixels) || touchesRightOfRegion(det, region, boundaryPixels))) {
+                    return true;
+                }
             }
-            return Math.abs(ann.getMaxY() - det.getMaxY()) < pixelOverlapTolerance
-                    || Math.abs(det.getMinY() - ann.getMinY()) < pixelOverlapTolerance
-                    || Math.abs(ann.getMaxX() - det.getMaxX()) < pixelOverlapTolerance
-                    || Math.abs(det.getMinX() - ann.getMinX()) < pixelOverlapTolerance;
+
+            if (touchesRightOfImage(det, imageWidth, boundaryPixels)) {
+                if (touchesTopOfImage(det, boundaryPixels) || touchesBottomOfImage(det, imageHeight, boundaryPixels)) {
+                    return true;
+                }
+                if (!(touchesBottomOfRegion(det, region, boundaryPixels) || touchesTopOfRegion(det, region, boundaryPixels))) {
+                    return true;
+                }
+            }
+            if (touchesBottomOfImage(det, imageHeight, boundaryPixels)) {
+                if (touchesLeftOfImage(det, boundaryPixels) || touchesRightOfImage(det, imageWidth, boundaryPixels)) {
+                    return true;
+                }
+                if (!(touchesLeftOfRegion(det, region, boundaryPixels) || touchesRightOfRegion(det, region, boundaryPixels))) {
+                    return true;
+                }
+            }
+
+            // return true;
+            // remove any objects at other region boundaries
+            return !(touchesLeftOfRegion(det, region, boundaryPixels)
+                    || touchesRightOfRegion(det, region, boundaryPixels)
+                    || touchesBottomOfRegion(det, region, boundaryPixels)
+                    || touchesTopOfRegion(det, region, boundaryPixels));
         }
+    }
+
+    private static boolean touchesLeftOfImage(Envelope det, int boundary) {
+        return det.getMinX() < boundary;
+    }
+
+    private static boolean touchesRightOfImage(Envelope det, int width, int boundary) {
+        return width - det.getMaxX() < boundary;
+    }
+
+    private static boolean touchesTopOfImage(Envelope det, int boundary) {
+        return det.getMinY() < boundary;
+    }
+
+    private static boolean touchesBottomOfImage(Envelope det, int height, int boundary) {
+        return height - det.getMaxY() < boundary;
+    }
+
+    private static boolean touchesLeftOfRegion(Envelope det, Envelope region, int boundary) {
+        return det.getMinX() - region.getMinX() < boundary;
+    }
+
+    private static boolean touchesRightOfRegion(Envelope det, Envelope region, int boundary) {
+        return region.getMaxX() - det.getMaxX() < boundary;
+    }
+
+    private static boolean touchesTopOfRegion(Envelope det, Envelope region, int boundary) {
+        return det.getMinY() - region.getMinY() < boundary;
+    }
+
+    private static boolean touchesBottomOfRegion(Envelope det, Envelope region, int boundary) {
+        return region.getMaxY() - det.getMaxY() < boundary;
     }
 }

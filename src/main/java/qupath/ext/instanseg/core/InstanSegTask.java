@@ -66,8 +66,12 @@ public class InstanSegTask extends Task<Void> {
             int inputWidth = tileSize;
             int inputHeight = inputWidth;
 
-            int padding = 80; // todo: setting? or just based on tile size. Plus relate to prune later on
-
+            int padding = 80; // todo: setting? or just based on tile size. Should discuss.
+            int boundary = 25;
+            if (tileSize == 128) {
+                padding = 50;
+                boundary = 20;
+            }
             // Optionally pad images to the required size
             boolean padToInputSize = true;
             String layout = "CHW";
@@ -123,7 +127,7 @@ public class InstanSegTask extends Task<Void> {
                                         .cropTiles(false)
                                         .build()
                                 )
-                                .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(), 25))
+                                .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(), boundary))
                                 .padding(padding)
                                 .merger(ObjectMerger.createIoUMerger(0.5))
                                 .downsample(downsample)
