@@ -14,34 +14,36 @@ import qupath.opencv.tools.OpenCVTools;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 
 class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
     private final OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> converter = OpenCVProcessor.createDetectionConverter();
 
     @Override
-    public List<PathObject> convertToObjects(Parameters params, Mat output) {
+    public List<PathObject> convertToObjects(Parameters<Mat, Mat> params, Mat output) {
         List<PathObject> detections = new ArrayList<>();
-        int channelCount = 0;
-        for (var mat : OpenCVTools.splitChannels(output)) {
-            List<PathObject> pathObjects = converter.convertToObjects(params, mat);
-            if (output.channels() > 1) {
-                PathClass pathClass = QP.getPathClass("Cell5", QP.makeRGB(90, 220, 90));
-                if (channelCount == 0)
-                    pathClass = QP.getPathClass("Nucleus3", QP.makeRGB(200, 70, 70));
-                for (var p: pathObjects) {
-                    p.setPathClass(pathClass);
+        var channels = OpenCVTools.splitChannels(output);
+        IntStream.range(0, channels.size()).parallel().forEach(
+                i -> {
+                    List<PathObject> pathObjects = converter.convertToObjects(params, channels.get(i));
+                    PathClass pathClass = switch(i) {
+                        case 0 -> QP.getPathClass("Nucleus3", QP.makeRGB(200, 70, 70));
+                        case 1 -> QP.getPathClass("Cell5", QP.makeRGB(90, 220, 90));
+                        default -> throw new IllegalArgumentException("Dunno what to make of channel " + i);
+                    };
+                    for (var p: pathObjects) {
+                        p.setPathClass(pathClass);
+                    }
+                    detections.addAll(pathObjects);
                 }
-            }
-            detections.addAll(pathObjects);
-            channelCount++;
-        }
+        );
         return detections;
     }
 
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
 
-        private OutputToObjectConverter<S, T, U> converter;
+        private final OutputToObjectConverter<S, T, U> converter;
         private final double boundaryThresholdPixels;
 
         PruneObjectOutputHandler(OutputToObjectConverter<S, T, U> converter, double boundaryThresholdPixels) {
@@ -70,14 +72,14 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
 
                 int maxX = params.getServer().getWidth();
                 int maxY = params.getServer().getHeight();
-                newObjects = newObjects.stream()
+                newObjects = newObjects.parallelStream()
                         .filter(p -> !testIfTouching(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThresholdPixels, maxX, maxY))
                         .toList();
 
                 if (!newObjects.isEmpty()) {
                     // since we're using IoU to merge objects, we want to keep anything that is within the overall object bounding box
                     var parent = params.getParent().getROI();
-                    newObjects = newObjects.stream()
+                    newObjects = newObjects.parallelStream()
                             .flatMap(p -> PixelProcessorUtils.maskObject(parent, p).stream())
                             .toList();
                 }
@@ -89,6 +91,7 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
 
 
         private boolean testIfTouching(Envelope det, Envelope ann, double pixelOverlapTolerance, int maxX, int maxY) {
+            // keep any objects at the boundary of the image (should maybe use the overall roi, not the image...)
             if (det.getMinX() < pixelOverlapTolerance || det.getMinY() < pixelOverlapTolerance) {
                 return false;
             }
