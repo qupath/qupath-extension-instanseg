@@ -9,7 +9,7 @@ pluginManagement {
 }
 
 rootProject.name = 'qupath-extension-instanseg'
-gradle.ext.qupathVersion = "0.5.1"
+gradle.ext.qupathVersion = "0.6.0"
 
 dependencyResolutionManagement {
 
@@ -21,7 +21,6 @@ dependencyResolutionManagement {
     }
 
     repositories {
-
         mavenCentral()
 
         // Add scijava - which is where QuPath's jars are hosted
