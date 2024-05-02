@@ -142,7 +142,6 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                 }
             }
 
-            // return true;
             // remove any objects at other region boundaries
             return !(touchesLeftOfRegion(det, region, boundaryPixels)
                     || touchesRightOfRegion(det, region, boundaryPixels)
