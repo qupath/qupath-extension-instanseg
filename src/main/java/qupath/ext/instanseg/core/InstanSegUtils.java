@@ -45,7 +45,7 @@ public class InstanSegUtils {
             BufferedImage image;
             if (imageData.getServer().nResolutions() > 1) {
                 // if there's more than one resolution, pray that the thumbnail is reasonable size
-                image = imageData.getServer().getDefaultThumbnail(0, 0);
+                image = imageData.getServer().getDefaultThumbnail(pathObject.getROI().getZ(), pathObject.getROI().getT());
             } else {
                 double downsample = Math.max(nPix / 5e7, 1);
                 var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
