@@ -4,12 +4,12 @@ pluginManagement {
         // Specifying it here, rather than build.gradle, makes it possible
         // to include the extension as a subproject of QuPath itself
         // (which is useful during development)
-        id 'org.bytedeco.gradle-javacpp-platform' version '1.5.9'
+        id 'org.bytedeco.gradle-javacpp-platform' version '1.5.10'
     }
 }
 
 rootProject.name = 'qupath-extension-instanseg'
-gradle.ext.qupathVersion = "0.6.0"
+gradle.ext.qupathVersion = "0.6.0-SNAPSHOT"
 
 dependencyResolutionManagement {
 

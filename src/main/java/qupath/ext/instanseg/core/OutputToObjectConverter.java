@@ -2,43 +2,68 @@ package qupath.ext.instanseg.core;
 
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Envelope;
+import qupath.lib.analysis.images.ContourTracing;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
 import qupath.lib.experimental.pixels.PixelProcessorUtils;
 import qupath.lib.objects.PathObject;
+import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.roi.GeometryTools;
+import qupath.lib.roi.interfaces.ROI;
 import qupath.lib.scripting.QP;
 import qupath.opencv.tools.OpenCVTools;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
-    private final OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> converter = OpenCVProcessor.createDetectionConverter();
+    private static long seed = 1243;
 
     @Override
-    public List<PathObject> convertToObjects(Parameters<Mat, Mat> params, Mat output) {
-        List<PathObject> detections = new ArrayList<>();
-        var channels = OpenCVTools.splitChannels(output);
-        IntStream.range(0, channels.size()).parallel().forEach(
-                i -> {
-                    List<PathObject> pathObjects = converter.convertToObjects(params, channels.get(i));
-                    PathClass pathClass = switch(i) {
-                        case 0 -> QP.getPathClass("Nucleus3", QP.makeRGB(200, 70, 70));
-                        case 1 -> QP.getPathClass("Cell5", QP.makeRGB(90, 220, 90));
-                        default -> throw new IllegalArgumentException("Dunno what to make of channel " + i);
-                    };
-                    for (var p: pathObjects) {
-                        p.setPathClass(pathClass);
-                    }
-                    detections.addAll(pathObjects);
-                }
-        );
-        return detections;
+    public List<PathObject> convertToObjects(Parameters params, Mat output) {
+        int nChannels = output.channels();
+        if (nChannels < 1 || nChannels > 2)
+            throw new IllegalArgumentException("Expected 1 or 2 channels, but found " + nChannels);
+
+        List<Map<Number, ROI>> roiMaps = new ArrayList<>();
+        for (var mat : OpenCVTools.splitChannels(output)) {
+            var image = OpenCVTools.matToSimpleImage(mat, 0);
+            roiMaps.add(
+                    ContourTracing.createROIs(image, params.getRegionRequest(), 1, -1)
+            );
+        }
+        if (roiMaps.size() == 1) {
+            // One-channel detected, represent using detection objects
+            return roiMaps.get(0).values().stream()
+                    .map(roi -> PathObjects.createDetectionObject(roi))
+                    .collect(Collectors.toList());
+        } else {
+            // Two channels detected, represent using cell objects
+            // We assume that the labels are matched - and we can't have a nucleus without a cell
+            Map<Number, ROI> nucleusROIs = roiMaps.get(0);
+            Map<Number, ROI> cellROIs = roiMaps.get(1);
+            List<PathObject> cells = new ArrayList<>();
+            var rng = new Random(seed);
+            for (var entry : cellROIs.entrySet()) {
+                var cell = entry.getValue();
+                var nucleus = nucleusROIs.getOrDefault(entry.getKey(), null);
+                var cellObject = PathObjects.createCellObject(cell, nucleus);
+                cellObject.setColor(
+                        rng.nextInt(255),
+                        rng.nextInt(255),
+                        rng.nextInt(255)
+                );
+                cells.add(cellObject);
+            }
+            return cells;
+        }
     }
 
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
