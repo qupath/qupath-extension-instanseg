@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 public class InstanSegUtils {
+
     private static final Logger logger = LoggerFactory.getLogger(InstanSegUtils.class);
 
     private InstanSegUtils() {

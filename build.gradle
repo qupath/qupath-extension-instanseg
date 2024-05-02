@@ -20,7 +20,7 @@ base {
 
 ext.qupathVersion = gradle.ext.qupathVersion
 
-// Should be Java 17 for QuPath v0.5.0
+// Should be Java 21 for QuPath v0.6.0
 ext.qupathJavaVersion = 21
 
 /**
