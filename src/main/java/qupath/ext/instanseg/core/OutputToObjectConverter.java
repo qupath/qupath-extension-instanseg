@@ -3,16 +3,13 @@ package qupath.ext.instanseg.core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Envelope;
 import qupath.lib.analysis.images.ContourTracing;
-import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
 import qupath.lib.experimental.pixels.PixelProcessorUtils;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
-import qupath.lib.objects.classes.PathClass;
 import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
-import qupath.lib.scripting.QP;
 import qupath.opencv.tools.OpenCVTools;
 
 import java.util.ArrayList;
@@ -20,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 

@@ -30,7 +30,9 @@ import java.util.concurrent.BlockingQueue;
 import static qupath.lib.gui.scripting.QPEx.createTaskRunner;
 
 public class InstanSegTask extends Task<Void> {
+
     private static final Logger logger = LoggerFactory.getLogger(InstanSegTask.class);
+
     private final int tileSize, nThreads;
     private final List<ColorTransforms.ColorTransform> channels;
     private final double downsample;
