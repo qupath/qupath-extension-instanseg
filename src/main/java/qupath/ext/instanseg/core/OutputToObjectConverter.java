@@ -91,7 +91,7 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                 parentOrProxy.clearChildObjects();
 
                 // remove features within N pixels of the region request boundaries
-                var regionRequest = GeometryTools.createRectangle(
+                var bounds = GeometryTools.createRectangle(
                         params.getRegionRequest().getX(), params.getRegionRequest().getY(),
                         params.getRegionRequest().getWidth(), params.getRegionRequest().getHeight());
 
@@ -101,7 +101,7 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                 // QP.addObject(PathObjects.createAnnotationObject(GeometryTools.geometryToROI(regionRequest, ImagePlane.getPlane(0,0))));
 
                 newObjects = newObjects.parallelStream()
-                        .filter(p -> doesntTouchBoundaries(p.getROI().getGeometry().getEnvelopeInternal(), regionRequest.getEnvelopeInternal(), boundaryThreshold, maxX, maxY))
+                        .filter(p -> doesntTouchBoundaries(p.getROI().getGeometry().getEnvelopeInternal(), bounds.getEnvelopeInternal(), boundaryThreshold, maxX, maxY))
                         .toList();
 
                 if (!newObjects.isEmpty()) {
