@@ -40,7 +40,7 @@ class PytorchManager {
     static Collection<String> getAvailableDevices() {
         Set<String> availableDevices = new LinkedHashSet<>();
         boolean includesMPS = false; // Don't add MPS twice
-        var engine = getEngineOffline();
+        var engine = getEngineOnline();
         if (engine != null) {
             // This is expected to return GPUs if available, or CPU otherwise
             for (var device : engine.getDevices()) {
