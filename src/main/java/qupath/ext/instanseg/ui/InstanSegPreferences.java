@@ -26,7 +26,7 @@ public class InstanSegPreferences {
 
     private static final IntegerProperty tileSizeProperty = PathPrefs.createPersistentPreference(
             "intanseg.tile.size",
-            512);
+            256);
 
     public static StringProperty modelDirectoryProperty() {
         return modelDirectoryProperty;
