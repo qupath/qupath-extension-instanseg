@@ -12,6 +12,7 @@ import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -85,6 +86,8 @@ public class InstanSegController extends BorderPane {
     private ToggleButton selectAllAnnotationsButton;
     @FXML
     private ToggleButton selectAllTMACoresButton;
+    @FXML
+    private CheckBox nucleiOnlyCheckBox;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath = QuPathGUI.getInstance();
@@ -358,6 +361,7 @@ public class InstanSegController extends BorderPane {
                             InstanSegPreferences.tileSizeProperty().get(),
                             model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
+                            nucleiOnlyCheckBox.isSelected(),
                             QPEx.createTaskRunner(InstanSegPreferences.numThreadsProperty().getValue()));
                 } catch (ModelNotFoundException | MalformedModelException |
                          IOException | InterruptedException e) {

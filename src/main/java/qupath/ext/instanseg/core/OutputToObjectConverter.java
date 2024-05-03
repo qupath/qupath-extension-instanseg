@@ -38,10 +38,19 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                     ContourTracing.createROIs(image, params.getRegionRequest(), 1, -1)
             );
         }
+        var rng = new Random(seed);
         if (roiMaps.size() == 1) {
             // One-channel detected, represent using detection objects
             return roiMaps.get(0).values().stream()
-                    .map(PathObjects::createDetectionObject)
+                    .map(p -> {
+                        var obj = PathObjects.createDetectionObject(p);
+                        obj.setColor(
+                                rng.nextInt(255),
+                                rng.nextInt(255),
+                                rng.nextInt(255)
+                        );
+                        return obj;
+                    })
                     .collect(Collectors.toList());
         } else {
             // Two channels detected, represent using cell objects
@@ -49,7 +58,6 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
             Map<Number, ROI> nucleusROIs = roiMaps.get(0);
             Map<Number, ROI> cellROIs = roiMaps.get(1);
             List<PathObject> cells = new ArrayList<>();
-            var rng = new Random(seed);
             for (var entry : cellROIs.entrySet()) {
                 var cell = entry.getValue();
                 var nucleus = nucleusROIs.getOrDefault(entry.getKey(), null);
