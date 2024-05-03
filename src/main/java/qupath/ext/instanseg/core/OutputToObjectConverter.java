@@ -20,10 +20,13 @@ import java.util.stream.Collectors;
 
 class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
-    private static long seed = 1243;
+    private static final long seed = 1243;
 
     @Override
-    public List<PathObject> convertToObjects(Parameters params, Mat output) {
+    public List<PathObject> convertToObjects(Parameters<Mat, Mat> params, Mat output) {
+        if (output == null) {
+            return List.of();
+        }
         int nChannels = output.channels();
         if (nChannels < 1 || nChannels > 2)
             throw new IllegalArgumentException("Expected 1 or 2 channels, but found " + nChannels);
@@ -38,7 +41,7 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         if (roiMaps.size() == 1) {
             // One-channel detected, represent using detection objects
             return roiMaps.get(0).values().stream()
-                    .map(roi -> PathObjects.createDetectionObject(roi))
+                    .map(PathObjects::createDetectionObject)
                     .collect(Collectors.toList());
         } else {
             // Two channels detected, represent using cell objects
@@ -91,13 +94,11 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                         params.getRegionRequest().getX(), params.getRegionRequest().getY(),
                         params.getRegionRequest().getWidth(), params.getRegionRequest().getHeight());
 
-                int maxX = params.getServer().getWidth();
-                int maxY = params.getServer().getHeight();
-
-                // QP.addObject(PathObjects.createAnnotationObject(GeometryTools.geometryToROI(regionRequest, ImagePlane.getPlane(0,0))));
+                int width = params.getServer().getWidth();
+                int height = params.getServer().getHeight();
 
                 newObjects = newObjects.parallelStream()
-                        .filter(p -> doesntTouchBoundaries(p.getROI().getGeometry().getEnvelopeInternal(), bounds.getEnvelopeInternal(), boundaryThreshold, maxX, maxY))
+                        .filter(p -> doesntTouchBoundaries(p.getROI().getGeometry().getEnvelopeInternal(), bounds.getEnvelopeInternal(), boundaryThreshold, width, height))
                         .toList();
 
                 if (!newObjects.isEmpty()) {

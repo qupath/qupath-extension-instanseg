@@ -1,18 +1,45 @@
 package qupath.ext.instanseg.core;
 
+import ai.djl.Device;
+import ai.djl.MalformedModelException;
+import ai.djl.inference.Predictor;
+import ai.djl.ndarray.BaseNDManager;
+import ai.djl.repository.zoo.Criteria;
+import ai.djl.repository.zoo.ModelNotFoundException;
+import ai.djl.training.util.ProgressBar;
 import com.google.gson.internal.LinkedTreeMap;
+import org.bytedeco.opencv.opencv_core.Mat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
+import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.gui.UserDirectoryManager;
+import qupath.lib.gui.scripting.QPEx;
+import qupath.lib.images.ImageData;
+import qupath.lib.images.servers.ColorTransforms;
+import qupath.lib.images.servers.PixelType;
+import qupath.lib.objects.PathObject;
+import qupath.lib.objects.utils.ObjectMerger;
+import qupath.lib.objects.utils.Tiler;
+import qupath.lib.plugins.TaskRunner;
+import qupath.opencv.ops.ImageOps;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class InstanSegModel {
+    private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
 
     private Path path = null;
     private URL modelURL = null;
@@ -102,4 +129,98 @@ public class InstanSegModel {
     public String toString() {
         return getName();
     }
+
+    public void runInstanSeg(
+            Collection<PathObject> pathObjects,
+            ImageData<BufferedImage> imageData,
+            List<ColorTransforms.ColorTransform> channels,
+            int tileSize,
+            double downsample,
+            String deviceName,
+            TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
+
+        Path modelPath = getPath().resolve("instanseg.pt");
+        int nPredictors = 1; // todo: change me?
+
+        int padding = 80; // todo: setting? or just based on tile size. Should discuss.
+        int boundary = 25;
+        if (tileSize == 128) {
+            padding = 50;
+            boundary = 20;
+        }
+        // Optionally pad images to the required size
+        boolean padToInputSize = true;
+        String layout = "CHW";
+
+        // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
+        String layoutOutput = "CHW";
+
+        var device = Device.fromName(deviceName);
+
+        try (var model = Criteria.builder()
+                .setTypes(Mat.class, Mat.class)
+                .optModelUrls(String.valueOf(modelPath))
+                .optProgress(new ProgressBar())
+                .optDevice(device) // Remove this line if devices are problematic!
+                .optTranslator(new MatTranslator(layout, layoutOutput))
+                .build()
+                .loadModel()) {
+
+            BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
+            printResourceCount("Resource count before prediction",
+                    (BaseNDManager)baseManager.getParentManager());
+            baseManager.debugDump(2);
+            BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
+
+            try {
+                for (int i = 0; i < nPredictors; i++) {
+                    predictors.put(model.newPredictor());
+                }
+
+                printResourceCount("Resource count after creating predictors",
+                        (BaseNDManager)baseManager.getParentManager());
+
+                for (var pathObject: pathObjects) {
+                    pathObject.setLocked(true);
+                    var norm = ImageOps.Normalize.percentile(1, 99);
+
+                    if (imageData.isFluorescence()) {
+                        norm = InstanSegUtils.getNormalization(imageData, pathObject, channels);
+                    }
+                    var preprocessing = ImageOps.Core.sequential(
+                            ImageOps.Core.ensureType(PixelType.FLOAT32),
+                            norm,
+                            ImageOps.Core.clip(-0.5, 1.5)
+                    );
+
+                    var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
+                            layout, layoutOutput, preprocessing, tileSize, tileSize, padToInputSize);
+                    var processor = OpenCVProcessor.builder(predictionProcessor)
+                            .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
+                            .tiler(Tiler.builder((int)(downsample * tileSize), (int)(downsample * tileSize))
+                                    .alignCenter()
+                                    .cropTiles(false)
+                                    .build()
+                            )
+                            .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(), boundary))
+                            .padding(padding)
+                            .merger(ObjectMerger.createIoUMerger(0.2))
+                            .downsample(downsample)
+                            .build();
+                    processor.processObjects(taskRunner, imageData, Collections.singleton(pathObject));
+                }
+            } finally {
+                for (var predictor: predictors) {
+                    predictor.close();
+                }
+            }
+            printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
+        }
+    }
+
+    private static void printResourceCount(String title, BaseNDManager manager) {
+        logger.info(title);
+        manager.debugDump(2);
+    }
+
 }

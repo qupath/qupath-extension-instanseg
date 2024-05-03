@@ -65,9 +65,11 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
             if (padding != null)
                 matOutput = OpenCVTools.crop(matOutput, padding);
             return matOutput;
-        } catch (TranslateException | InterruptedException e) {
-            // todo: deal with exception
-            throw new RuntimeException(e);
+        } catch (TranslateException e) {
+            logger.error("Error in prediction", e);
+        } catch (InterruptedException | IllegalStateException e) {
+            // illegal state exception comes when ndmanager is closed from another thread
+            logger.debug("Prediction interrupted", e);
         } finally {
             if (predictor != null) {
                 try {
@@ -77,5 +79,6 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
                 }
             }
         }
+        return null;
     }
 }
