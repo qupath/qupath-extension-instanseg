@@ -38,7 +38,7 @@ public class InstanSegUtils {
      * @return Percentile-based normalisation based on the bounding box,
      * or default tile-based percentile normalisation if that fails.
      */
-    public static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
+     static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
         var defaults = ImageOps.Normalize.percentile(1, 99, true, 1e-6);
         try {
             // read the bounding box of the current object
@@ -51,7 +51,7 @@ public class InstanSegUtils {
             double eps = 1e-6;
 
             var params = channels.stream().map(colorTransform -> {
-                var mask = BufferedImageTools.createROIMask(roi, downsample);
+                var mask = BufferedImageTools.createROIMask(image.getWidth(), image.getHeight(), roi, request);
                 float[] maskPix = ColorTransforms.createChannelExtractor(0).extractChannel(null, mask, null);
                 float[] fpix = colorTransform.extractChannel(imageData.getServer(), image, null);
                 assert maskPix.length == fpix.length;
