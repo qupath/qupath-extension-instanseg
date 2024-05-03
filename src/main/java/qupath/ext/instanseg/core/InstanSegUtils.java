@@ -2,6 +2,7 @@ package qupath.ext.instanseg.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.lib.awt.common.BufferedImageTools;
 import qupath.lib.experimental.pixels.MeasurementProcessor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
@@ -11,6 +12,7 @@ import qupath.opencv.ops.ImageOp;
 import qupath.opencv.ops.ImageOps;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -36,40 +38,41 @@ public class InstanSegUtils {
      * @return Percentile-based normalisation based on the bounding box,
      * or default tile-based percentile normalisation if that fails.
      */
-    static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
+     static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
         var defaults = ImageOps.Normalize.percentile(1, 99, true, 1e-6);
         try {
             // read the bounding box of the current object
             var roi = pathObject.getROI();
-            double nPix = roi.getBoundsWidth() * roi.getBoundsHeight() * channels.size();
 
             BufferedImage image;
-            if (imageData.getServer().nResolutions() > 1) {
-                // if there's more than one resolution, pray that the thumbnail is reasonable size
-                image = imageData.getServer().getDefaultThumbnail(pathObject.getROI().getZ(), pathObject.getROI().getT());
-            } else {
-                double downsample = Math.max(nPix / 5e7, 1);
-                var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
-                image = imageData.getServer().readRegion(request);
-            }
-
+            double downsample = Math.max(1,  Math.max(roi.getBoundsWidth(), roi.getBoundsHeight()) / 1024);
+            var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
+            image = imageData.getServer().readRegion(request);
             double eps = 1e-6;
+
             var params = channels.stream().map(colorTransform -> {
+                var mask = BufferedImageTools.createROIMask(image.getWidth(), image.getHeight(), roi, request);
+                float[] maskPix = ColorTransforms.createChannelExtractor(0).extractChannel(null, mask, null);
                 float[] fpix = colorTransform.extractChannel(imageData.getServer(), image, null);
-                double[] pixels = new double[fpix.length];
+                assert maskPix.length == fpix.length;
+
+                int ind = 0;
+                for (int i = 0; i< maskPix.length; i++) {
+                    if (maskPix[i] == 255) {
+                        fpix[ind] = fpix[i];
+                        ind++;
+                    }
+                }
+                double[] usePixels = new double[ind];
+                for (int i = 0; i < ind; i++) {
+                    usePixels[i] = fpix[i];
+                }
+
                 double offset;
                 double scale;
-                for (int j = 0; j < pixels.length; j++) {
-                    pixels[j] = (double) fpix[j];
-                }
-                var lo = MeasurementProcessor.Functions.percentile(1).apply(pixels);
-                var hi = MeasurementProcessor.Functions.percentile(99).apply(pixels);
-                if (hi == lo && eps == 0.0) {
-                    logger.warn("Normalization percentiles give the same value ({}), scale will be Infinity", lo);
-                    scale = Double.POSITIVE_INFINITY;
-                } else {
-                    scale = 1.0 / (hi - lo + eps);
-                }
+                var lo = MeasurementProcessor.Functions.percentile(1).apply(usePixels);
+                var hi = MeasurementProcessor.Functions.percentile(99).apply(usePixels);
+                scale = 1.0 / (hi - lo + eps);
                 offset = -lo * scale;
                 return new double[]{offset, scale};
             }).toList();
@@ -79,8 +82,8 @@ public class InstanSegUtils {
                     ImageOps.Core.add(params.stream().mapToDouble(e -> e[0]).toArray())
             );
 
-        } catch (Exception e) {
-            logger.error("Error reading thumbnail", e);
+        } catch (IOException e) {
+            logger.error("Error reading image", e);
         }
         return defaults;
     }
