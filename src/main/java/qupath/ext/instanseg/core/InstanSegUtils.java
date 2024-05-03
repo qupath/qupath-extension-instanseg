@@ -33,12 +33,14 @@ public class InstanSegUtils {
      *
      * @param imageData  ImageData for the current image.
      * @param pathObject The object that we'll be doing segmentation in.
-     * @param channels The channels/color transforms that the segmentation
-     *                 will be restricted to.
+     * @param channels   The channels/color transforms that the segmentation
+     *                   will be restricted to.
+     * @param lowPerc
+     * @param hiPerc
      * @return Percentile-based normalisation based on the bounding box,
      * or default tile-based percentile normalisation if that fails.
      */
-     static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels) {
+     static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, List<ColorTransforms.ColorTransform> channels, double lowPerc, double hiPerc) {
         var defaults = ImageOps.Normalize.percentile(1, 99, true, 1e-6);
         try {
             // read the bounding box of the current object
@@ -70,8 +72,8 @@ public class InstanSegUtils {
 
                 double offset;
                 double scale;
-                var lo = MeasurementProcessor.Functions.percentile(1).apply(usePixels);
-                var hi = MeasurementProcessor.Functions.percentile(99).apply(usePixels);
+                var lo = MeasurementProcessor.Functions.percentile(lowPerc).apply(usePixels);
+                var hi = MeasurementProcessor.Functions.percentile(hiPerc).apply(usePixels);
                 scale = 1.0 / (hi - lo + eps);
                 offset = -lo * scale;
                 return new double[]{offset, scale};

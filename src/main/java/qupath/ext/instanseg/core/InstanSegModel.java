@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.gui.UserDirectoryManager;
-import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
@@ -185,7 +184,7 @@ public class InstanSegModel {
                     var norm = ImageOps.Normalize.percentile(1, 99);
 
                     if (imageData.isFluorescence()) {
-                        norm = InstanSegUtils.getNormalization(imageData, pathObject, channels);
+                        norm = InstanSegUtils.getNormalization(imageData, pathObject, channels, 0.1, 99.9);
                     }
                     var preprocessing = ImageOps.Core.sequential(
                             ImageOps.Core.ensureType(PixelType.FLOAT32),
