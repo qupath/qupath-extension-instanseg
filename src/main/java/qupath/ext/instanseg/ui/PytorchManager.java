@@ -1,12 +1,14 @@
 package qupath.ext.instanseg.ui;
 
 import ai.djl.engine.Engine;
+import ai.djl.engine.EngineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.common.GeneralTools;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -22,27 +24,27 @@ class PytorchManager {
      * @return
      */
     static Collection<String> getAvailableDevices() {
-        Set<String> availableDevices = new LinkedHashSet<>();
-        boolean includesMPS = false; // Don't add MPS twice
-        var engine = getEngineOnline();
-        if (engine != null) {
+        try {
+            Set<String> availableDevices = new LinkedHashSet<>();
+
+            var engine = getEngineOnline();
             // This is expected to return GPUs if available, or CPU otherwise
             for (var device : engine.getDevices()) {
                 String name = device.getDeviceType();
                 availableDevices.add(name);
-                if (name.toLowerCase().startsWith("mps"))
-                    includesMPS = true;
             }
-        }
-        // CPU should always be available
-        if (!availableDevices.contains("cpu"))
+            // If we could use MPS, but don't have it already, add it
+            if (GeneralTools.isMac() && "aarch64".equals(System.getProperty("os.arch"))) {
+                availableDevices.add("mps");
+            }
+            // CPU should always be available
             availableDevices.add("cpu");
 
-        // If we could use MPS, but don't have it already, add it
-        if (!includesMPS && GeneralTools.isMac() && "aarch64".equals(System.getProperty("os.arch"))) {
-            availableDevices.add("mps");
+            return availableDevices;
+        } catch (EngineException e) {
+            logger.error("Unable to fetch engine", e);
+            return List.of();
         }
-        return availableDevices;
     }
 
     /**
