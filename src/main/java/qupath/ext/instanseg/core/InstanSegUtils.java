@@ -35,8 +35,8 @@ public class InstanSegUtils {
      * @param pathObject The object that we'll be doing segmentation in.
      * @param channels   The channels/color transforms that the segmentation
      *                   will be restricted to.
-     * @param lowPerc The lower percentile for normalisation
-     * @param hiPerc The higher percentile for normalisation
+     * @param lowPerc The lower percentile for normalisation.
+     * @param hiPerc The higher percentile for normalisation.
      * @return Percentile-based normalisation based on the bounding box,
      * or default tile-based percentile normalisation if that fails.
      */
