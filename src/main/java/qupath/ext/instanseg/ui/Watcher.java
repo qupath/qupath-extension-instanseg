@@ -4,7 +4,6 @@ import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSegModel;
-import qupath.ext.instanseg.core.InstanSegUtils;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -87,14 +86,14 @@ class Watcher {
                 // print out event
                 logger.debug("{}: {}", event.kind().name(), child);
 
-                if (kind == ENTRY_CREATE && InstanSegUtils.isValidModel(name)) {
+                if (kind == ENTRY_CREATE && InstanSegModel.isValidModel(name)) {
                     try {
                         modelChoiceBox.getItems().add(InstanSegModel.createModel(child));
                     } catch (IOException e) {
                         logger.error("Unable to add model", e);
                     }
                 }
-                if (kind == ENTRY_DELETE && InstanSegUtils.isValidModel(name)) {
+                if (kind == ENTRY_DELETE && InstanSegModel.isValidModel(name)) {
                     modelChoiceBox.getItems().removeIf(model -> model.getPath().equals(child));
                 }
 
