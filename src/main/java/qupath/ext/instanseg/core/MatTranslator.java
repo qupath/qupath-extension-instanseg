@@ -30,13 +30,13 @@ class MatTranslator implements Translator<Mat, Mat> {
         var manager = ctx.getNDManager();
         var ndarray = DjlTools.matToNDArray(manager, input, inputLayoutNd);
         var out = new NDList(ndarray);
-        var inds = new int[]{1, 1};
         if (nucleiOnly) {
+            var inds = new int[]{1, 1};
             inds[1] = 0;
+            var array = manager.create(inds, new Shape(2));
+            var arrayCPU = array.toDevice(Device.cpu(), false);
+            out.add(arrayCPU);
         }
-        var array = manager.create(inds, new Shape(2));
-        var arrayCPU = array.toDevice(Device.cpu(), false);
-        out.add(arrayCPU);
         return out;
     }
 
