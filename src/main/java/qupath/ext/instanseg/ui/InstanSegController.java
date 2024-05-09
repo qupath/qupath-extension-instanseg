@@ -27,7 +27,6 @@ import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSegModel;
-import qupath.ext.instanseg.core.InstanSegUtils;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
 import qupath.fx.utils.FXUtils;
@@ -322,7 +321,7 @@ public class InstanSegController extends BorderPane {
         if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {
             for (var file: ps.toList()) {
-                if (InstanSegUtils.isValidModel(file)) {
+                if (InstanSegModel.isValidModel(file)) {
                     box.getItems().add(InstanSegModel.createModel(file));
                 }
             }
