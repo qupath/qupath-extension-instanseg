@@ -142,6 +142,7 @@ public class InstanSegModel {
             int tileSize,
             double downsample,
             String deviceName,
+            boolean nucleiOnly,
             TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
 
         Path modelPath = getPath().resolve("instanseg.pt");
@@ -167,7 +168,7 @@ public class InstanSegModel {
                 .optModelUrls(String.valueOf(modelPath))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
-                .optTranslator(new MatTranslator(layout, layoutOutput))
+                .optTranslator(new MatTranslator(layout, layoutOutput, nucleiOnly))
                 .build()
                 .loadModel()) {
 
@@ -184,7 +185,6 @@ public class InstanSegModel {
 
                 printResourceCount("Resource count after creating predictors",
                         (BaseNDManager)baseManager.getParentManager());
-
                 for (var pathObject: pathObjects) {
                     pathObject.setLocked(true);
                     ImageOp norm = ImageOps.Normalize.percentile(1, 99);
@@ -265,20 +265,22 @@ public class InstanSegModel {
             double eps = 1e-6;
 
             var params = channels.stream().map(colorTransform -> {
-                var mask = BufferedImageTools.createROIMask(roi, downsample);
+                var mask = BufferedImageTools.createROIMask(image.getWidth(), image.getHeight(), roi, request);
                 float[] maskPix = ColorTransforms.createChannelExtractor(0).extractChannel(null, mask, null);
                 float[] fpix = colorTransform.extractChannel(imageData.getServer(), image, null);
                 assert maskPix.length == fpix.length;
 
-                double[] pixels = new double[fpix.length];
                 int ind = 0;
                 for (int i = 0; i< maskPix.length; i++) {
                     if (maskPix[i] == 255) {
-                        pixels[ind] = fpix[i];
+                        fpix[ind] = fpix[i];
                         ind++;
                     }
                 }
-                double[] usePixels = Arrays.copyOf(pixels, ind);
+                double[] usePixels = new double[ind];
+                for (int i = 0; i < ind; i++) {
+                    usePixels[i] = fpix[i];
+                }
 
                 double offset;
                 double scale;
