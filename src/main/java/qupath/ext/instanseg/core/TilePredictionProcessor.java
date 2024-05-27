@@ -57,9 +57,12 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
 
         var mat = params.getImage();
 
-        ImageOp norm = ImageOps.Normalize.percentile(1, 99);
+        ImageOp norm;
         var imageData = params.getImageData();
-        if (imageData.isFluorescence()) {
+        // Normalize 8-bit using the bit-depth, and all others using percentiles (from downsampled image)
+        if (imageData.getServer().getPixelType() == PixelType.UINT8) {
+            norm = ImageOps.Core.divide(255.0);
+        } else {
             norm = getNormalization(imageData, params.getParent(), channels, 0.1, 99.9);
         }
         var preprocessing = ImageOps.Core.sequential(
