@@ -158,7 +158,7 @@ public class InstanSegModel {
 
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
-                .optModelUrls(String.valueOf(modelPath))
+                .optModelUrls(String.valueOf(modelPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
                 .optTranslator(new MatTranslator(layout, layoutOutput, nucleiOnly))
@@ -201,6 +201,8 @@ public class InstanSegModel {
                 }
             }
             printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
+        } catch (Exception e) {
+            logger.error("Error running InstanSeg", e);
         }
     }
 

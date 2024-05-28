@@ -249,7 +249,7 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureTileSizes() {
-        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
+        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024, 1536, 2048, 3072, 4096);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
         tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
         tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
