@@ -38,6 +38,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     private final int inputHeight;
     private final boolean doPadding;
     private final Collection<ColorTransforms.ColorTransform> channels;
+    private int nFailed = 0;
 
     TilePredictionProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors, NDManager manager,
                             String layout, String layoutOutput, Collection<ColorTransforms.ColorTransform> channels,
@@ -86,9 +87,10 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
                 matOutput = OpenCVTools.crop(matOutput, padding);
             return matOutput;
         } catch (TranslateException e) {
+            nFailed++;
             logger.error("Error in prediction", e);
         } catch (InterruptedException | IllegalStateException e) {
-            // illegal state exception comes when ndmanager is closed from another thread
+            // illegal state exception comes when ndmanager is closed from another thread (I think)
             logger.debug("Prediction interrupted", e);
         } finally {
             if (predictor != null) {
@@ -167,4 +169,11 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         return defaults;
     }
 
+    /**
+     * The number of tiles that failed during processing.
+     * @return The count of the number of failed tiles.
+     */
+    public int nFailed() {
+        return nFailed;
+    }
 }
