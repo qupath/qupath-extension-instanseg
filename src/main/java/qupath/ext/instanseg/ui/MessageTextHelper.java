@@ -73,7 +73,8 @@ class MessageTextHelper {
     private StringBinding createSelectedObjectTextBinding() {
         return Bindings.createStringBinding(this::getSelectedObjectText,
                 selectedObjectCounter.numSelectedAnnotations,
-                selectedObjectCounter.numSelectedDetections);
+                selectedObjectCounter.numSelectedDetections,
+                selectedObjectCounter.numSelectedTMACores);
     }
 
     private String getSelectedObjectText() {
