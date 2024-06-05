@@ -43,6 +43,7 @@ public class InstanSegModel {
     private URL modelURL = null;
     private BioimageIoSpec.BioimageIoModel model = null;
     private final String name;
+    private int nFailed = 0;
 
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
@@ -138,6 +139,7 @@ public class InstanSegModel {
             boolean nucleiOnly,
             TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
 
+        nFailed = 0;
         Path modelPath = getPath().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
@@ -195,6 +197,7 @@ public class InstanSegModel {
                         .downsample(downsample)
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);
+                nFailed = predictionProcessor.nFailed();
             } finally {
                 for (var predictor: predictors) {
                     predictor.close();
@@ -211,6 +214,13 @@ public class InstanSegModel {
         manager.debugDump(2);
     }
 
+    /**
+     * Check if a path is (likely) a valid InstanSeg model.
+     * @param path The path to a folder.
+     * @return True if the folder contains an instanseg.pt file and an accompanying rdf.yaml.
+     * Does not currently validate the contents of either, but may in future check
+     * the yaml contents and the checksum of the pt file.
+     */
     public static boolean isValidModel(Path path) {
         // return path.toString().endsWith(".pt"); // if just looking at pt files
         if (Files.isDirectory(path)) {
@@ -219,6 +229,12 @@ public class InstanSegModel {
         return false;
     }
 
-
+    /**
+     * The number of tiles that failed during processing.
+     * @return The count of the number of failed tiles.
+     */
+    public int nFailed() {
+        return nFailed;
+    }
 
 }

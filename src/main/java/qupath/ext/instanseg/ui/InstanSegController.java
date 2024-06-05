@@ -368,6 +368,12 @@ public class InstanSegController extends BorderPane {
                     logger.error("Unable to run InstanSeg", e);
                 }
                 QP.fireHierarchyUpdate();
+                if (model.nFailed() > 0) {
+                    var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
+                    logger.error(errorMessage);
+                    Dialogs.showErrorMessage(resources.getString("title"),
+                            errorMessage);
+                }
                 return null;
             }
         };
