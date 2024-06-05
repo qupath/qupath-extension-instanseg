@@ -2,6 +2,8 @@ package qupath.ext.instanseg.ui;
 
 import ai.djl.MalformedModelException;
 import ai.djl.repository.zoo.ModelNotFoundException;
+import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
@@ -286,6 +288,15 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureDeviceChoices() {
+        deviceChoices.disableProperty().bind(Bindings.size(deviceChoices.getItems()).isEqualTo(0));
+        addDeviceChoices();
+        // Don't bind property for now, since this would cause trouble if the InstanSegPreferences.preferredDeviceProperty() is
+        // changed elsewhere
+        deviceChoices.getSelectionModel().selectedItemProperty().addListener(
+                (value, oldValue, newValue) -> InstanSegPreferences.preferredDeviceProperty().set(newValue));
+    }
+
+    private void addDeviceChoices() {
         var available = PytorchManager.getAvailableDevices();
         deviceChoices.getItems().setAll(available);
         var selected = InstanSegPreferences.preferredDeviceProperty().get();
@@ -294,14 +305,10 @@ public class InstanSegController extends BorderPane {
         } else {
             deviceChoices.getSelectionModel().selectFirst();
         }
-        // Don't bind property for now, since this would cause trouble if the WSInferPrefs.deviceProperty() is
-        // changed elsewhere
-        deviceChoices.getSelectionModel().selectedItemProperty().addListener(
-                (value, oldValue, newValue) -> InstanSegPreferences.preferredDeviceProperty().set(newValue));
     }
 
     private void configureMessageLabel() {
-        messageTextHelper = new MessageTextHelper(modelChoiceBox);
+        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices);
         labelMessage.textProperty().bind(messageTextHelper.messageLabelText());
         if (messageTextHelper.hasWarning().get()) {
             labelMessage.getStyleClass().setAll("warning-message");
@@ -340,6 +347,13 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private void runInstanSeg() {
+        if (!PytorchManager.hasPyTorchEngine()) {
+            if (!Dialogs.showConfirmDialog(resources.getString("title"), resources.getString("ui.pytorch"))) {
+                Dialogs.showWarningNotification(resources.getString("title"), resources.getString("ui.pytorch-popup"));
+                return;
+            }
+        }
+
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
         List<ColorTransforms.ColorTransform> selectedChannels = comboChannels
@@ -352,6 +366,10 @@ public class InstanSegController extends BorderPane {
         var task = new Task<Void>() {
             @Override
             protected Void call() {
+                // Ensure PyTorch engine is available
+                if (!PytorchManager.hasPyTorchEngine()) {
+                    downloadPyTorch();
+                }
                 try {
                     model.runInstanSeg(
                             QP.getSelectedObjects(),
@@ -385,6 +403,12 @@ public class InstanSegController extends BorderPane {
                     pendingTask.set(null);
             }
         });
+    }
+
+    private void downloadPyTorch() {
+        Platform.runLater(() -> Dialogs.showInfoNotification(resources.getString("title"), resources.getString("ui.pytorch-downloading")));
+        PytorchManager.getEngineOnline();
+        Platform.runLater(this::addDeviceChoices);
     }
 
     @FXML

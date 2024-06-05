@@ -21,13 +21,16 @@ class PytorchManager {
 
     /**
      * Get the available devices for PyTorch, including MPS if Apple Silicon.
-     * @return
+     * @return Only "cpu" if no local engine is found.
      */
     static Collection<String> getAvailableDevices() {
         try {
             Set<String> availableDevices = new LinkedHashSet<>();
 
-            var engine = getEngineOnline();
+            var engine = getEngineOffline();
+            if (engine == null) {
+                return List.of("cpu");
+            }
             // This is expected to return GPUs if available, or CPU otherwise
             for (var device : engine.getDevices()) {
                 String name = device.getDeviceType();
@@ -43,7 +46,7 @@ class PytorchManager {
             return availableDevices;
         } catch (EngineException e) {
             logger.error("Unable to fetch engine", e);
-            return List.of();
+            return List.of("cpu");
         }
     }
 
@@ -63,7 +66,7 @@ class PytorchManager {
         try {
             return callOffline(() -> Engine.getEngine("PyTorch"));
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            logger.info("Failed to fetch offline engine", e);
             return null;
         }
     }
