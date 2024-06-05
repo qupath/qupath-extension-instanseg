@@ -10,6 +10,7 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
+import javafx.scene.control.ChoiceBox;
 import org.controlsfx.control.SearchableComboBox;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.lib.gui.QuPathGUI;
@@ -30,6 +31,7 @@ class MessageTextHelper {
     private static final QuPathGUI qupath = QuPathGUI.getInstance();
     private final SelectedObjectCounter selectedObjectCounter;
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
+    private final ChoiceBox<String> deviceChoiceBox;
 
     /**
      * Text to display a warning (because inference can't be run)
@@ -51,8 +53,9 @@ class MessageTextHelper {
      */
     private BooleanBinding hasWarning;
 
-    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox) {
+    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox) {
         this.modelChoiceBox = modelChoiceBox;
+        this.deviceChoiceBox = deviceChoiceBox;
         this.selectedObjectCounter = new SelectedObjectCounter(qupath.imageDataProperty());
         configureMessageTextBindings();
     }
@@ -101,6 +104,7 @@ class MessageTextHelper {
         return Bindings.createStringBinding(this::getWarningText,
                 qupath.imageDataProperty(),
                 modelChoiceBox.getSelectionModel().selectedItemProperty(),
+                deviceChoiceBox.getSelectionModel().selectedItemProperty(),
                 selectedObjectCounter.numSelectedAnnotations,
                 selectedObjectCounter.numSelectedTMACores,
                 selectedObjectCounter.numSelectedDetections);
@@ -115,6 +119,8 @@ class MessageTextHelper {
                 selectedObjectCounter.numSelectedDetections.get() == 0 &&
                 selectedObjectCounter.numSelectedTMACores.get() == 0)
             return resources.getString("ui.error.no-selection");
+        if (deviceChoiceBox.getSelectionModel().isEmpty())
+            return resources.getString("ui.error.no-device");
         return null;
     }
 
