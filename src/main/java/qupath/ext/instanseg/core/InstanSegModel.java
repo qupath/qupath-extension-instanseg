@@ -61,6 +61,7 @@ public class InstanSegModel {
 
     public static InstanSeg fromName(String name) {
         // todo: instantiate built-in models somehow!
+        return null;
     }
 
     public BioimageIoSpec.BioimageIoModel getModel() {
