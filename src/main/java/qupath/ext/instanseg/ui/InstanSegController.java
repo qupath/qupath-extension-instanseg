@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.ui;
 
+import ai.djl.Device;
 import ai.djl.MalformedModelException;
 import ai.djl.repository.zoo.ModelNotFoundException;
 import javafx.application.Platform;
@@ -142,6 +143,16 @@ public class InstanSegController extends BorderPane {
         comboChannels.getItems().clear();
         comboChannels.getItems().setAll(getAvailableChannels(imageData));
         comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+    }
+
+    private static void addToHistoryWorkflow(ImageData<?> imageData) {
+        // todo: need to instantiate the model, then run it...
+        // imageData.getHistoryWorkflow()
+        //         .addStep(
+        //                 new DefaultScriptableWorkflowStep(
+        //                         resources.getString("workflow.title"),
+        //                         WSInfer.class.getName() + ".runInference(\"" + modelName + "\")"
+        //                 ));
     }
 
     private static String getCheckComboBoxText(CheckComboBox<ChannelSelectItem> comboBox) {
@@ -332,7 +343,7 @@ public class InstanSegController extends BorderPane {
         try (var ps = Files.list(path)) {
             for (var file: ps.toList()) {
                 if (InstanSegModel.isValidModel(file)) {
-                    box.getItems().add(InstanSegModel.createModel(file));
+                    box.getItems().add(InstanSegModel.fromPath(file));
                 }
             }
         } catch (IOException e) {
@@ -377,7 +388,7 @@ public class InstanSegController extends BorderPane {
                             selectedChannels,
                             InstanSegPreferences.tileSizeProperty().get(),
                             model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                            deviceChoices.getSelectionModel().getSelectedItem(),
+                            Device.fromName(deviceChoices.getSelectionModel().getSelectedItem()),
                             nucleiOnlyCheckBox.isSelected(),
                             QPEx.createTaskRunner(InstanSegPreferences.numThreadsProperty().getValue()));
                 } catch (ModelNotFoundException | MalformedModelException |

@@ -31,7 +31,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -56,8 +55,12 @@ public class InstanSegModel {
         this.name = name;
     }
 
-    public static InstanSegModel createModel(Path path) throws IOException {
+    public static InstanSegModel fromPath(Path path) throws IOException {
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
+    }
+
+    public static InstanSeg fromName(String name) {
+        // todo: instantiate built-in models somehow!
     }
 
     public BioimageIoSpec.BioimageIoModel getModel() {
@@ -132,10 +135,10 @@ public class InstanSegModel {
     public void runInstanSeg(
             Collection<PathObject> pathObjects,
             ImageData<BufferedImage> imageData,
-            List<ColorTransforms.ColorTransform> channels,
-            int tileSize,
+            Collection<ColorTransforms.ColorTransform> channels,
+            int tileDims,
             double downsample,
-            String deviceName,
+            Device device,
             boolean nucleiOnly,
             TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
 
@@ -145,7 +148,7 @@ public class InstanSegModel {
 
         int padding = 40; // todo: setting? or just based on tile size. Should discuss.
         int boundary = 20;
-        if (tileSize == 128) {
+        if (tileDims == 128) {
             padding = 25;
             boundary = 15;
         }
@@ -156,7 +159,6 @@ public class InstanSegModel {
         // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
         String layoutOutput = "CHW";
 
-        var device = Device.fromName(deviceName);
 
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
@@ -181,9 +183,9 @@ public class InstanSegModel {
                 printResourceCount("Resource count after creating predictors",
                         (BaseNDManager)baseManager.getParentManager());
 
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileSize - (double) padding));
+                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding));
                 var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                        layout, layoutOutput, channels, tileSize, tileSize, padToInputSize);
+                        layout, layoutOutput, channels, tileDims, tileDims, padToInputSize);
                 var processor = OpenCVProcessor.builder(predictionProcessor)
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(Tiler.builder(sizeWithoutPadding)
