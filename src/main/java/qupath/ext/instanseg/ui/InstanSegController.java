@@ -1,6 +1,5 @@
 package qupath.ext.instanseg.ui;
 
-import ai.djl.Device;
 import ai.djl.MalformedModelException;
 import ai.djl.repository.zoo.ModelNotFoundException;
 import javafx.application.Platform;
@@ -30,6 +29,7 @@ import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
@@ -42,6 +42,7 @@ import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.ImageServer;
+import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
@@ -147,12 +148,7 @@ public class InstanSegController extends BorderPane {
 
     private static void addToHistoryWorkflow(ImageData<?> imageData) {
         // todo: need to instantiate the model, then run it...
-        // imageData.getHistoryWorkflow()
-        //         .addStep(
-        //                 new DefaultScriptableWorkflowStep(
-        //                         resources.getString("workflow.title"),
-        //                         WSInfer.class.getName() + ".runInference(\"" + modelName + "\")"
-        //                 ));
+
     }
 
     private static String getCheckComboBoxText(CheckComboBox<ChannelSelectItem> comboBox) {
@@ -367,6 +363,7 @@ public class InstanSegController extends BorderPane {
 
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
+        // todo: how to record this in workflow?
         List<ColorTransforms.ColorTransform> selectedChannels = comboChannels
                 .getCheckModel().getCheckedItems()
                 .stream()
@@ -382,15 +379,37 @@ public class InstanSegController extends BorderPane {
                     downloadPyTorch();
                 }
                 try {
-                    model.runInstanSeg(
-                            QP.getSelectedObjects(),
-                            QP.getCurrentImageData(),
-                            selectedChannels,
+                    String cmd = String.format("""
+                            def instanSeg = InstanSeg.builder()
+                                .modelPath("%s")
+                                .device("%s")
+                                .numOutputChannels(%d)
+                                .channels(selectedChannels)
+                                .tileDims(%d)
+                                .downsample(%f)
+                                .build();
+                            """,
+                            model.getPath(),
+                            deviceChoices.getSelectionModel().getSelectedItem(),
+                            nucleiOnlyCheckBox.isSelected() ? 1:2,
+                            // todo: channels,
                             InstanSegPreferences.tileSizeProperty().get(),
-                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                            Device.fromName(deviceChoices.getSelectionModel().getSelectedItem()),
-                            nucleiOnlyCheckBox.isSelected(),
-                            QPEx.createTaskRunner(InstanSegPreferences.numThreadsProperty().getValue()));
+                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize()
+                    );
+                    QP.getCurrentImageData().getHistoryWorkflow()
+                        .addStep(
+                                new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
+                        );
+                    var instanSeg = InstanSeg.builder()
+                            .model(model) // todo: set this in workflow somehow
+                            .device(deviceChoices.getSelectionModel().getSelectedItem())
+                            .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1:2)
+                            .channels(selectedChannels)
+                            .tileDims(InstanSegPreferences.tileSizeProperty().get())
+                            .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                            .taskRunner(QPEx.createTaskRunner(InstanSegPreferences.numThreadsProperty().getValue()))
+                            .build();
+                    instanSeg.detectObjects();
                 } catch (ModelNotFoundException | MalformedModelException |
                          IOException | InterruptedException e) {
                     Dialogs.showErrorMessage("Unable to run InstanSeg", e);

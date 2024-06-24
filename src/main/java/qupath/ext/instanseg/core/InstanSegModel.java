@@ -59,8 +59,8 @@ public class InstanSegModel {
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
     }
 
-    public static InstanSeg fromName(String name) {
-        // todo: instantiate built-in models somehow!
+    public static InstanSegModel fromName(String name) {
+        // todo: instantiate built-in models somehow
         return null;
     }
 
@@ -133,12 +133,14 @@ public class InstanSegModel {
         return getName();
     }
 
-    public void runInstanSeg(
+    void runInstanSeg(
             Collection<PathObject> pathObjects,
             ImageData<BufferedImage> imageData,
             Collection<ColorTransforms.ColorTransform> channels,
             int tileDims,
             double downsample,
+            int padding,
+            int boundary,
             Device device,
             boolean nucleiOnly,
             TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
@@ -147,12 +149,13 @@ public class InstanSegModel {
         Path modelPath = getPath().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
-        int padding = 40; // todo: setting? or just based on tile size. Should discuss.
-        int boundary = 20;
-        if (tileDims == 128) {
-            padding = 25;
-            boundary = 15;
-        }
+        // int padding = 40; // todo: setting? or just based on tile size. Should discuss.
+        // int boundary = 20;
+        // if (tileDims == 128) {
+        //     padding = 25;
+        //     boundary = 15;
+        // }
+
         // Optionally pad images to the required size
         boolean padToInputSize = true;
         String layout = "CHW";
