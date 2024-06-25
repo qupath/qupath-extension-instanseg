@@ -1,7 +1,5 @@
 package qupath.ext.instanseg.ui;
 
-import ai.djl.MalformedModelException;
-import ai.djl.repository.zoo.ModelNotFoundException;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
@@ -144,11 +142,6 @@ public class InstanSegController extends BorderPane {
         comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
     }
 
-    private static void addToHistoryWorkflow(ImageData<?> imageData) {
-        // todo: need to instantiate the model, then run it...
-
-    }
-
     private static String getCheckComboBoxText(CheckComboBox<ChannelSelectItem> comboBox) {
         int n = comboBox.getCheckModel().getCheckedItems().stream()
                 .filter(Objects::nonNull)
@@ -209,9 +202,6 @@ public class InstanSegController extends BorderPane {
                 hasDuplicates = true;
             }
             names.add(name);
-            // if (!server.isRGB()) {
-            //     name += " (C" + i + ")";
-            // }
             if (hasDuplicates) {
                 item = new ChannelSelectItem(name, i - 1);
             } else {
@@ -372,7 +362,6 @@ public class InstanSegController extends BorderPane {
                 .getCheckModel().getCheckedItems()
                 .stream()
                 .filter(Objects::nonNull)
-                // .map(ChannelSelectItem::getTransform)
                 .toList();
 
         var task = new Task<Void>() {
@@ -382,48 +371,41 @@ public class InstanSegController extends BorderPane {
                 if (!PytorchManager.hasPyTorchEngine()) {
                     downloadPyTorch();
                 }
-                try {
-                    String cmd = String.format("""
-                            var channels = %s;
-                            def instanSeg = InstanSeg.builder()
-                                .modelPath("%s")
-                                .device("%s")
-                                .numOutputChannels(%d)
-                                .channels(channels)
-                                .tileDims(%d)
-                                .downsample(%f)
-                                .nthreads(%d)
-                                .build();
-                            instanSeg.detectObjects();
-                            """,
-                            ChannelSelectItem.toConstructorString(selectedChannels),
-                            model.getPath(),
-                            deviceChoices.getSelectionModel().getSelectedItem(),
-                            nucleiOnlyCheckBox.isSelected() ? 1:2,
-                            // todo: channels,
-                            InstanSegPreferences.tileSizeProperty().get(),
-                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                            InstanSegPreferences.numThreadsProperty().getValue()
-                    );
-                    QP.getCurrentImageData().getHistoryWorkflow()
-                        .addStep(
-                                new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
-                        );
-                    var instanSeg = InstanSeg.builder()
-                            .model(model)
-                            .device(deviceChoices.getSelectionModel().getSelectedItem())
-                            .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1:2)
-                            .channels(selectedChannels.stream().map(ChannelSelectItem::getTransform).toList())
-                            .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                            .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
-                            .nThreads(InstanSegPreferences.numThreadsProperty().getValue())
+                String cmd = String.format("""
+                        var channels = %s;
+                        def instanSeg = InstanSeg.builder()
+                            .modelPath("%s")
+                            .device("%s")
+                            .numOutputChannels(%d)
+                            .channels(channels)
+                            .tileDims(%d)
+                            .downsample(%f)
+                            .nthreads(%d)
                             .build();
-                    instanSeg.detectObjects();
-                } catch (ModelNotFoundException | MalformedModelException |
-                         IOException | InterruptedException e) {
-                    Dialogs.showErrorMessage("Unable to run InstanSeg", e);
-                    logger.error("Unable to run InstanSeg", e);
-                }
+                        instanSeg.detectObjects();
+                        """,
+                        ChannelSelectItem.toConstructorString(selectedChannels),
+                        model.getPath(),
+                        deviceChoices.getSelectionModel().getSelectedItem(),
+                        nucleiOnlyCheckBox.isSelected() ? 1:2,
+                        InstanSegPreferences.tileSizeProperty().get(),
+                        model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                        InstanSegPreferences.numThreadsProperty().getValue()
+                );
+                QP.getCurrentImageData().getHistoryWorkflow()
+                    .addStep(
+                            new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
+                    );
+                var instanSeg = InstanSeg.builder()
+                        .model(model)
+                        .device(deviceChoices.getSelectionModel().getSelectedItem())
+                        .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1:2)
+                        .channels(selectedChannels.stream().map(ChannelSelectItem::getTransform).toList())
+                        .tileDims(InstanSegPreferences.tileSizeProperty().get())
+                        .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                        .nThreads(InstanSegPreferences.numThreadsProperty().getValue())
+                        .build();
+                instanSeg.detectObjects();
                 QP.fireHierarchyUpdate();
                 if (model.nFailed() > 0) {
                     var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());

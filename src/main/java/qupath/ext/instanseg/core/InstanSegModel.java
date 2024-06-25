@@ -1,11 +1,9 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
-import ai.djl.MalformedModelException;
 import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
-import ai.djl.repository.zoo.ModelNotFoundException;
 import ai.djl.training.util.ProgressBar;
 import com.google.gson.internal.LinkedTreeMap;
 import org.bytedeco.opencv.opencv_core.Mat;
@@ -143,18 +141,12 @@ public class InstanSegModel {
             int boundary,
             Device device,
             boolean nucleiOnly,
-            TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
+            TaskRunner taskRunner) {
 
         nFailed = 0;
         Path modelPath = getPath().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
-        // int padding = 40; // todo: setting? or just based on tile size. Should discuss.
-        // int boundary = 20;
-        // if (tileDims == 128) {
-        //     padding = 25;
-        //     boundary = 15;
-        // }
 
         // Optionally pad images to the required size
         boolean padToInputSize = true;

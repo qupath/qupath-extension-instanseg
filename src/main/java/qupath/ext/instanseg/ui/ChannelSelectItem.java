@@ -39,19 +39,19 @@ class ChannelSelectItem {
         return this.name;
     }
 
-    public String getName() {
+    String getName() {
         return name;
     }
 
-    public ColorTransforms.ColorTransform getTransform() {
+    ColorTransforms.ColorTransform getTransform() {
         return transform;
     }
 
-    public String getConstructor() {
+    private String getConstructor() {
         return this.constructor;
     }
 
-    public static String toConstructorString(Collection<ChannelSelectItem> items) {
+    static String toConstructorString(Collection<ChannelSelectItem> items) {
         return "List.of(" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + ")";
     }
 }

@@ -1,8 +1,6 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
-import ai.djl.MalformedModelException;
-import ai.djl.repository.zoo.ModelNotFoundException;
 import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
@@ -31,7 +29,7 @@ public class InstanSeg {
         return new Builder();
     }
 
-    public void detectObjects() throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
+    public void detectObjects() {
         model.runInstanSeg(
                 QP.getSelectedObjects(),
                 imageData,
@@ -60,51 +58,99 @@ public class InstanSeg {
 
         Builder() {}
 
+        /**
+         * Set the width and height of tiles
+         * @param tileDims The tile width and height
+         * @return A modified builder
+         */
         public Builder tileDims(int tileDims) {
             this.tileDims = tileDims;
             return this;
         }
 
+        /**
+         * Set the downsample to be used in region requests
+         * @param downsample The downsample to be used
+         * @return A modified builder
+         */
         public Builder downsample(double downsample) {
             this.downsample = downsample;
             return this;
         }
 
+        /**
+         * Set the padding (overlap) between tiles
+         * @param padding The extra size added to tiles to allow overlap
+         * @return A modified builder
+         */
         public Builder interTilePadding(int padding) {
             this.padding = padding;
             return this;
         }
 
+        /**
+         * Set the size of the overlap region between tiles
+         * @param boundary The width in pixels that overlaps between tiles
+         * @return A modified builder
+         */
         public Builder tileBoundary(int boundary) {
             this.boundary = boundary;
             return this;
         }
 
+        /**
+         * Set the number of output channels
+         * @param numOutputChannels The number of output channels (1 or 2 currently)
+         * @return A modified builder
+         */
         public Builder numOutputChannels(int numOutputChannels) {
             this.numOutputChannels = numOutputChannels;
             return this;
         }
 
+        /**
+         * Set the imageData to be used
+         * @param imageData An imageData instance
+         * @return A modified builder
+         */
         public Builder imageData(ImageData<BufferedImage> imageData) {
             this.imageData = imageData;
             return this;
         }
 
+        /**
+         * Set the imageData to the currently visible one
+         * @return A modified builder
+         */
         public Builder currentImageData() {
             this.imageData = QP.getCurrentImageData();
             return this;
         }
 
+        /**
+         * Set the channels to be used in inference
+         * @param channels A collection of channels to be used in inference
+         * @return A modified builder
+         */
         public Builder channels(Collection<ColorTransforms.ColorTransform> channels) {
             this.channels = channels;
             return this;
         }
 
+        /**
+         * Set the model to use all channels for inference
+         * @return A modified builder
+         */
         public Builder allChannels() {
             // todo: lazy eval this?
             return channelIndices(IntStream.of(imageData.getServer().nChannels()).boxed().toList());
         }
 
+        /**
+         * Set the channels using indices
+         * @param channels Integers used to specify the channels used
+         * @return A modified builder
+         */
         public Builder channelIndices(Collection<Integer> channels) {
             this.channels = channels.stream()
                     .map(ColorTransforms::createChannelExtractor)
@@ -112,6 +158,11 @@ public class InstanSeg {
             return this;
         }
 
+        /**
+         * Set the channel names to be used
+         * @param channels A set of channel names
+         * @return A modified builder
+         */
         public Builder channelNames(Collection<String> channels) {
             this.channels = channels.stream()
                     .map(ColorTransforms::createChannelExtractor)
@@ -119,34 +170,68 @@ public class InstanSeg {
             return this;
         }
 
+        /**
+         * Set the number of threads used
+         * @param nThreads The number of threads to be used
+         * @return A modified builder
+         */
         public Builder nThreads(int nThreads) {
             this.nThreads = nThreads;
             return this;
         }
 
+        /**
+         * Set the specific model to be used
+         * @param model An already instantiated InstanSeg model.
+         * @return A modified builder
+         */
         public Builder model(InstanSegModel model) {
             this.model = model;
             return this;
         }
 
+        /**
+         * Set the specific model by path
+         * @param path A path on disk to create an InstanSeg model from.
+         * @return A modified builder
+         */
         public Builder modelPath(Path path) throws IOException {
             return model(InstanSegModel.fromPath(path));
         }
 
+        /**
+         * Set the specific model to be used
+         * @param name The name of a built-in model
+         * @return A modified builder
+         */
         public Builder modelName(String name) {
             return model(InstanSegModel.fromName(name));
         }
 
+        /**
+         * Set the device to be used
+         * @param deviceName The name of the device to be used (eg, "gpu", "mps").
+         * @return A modified builder
+         */
         public Builder device(String deviceName) {
             this.device = Device.fromName(deviceName);
             return this;
         }
 
+        /**
+         * Set the device to be used
+         * @param device The {@link Device} to be used
+         * @return A modified builder
+         */
         public Builder device(Device device) {
             this.device = device;
             return this;
         }
 
+        /**
+         * Build the InstanSeg instance.
+         * @return An InstanSeg instance ready for object detection.
+         */
         public InstanSeg build() {
             if (imageData == null) {
                 this.currentImageData();
