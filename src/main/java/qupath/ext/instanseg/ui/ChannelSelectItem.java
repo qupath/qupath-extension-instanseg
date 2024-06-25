@@ -47,7 +47,7 @@ class ChannelSelectItem {
         return transform;
     }
 
-    private String getConstructor() {
+    String getConstructor() {
         return this.constructor;
     }
 

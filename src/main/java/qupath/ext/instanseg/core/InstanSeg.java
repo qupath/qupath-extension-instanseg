@@ -9,7 +9,9 @@ import qupath.lib.scripting.QP;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.IntStream;
 
 public class InstanSeg {
@@ -138,12 +140,24 @@ public class InstanSeg {
         }
 
         /**
+         * Set the channels to be used in inference
+         * @param channels Channels to be used in inference
+         * @return A modified builder
+         */
+        public Builder channels(ColorTransforms.ColorTransform... channels) {
+            this.channels = List.of(channels);
+            return this;
+        }
+
+        /**
          * Set the model to use all channels for inference
          * @return A modified builder
          */
         public Builder allChannels() {
-            // todo: lazy eval this?
-            return channelIndices(IntStream.of(imageData.getServer().nChannels()).boxed().toList());
+            return channelIndices(
+                    IntStream.of(imageData.getServer().nChannels())
+                            .boxed()
+                            .toList());
         }
 
         /**
@@ -159,12 +173,36 @@ public class InstanSeg {
         }
 
         /**
+         * Set the channels using indices
+         * @param channels Integers used to specify the channels used
+         * @return A modified builder
+         */
+        public Builder channelIndices(int... channels) {
+            this.channels = Arrays.stream(channels).boxed()
+                    .map(ColorTransforms::createChannelExtractor)
+                    .toList();
+            return this;
+        }
+
+        /**
          * Set the channel names to be used
          * @param channels A set of channel names
          * @return A modified builder
          */
         public Builder channelNames(Collection<String> channels) {
             this.channels = channels.stream()
+                    .map(ColorTransforms::createChannelExtractor)
+                    .toList();
+            return this;
+        }
+
+        /**
+         * Set the channel names to be used
+         * @param channels A set of channel names
+         * @return A modified builder
+         */
+        public Builder channelNames(String... channels) {
+            this.channels = Arrays.stream(channels)
                     .map(ColorTransforms::createChannelExtractor)
                     .toList();
             return this;
