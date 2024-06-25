@@ -52,6 +52,6 @@ class ChannelSelectItem {
     }
 
     static String toConstructorString(Collection<ChannelSelectItem> items) {
-        return "List.of(" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + ")";
+        return "[" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + "]";
     }
 }

@@ -372,7 +372,7 @@ public class InstanSegController extends BorderPane {
                     downloadPyTorch();
                 }
                 String cmd = String.format("""
-                        var channels = %s;
+                        def channels = %s;
                         def instanSeg = InstanSeg.builder()
                             .modelPath("%s")
                             .device("%s")
