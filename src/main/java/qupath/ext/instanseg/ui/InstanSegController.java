@@ -37,10 +37,8 @@ import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
-import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
-import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 import qupath.lib.scripting.QP;
@@ -172,6 +170,11 @@ public class InstanSegController extends BorderPane {
             var channelNames = activeChannels.stream()
                     .map(ChannelDisplayInfo::getName)
                     .toList();
+            if (qupath.getImageData() != null && !qupath.getImageData().getServer().isRGB()) {
+                channelNames = channelNames.stream()
+                        .map(s -> s.replaceAll(" \\(C\\d+\\)$", ""))
+                        .toList();
+            }
             var comboItems = comboChannels.getItems();
             for (int i = 0; i < comboItems.size(); i++) {
                 if (channelNames.contains(comboItems.get(i).getName())) {
@@ -197,29 +200,30 @@ public class InstanSegController extends BorderPane {
         var server = imageData.getServer();
         int i = 1;
         boolean hasDuplicates = false;
+        ChannelSelectItem item;
         for (var channel : server.getMetadata().getChannels()) {
             var name = channel.getName();
-            var transform = ColorTransforms.createChannelExtractor(name);
             if (names.contains(name)) {
                 logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "').");
                 logger.warn("Using channel indices instead of names because of duplicated channel names.");
                 hasDuplicates = true;
             }
             names.add(name);
+            // if (!server.isRGB()) {
+            //     name += " (C" + i + ")";
+            // }
             if (hasDuplicates) {
-                transform = ColorTransforms.createChannelExtractor(i - 1);
+                item = new ChannelSelectItem(name, i - 1);
+            } else {
+                item = new ChannelSelectItem(name);
             }
-            if (!server.isRGB()) {
-                name += " (C" + i + ")";
-            }
-            list.add(new ChannelSelectItem(name, transform));
+            list.add(item);
             i++;
         }
         var stains = imageData.getColorDeconvolutionStains();
         if (stains != null) {
             for (i = 1; i < 4; i++) {
-                var transform = ColorTransforms.createColorDeconvolvedChannel(stains, i);
-                list.add(new ChannelSelectItem(transform.getName(), transform));
+                list.add(new ChannelSelectItem(stains, i));
             }
         }
         return list;
@@ -364,11 +368,11 @@ public class InstanSegController extends BorderPane {
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
         // todo: how to record this in workflow?
-        List<ColorTransforms.ColorTransform> selectedChannels = comboChannels
+        List<ChannelSelectItem> selectedChannels = comboChannels
                 .getCheckModel().getCheckedItems()
                 .stream()
                 .filter(Objects::nonNull)
-                .map(ChannelSelectItem::getTransform)
+                // .map(ChannelSelectItem::getTransform)
                 .toList();
 
         var task = new Task<Void>() {
@@ -380,34 +384,39 @@ public class InstanSegController extends BorderPane {
                 }
                 try {
                     String cmd = String.format("""
+                            var channels = %s;
                             def instanSeg = InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
                                 .numOutputChannels(%d)
-                                .channels(selectedChannels)
+                                .channels(channels)
                                 .tileDims(%d)
                                 .downsample(%f)
+                                .nthreads(%d)
                                 .build();
+                            instanSeg.detectObjects();
                             """,
+                            ChannelSelectItem.toConstructorString(selectedChannels),
                             model.getPath(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
                             nucleiOnlyCheckBox.isSelected() ? 1:2,
                             // todo: channels,
                             InstanSegPreferences.tileSizeProperty().get(),
-                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize()
+                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                            InstanSegPreferences.numThreadsProperty().getValue()
                     );
                     QP.getCurrentImageData().getHistoryWorkflow()
                         .addStep(
                                 new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
                         );
                     var instanSeg = InstanSeg.builder()
-                            .model(model) // todo: set this in workflow somehow
+                            .model(model)
                             .device(deviceChoices.getSelectionModel().getSelectedItem())
                             .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1:2)
-                            .channels(selectedChannels)
+                            .channels(selectedChannels.stream().map(ChannelSelectItem::getTransform).toList())
                             .tileDims(InstanSegPreferences.tileSizeProperty().get())
                             .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
-                            .taskRunner(QPEx.createTaskRunner(InstanSegPreferences.numThreadsProperty().getValue()))
+                            .nThreads(InstanSegPreferences.numThreadsProperty().getValue())
                             .build();
                     instanSeg.detectObjects();
                 } catch (ModelNotFoundException | MalformedModelException |

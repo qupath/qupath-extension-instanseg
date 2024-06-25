@@ -1,6 +1,10 @@
 package qupath.ext.instanseg.ui;
 
+import qupath.lib.color.ColorDeconvolutionStains;
 import qupath.lib.images.servers.ColorTransforms;
+
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 /**
  * Super simple class to deal with channel selection dropdown items that have different display and selection names.
@@ -9,14 +13,25 @@ import qupath.lib.images.servers.ColorTransforms;
 class ChannelSelectItem {
     private final String name;
     private final ColorTransforms.ColorTransform transform;
+    private final String constructor;
+
+    // todo: public method to get a constructor for the colortransform
     ChannelSelectItem(String name) {
         this.name = name;
         this.transform = ColorTransforms.createChannelExtractor(name);
+        this.constructor = String.format("ColorTransforms.createChannelExtractor(\"%s\")", name);
     }
 
-    ChannelSelectItem(String name, ColorTransforms.ColorTransform transform) {
+    ChannelSelectItem(String name, int i) {
         this.name = name;
-        this.transform = transform;
+        this.transform = ColorTransforms.createChannelExtractor(i);
+        this.constructor = String.format("ColorTransforms.createChannelExtractor(%d)", i);
+    }
+
+    ChannelSelectItem(ColorDeconvolutionStains stains, int i) {
+        this.name = stains.getStain(i).getName();
+        this.transform = ColorTransforms.createColorDeconvolvedChannel(stains, i);
+        this.constructor = String.format("ColorTransforms.createColorDeconvolvedChannel(stains, %d)", i);
     }
 
     @Override
@@ -30,5 +45,13 @@ class ChannelSelectItem {
 
     public ColorTransforms.ColorTransform getTransform() {
         return transform;
+    }
+
+    public String getConstructor() {
+        return this.constructor;
+    }
+
+    public static String toConstructorString(Collection<ChannelSelectItem> items) {
+        return "List.of(" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + ")";
     }
 }
