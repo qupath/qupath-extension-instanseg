@@ -200,6 +200,15 @@ public class InstanSeg {
         }
 
         /**
+         * Set the specific model by path
+         * @param path A path on disk to create an InstanSeg model from.
+         * @return A modified builder
+         */
+        public Builder modelPath(String path) throws IOException {
+            return modelPath(Path.of(path));
+        }
+
+        /**
          * Set the specific model to be used
          * @param name The name of a built-in model
          * @return A modified builder

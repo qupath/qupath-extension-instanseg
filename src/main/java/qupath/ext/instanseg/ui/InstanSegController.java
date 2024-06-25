@@ -380,7 +380,7 @@ public class InstanSegController extends BorderPane {
                             .channels(channels)
                             .tileDims(%d)
                             .downsample(%f)
-                            .nthreads(%d)
+                            .nThreads(%d)
                             .build();
                         instanSeg.detectObjects();
                         """,
