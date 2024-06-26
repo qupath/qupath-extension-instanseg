@@ -372,6 +372,8 @@ public class InstanSegController extends BorderPane {
                     downloadPyTorch();
                 }
                 String cmd = String.format("""
+                        import qupath.ext.instanseg.core.InstanSeg
+
                         def channels = %s;
                         def instanSeg = InstanSeg.builder()
                             .modelPath("%s")
