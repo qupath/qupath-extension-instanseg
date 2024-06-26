@@ -4,7 +4,6 @@ import ai.djl.Device;
 import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
-import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -33,8 +32,8 @@ public class InstanSeg {
 
     public void detectObjects() {
         model.runInstanSeg(
-                QP.getSelectedObjects(),
                 imageData,
+                imageData.getHierarchy().getSelectionModel().getSelectedObjects(),
                 channels,
                 tileDims,
                 downsample,
@@ -52,7 +51,7 @@ public class InstanSeg {
         private int padding = 40;
         private int boundary = 20;
         private int numOutputChannels = 2;
-        private ImageData<BufferedImage> imageData = QP.getCurrentImageData();
+        private ImageData<BufferedImage> imageData;
         private Collection<ColorTransforms.ColorTransform> channels;
         private Device device;
         private InstanSegModel model;
@@ -117,15 +116,6 @@ public class InstanSeg {
          */
         public Builder imageData(ImageData<BufferedImage> imageData) {
             this.imageData = imageData;
-            return this;
-        }
-
-        /**
-         * Set the imageData to the currently visible one
-         * @return A modified builder
-         */
-        public Builder currentImageData() {
-            this.imageData = QP.getCurrentImageData();
             return this;
         }
 
@@ -281,7 +271,7 @@ public class InstanSeg {
          */
         public InstanSeg build() {
             if (imageData == null) {
-                this.currentImageData();
+                throw new IllegalStateException("imageData cannot be null!");
             }
             if (channels == null) {
                  allChannels();

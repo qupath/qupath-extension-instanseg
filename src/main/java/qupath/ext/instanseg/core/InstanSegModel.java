@@ -59,7 +59,7 @@ public class InstanSegModel {
 
     public static InstanSegModel fromName(String name) {
         // todo: instantiate built-in models somehow
-        return null;
+        throw new UnsupportedOperationException("Fetching models by name is not yet implemented!");
     }
 
     public BioimageIoSpec.BioimageIoModel getModel() {
@@ -132,8 +132,8 @@ public class InstanSegModel {
     }
 
     void runInstanSeg(
-            Collection<PathObject> pathObjects,
             ImageData<BufferedImage> imageData,
+            Collection<PathObject> pathObjects,
             Collection<ColorTransforms.ColorTransform> channels,
             int tileDims,
             double downsample,

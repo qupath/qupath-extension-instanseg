@@ -39,7 +39,6 @@ import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
-import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -381,6 +380,7 @@ public class InstanSegController extends BorderPane {
                             .numOutputChannels(%d)
                             .channels(channels)
                             .tileDims(%d)
+                            .imageData(QP.getCurrentImageData())
                             .downsample(%f)
                             .nThreads(%d)
                             .build();
@@ -394,12 +394,13 @@ public class InstanSegController extends BorderPane {
                         model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                         InstanSegPreferences.numThreadsProperty().getValue()
                 );
-                QP.getCurrentImageData().getHistoryWorkflow()
+                qupath.getImageData().getHistoryWorkflow()
                     .addStep(
                             new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
                     );
                 var instanSeg = InstanSeg.builder()
                         .model(model)
+                        .imageData(qupath.getImageData())
                         .device(deviceChoices.getSelectionModel().getSelectedItem())
                         .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1:2)
                         .channels(selectedChannels.stream().map(ChannelSelectItem::getTransform).toList())
@@ -408,7 +409,7 @@ public class InstanSegController extends BorderPane {
                         .nThreads(InstanSegPreferences.numThreadsProperty().getValue())
                         .build();
                 instanSeg.detectObjects();
-                QP.fireHierarchyUpdate();
+                qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
                 if (model.nFailed() > 0) {
                     var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
                     logger.error(errorMessage);
@@ -436,12 +437,14 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private void selectAllAnnotations() {
-        QP.selectAnnotations();
+        var hierarchy = qupath.getImageData().getHierarchy();
+        hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getAnnotationObjects(), null);
     }
 
     @FXML
     private void selectAllTMACores() {
-        QP.selectTMACores();
+        var hierarchy = qupath.getImageData().getHierarchy();
+        hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getTMAGrid().getTMACoreList(), null);
     }
 
     /**
