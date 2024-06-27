@@ -1,9 +1,12 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
-import qupath.lib.gui.scripting.QPEx;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
+import qupath.lib.plugins.TaskRunner;
+import qupath.lib.plugins.TaskRunnerUtils;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -14,6 +17,8 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 public class InstanSeg {
+    private static final Logger logger = LoggerFactory.getLogger(InstanSeg.class);
+
     private final int tileDims;
     private final double downsample;
     private final int padding;
@@ -21,9 +26,9 @@ public class InstanSeg {
     private final int numOutputChannels;
     private final ImageData<BufferedImage> imageData;
     private final Collection<ColorTransforms.ColorTransform> channels;
-    private final int nThreads;
     private final InstanSegModel model;
     private final Device device;
+    private final TaskRunner taskRunner;
 
 
     public static Builder builder() {
@@ -31,6 +36,7 @@ public class InstanSeg {
     }
 
     public void detectObjects() {
+        // todo: replace createTaskRunner
         model.runInstanSeg(
                 imageData,
                 imageData.getHierarchy().getSelectionModel().getSelectedObjects(),
@@ -41,9 +47,12 @@ public class InstanSeg {
                 boundary,
                 device,
                 numOutputChannels == 1,
-                QPEx.createTaskRunner(nThreads)
+                taskRunner
         );
     }
+
+
+
 
     public static final class Builder {
         private int tileDims = 512;
@@ -51,11 +60,11 @@ public class InstanSeg {
         private int padding = 40;
         private int boundary = 20;
         private int numOutputChannels = 2;
+        private Device device = Device.fromName("cpu");
         private ImageData<BufferedImage> imageData;
         private Collection<ColorTransforms.ColorTransform> channels;
-        private Device device;
         private InstanSegModel model;
-        private int nThreads = 1;
+        private TaskRunner taskRunner;
 
         Builder() {}
 
@@ -204,7 +213,17 @@ public class InstanSeg {
          * @return A modified builder
          */
         public Builder nThreads(int nThreads) {
-            this.nThreads = nThreads;
+            this.taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner(nThreads);
+            return this;
+        }
+
+        /**
+         * Set the TaskRunner
+         * @param taskRunner An object that will run tasks and show progress
+         * @return A modified builder
+         */
+        public Builder taskRunner(TaskRunner taskRunner) {
+            this.taskRunner = taskRunner;
             return this;
         }
 
@@ -276,9 +295,6 @@ public class InstanSeg {
             if (channels == null) {
                  allChannels();
             }
-            if (device == null) {
-                device("cpu");
-            }
             return new InstanSeg(
                     this.tileDims,
                     this.downsample,
@@ -287,16 +303,15 @@ public class InstanSeg {
                     this.numOutputChannels,
                     this.imageData,
                     this.channels,
-                    this.nThreads,
                     this.model,
-                    this.device
-            );
+                    this.device,
+                    this.taskRunner);
         }
 
     }
 
     private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
-                      Collection<ColorTransforms.ColorTransform> channels, int nThreads, InstanSegModel model, Device device) {
+                      Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner) {
         this.tileDims = tileDims;
         this.downsample = downsample;
         this.padding = padding;
@@ -304,8 +319,8 @@ public class InstanSeg {
         this.numOutputChannels = numOutputChannels;
         this.imageData = imageData;
         this.channels = channels;
-        this.nThreads = nThreads;
         this.model = model;
         this.device = device;
+        this.taskRunner = taskRunner;
     }
 }

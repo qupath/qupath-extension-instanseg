@@ -5,6 +5,7 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
@@ -35,6 +36,7 @@ import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.TaskRunnerFX;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
@@ -363,62 +365,7 @@ public class InstanSegController extends BorderPane {
                 .filter(Objects::nonNull)
                 .toList();
 
-        var task = new Task<Void>() {
-            @Override
-            protected Void call() {
-                // Ensure PyTorch engine is available
-                if (!PytorchManager.hasPyTorchEngine()) {
-                    downloadPyTorch();
-                }
-                String cmd = String.format("""
-                        import qupath.ext.instanseg.core.InstanSeg
-
-                        def channels = %s;
-                        def instanSeg = InstanSeg.builder()
-                            .modelPath("%s")
-                            .device("%s")
-                            .numOutputChannels(%d)
-                            .channels(channels)
-                            .tileDims(%d)
-                            .imageData(QP.getCurrentImageData())
-                            .downsample(%f)
-                            .nThreads(%d)
-                            .build();
-                        instanSeg.detectObjects();
-                        """,
-                        ChannelSelectItem.toConstructorString(selectedChannels),
-                        model.getPath(),
-                        deviceChoices.getSelectionModel().getSelectedItem(),
-                        nucleiOnlyCheckBox.isSelected() ? 1:2,
-                        InstanSegPreferences.tileSizeProperty().get(),
-                        model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                        InstanSegPreferences.numThreadsProperty().getValue()
-                );
-                qupath.getImageData().getHistoryWorkflow()
-                    .addStep(
-                            new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
-                    );
-                var instanSeg = InstanSeg.builder()
-                        .model(model)
-                        .imageData(qupath.getImageData())
-                        .device(deviceChoices.getSelectionModel().getSelectedItem())
-                        .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1:2)
-                        .channels(selectedChannels.stream().map(ChannelSelectItem::getTransform).toList())
-                        .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                        .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
-                        .nThreads(InstanSegPreferences.numThreadsProperty().getValue())
-                        .build();
-                instanSeg.detectObjects();
-                qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
-                if (model.nFailed() > 0) {
-                    var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
-                    logger.error(errorMessage);
-                    Dialogs.showErrorMessage(resources.getString("title"),
-                            errorMessage);
-                }
-                return null;
-            }
-        };
+        var task = new InstanSegTask(server, model, selectedChannels);
         pendingTask.set(task);
         // Reset the pending task when it completes (either successfully or not)
         task.stateProperty().addListener((observable, oldValue, newValue) -> {
@@ -427,6 +374,92 @@ public class InstanSegController extends BorderPane {
                     pendingTask.set(null);
             }
         });
+    }
+
+    private class InstanSegTask extends Task<Void> {
+
+        private final List<ChannelSelectItem> channels;
+        private final ImageServer<?> server;
+        private final InstanSegModel model;
+
+        InstanSegTask(ImageServer<?> server, InstanSegModel model, List<ChannelSelectItem> channels) {
+            this.server = server;
+            this.model = model;
+            this.channels = channels;
+            // this.progressListener = new ProgressDialog(this.
+            //         QuPathGUI.getInstance().getStage(), e -> {
+            //     if (Dialogs.showYesNoDialog(getDialogTitle(), resources.getString("ui.stop-tasks"))) {
+            //         cancel(true);
+            //         e.consume();
+            //     }
+            // });
+            this.stateProperty().addListener(this::handleStateChange);
+        }
+
+        private void handleStateChange(ObservableValue<? extends Worker.State> value, Worker.State oldValue, Worker.State newValue) {
+            // if (progressListener != null && newValue == Worker.State.CANCELLED)
+            //     progressListener.cancel();
+        }
+
+
+        @Override
+        protected Void call() {
+            // Ensure PyTorch engine is available
+            if (!PytorchManager.hasPyTorchEngine()) {
+                downloadPyTorch();
+            }
+            String cmd = String.format("""
+                            import qupath.ext.instanseg.core.InstanSeg
+
+                            def channels = %s;
+                            def instanSeg = InstanSeg.builder()
+                                .modelPath("%s")
+                                .device("%s")
+                                .numOutputChannels(%d)
+                                .channels(channels)
+                                .tileDims(%d)
+                                .imageData(QP.getCurrentImageData())
+                                .downsample(%f)
+                                .nThreads(QPEx.createTaskRunner(%d))
+                                .build();
+                            instanSeg.detectObjects();
+                            """,
+                    ChannelSelectItem.toConstructorString(channels),
+                    model.getPath(),
+                    deviceChoices.getSelectionModel().getSelectedItem(),
+                    nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                    InstanSegPreferences.tileSizeProperty().get(),
+                    model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                    InstanSegPreferences.numThreadsProperty().getValue()
+            );
+            qupath.getImageData().getHistoryWorkflow()
+                    .addStep(
+                            new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
+                    );
+            var taskRunner = new TaskRunnerFX(
+                    QuPathGUI.getInstance(),
+                    InstanSegPreferences.numThreadsProperty().getValue());
+
+            var instanSeg = InstanSeg.builder()
+                    .model(model)
+                    .imageData(qupath.getImageData())
+                    .device(deviceChoices.getSelectionModel().getSelectedItem())
+                    .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
+                    .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
+                    .tileDims(InstanSegPreferences.tileSizeProperty().get())
+                    .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                    .taskRunner(taskRunner)
+                    .build();
+            instanSeg.detectObjects();
+            qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
+            if (model.nFailed() > 0) {
+                var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
+                logger.error(errorMessage);
+                Dialogs.showErrorMessage(resources.getString("title"),
+                        errorMessage);
+            }
+            return null;
+        }
     }
 
     private void downloadPyTorch() {
