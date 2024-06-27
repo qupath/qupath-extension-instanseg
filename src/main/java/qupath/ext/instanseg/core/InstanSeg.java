@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
+import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.TaskRunner;
 import qupath.lib.plugins.TaskRunnerUtils;
 
@@ -31,15 +32,28 @@ public class InstanSeg {
     private final TaskRunner taskRunner;
 
 
+    /**
+     * Create a builder object for InstanSeg.
+     * @return A builder, which may not be valid.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Run inference for the currently selected PathObjects.
+     */
     public void detectObjects() {
-        // todo: replace createTaskRunner
+        detectObjects(imageData.getHierarchy().getSelectionModel().getSelectedObjects());
+    }
+
+    /**
+     * Run inference for a collection of PathObjects.
+     */
+    public void detectObjects(Collection<PathObject> pathObjects) {
         model.runInstanSeg(
                 imageData,
-                imageData.getHierarchy().getSelectionModel().getSelectedObjects(),
+                pathObjects,
                 channels,
                 tileDims,
                 downsample,
@@ -52,8 +66,9 @@ public class InstanSeg {
     }
 
 
-
-
+    /**
+     * A builder class for InstanSeg.
+     */
     public static final class Builder {
         private int tileDims = 512;
         private double downsample = 1;
