@@ -61,10 +61,10 @@ public class InstanSeg {
         private int boundary = 20;
         private int numOutputChannels = 2;
         private Device device = Device.fromName("cpu");
+        private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
         private ImageData<BufferedImage> imageData;
         private Collection<ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
-        private TaskRunner taskRunner;
 
         Builder() {}
 
