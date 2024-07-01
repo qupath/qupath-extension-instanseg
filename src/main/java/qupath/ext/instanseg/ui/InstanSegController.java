@@ -386,19 +386,6 @@ public class InstanSegController extends BorderPane {
             this.server = server;
             this.model = model;
             this.channels = channels;
-            // this.progressListener = new ProgressDialog(this.
-            //         QuPathGUI.getInstance().getStage(), e -> {
-            //     if (Dialogs.showYesNoDialog(getDialogTitle(), resources.getString("ui.stop-tasks"))) {
-            //         cancel(true);
-            //         e.consume();
-            //     }
-            // });
-            this.stateProperty().addListener(this::handleStateChange);
-        }
-
-        private void handleStateChange(ObservableValue<? extends Worker.State> value, Worker.State oldValue, Worker.State newValue) {
-            // if (progressListener != null && newValue == Worker.State.CANCELLED)
-            //     progressListener.cancel();
         }
 
 
