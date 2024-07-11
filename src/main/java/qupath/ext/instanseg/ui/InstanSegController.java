@@ -33,6 +33,7 @@ import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
 import qupath.fx.utils.FXUtils;
+import qupath.lib.analysis.features.ObjectMeasurements;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
@@ -41,6 +42,8 @@ import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.ImageServer;
+import qupath.lib.images.servers.TransformedServerBuilder;
+import qupath.lib.objects.PathObject;
 import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
@@ -49,6 +52,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -370,10 +374,12 @@ public class InstanSegController extends BorderPane {
                 if (!PytorchManager.hasPyTorchEngine()) {
                     downloadPyTorch();
                 }
+                var objects = QP.getSelectedObjects();
+                var imageData = QP.getCurrentImageData();
                 try {
                     model.runInstanSeg(
-                            QP.getSelectedObjects(),
-                            QP.getCurrentImageData(),
+                            objects,
+                            imageData,
                             selectedChannels,
                             InstanSegPreferences.tileSizeProperty().get(),
                             model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
@@ -384,6 +390,9 @@ public class InstanSegController extends BorderPane {
                          IOException | InterruptedException e) {
                     Dialogs.showErrorMessage("Unable to run InstanSeg", e);
                     logger.error("Unable to run InstanSeg", e);
+                }
+                for (PathObject po: objects) {
+                    makeMeasurements(imageData, po.getChildObjects(), model);
                 }
                 QP.fireHierarchyUpdate();
                 if (model.nFailed() > 0) {
@@ -410,6 +419,61 @@ public class InstanSegController extends BorderPane {
         PytorchManager.getEngineOnline();
         Platform.runLater(this::addDeviceChoices);
     }
+
+
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections, InstanSegModel model) {
+        var pixelSize = model.getPixelSizeX();
+        var server = imageData.getServer();
+        var resolution = server.getPixelCalibration();
+        var pixelCal = server.getPixelCalibration();
+
+        if (Double.isFinite(pixelSize) && pixelSize > 0) {
+            double downsample = pixelSize / resolution.getAveragedPixelSize().doubleValue();
+            resolution = resolution.createScaledInstance(downsample, downsample);
+        }
+
+        detections.parallelStream().forEach(c -> ObjectMeasurements.addShapeMeasurements(c, pixelCal));
+
+        Collection<ObjectMeasurements.Compartments> compartments = Arrays.asList(ObjectMeasurements.Compartments.values());
+        // Add intensity measurements, if needed
+        var measurements = Arrays.asList(
+                ObjectMeasurements.Measurements.MEAN,
+                ObjectMeasurements.Measurements.MEDIAN,
+                ObjectMeasurements.Measurements.MIN,
+                ObjectMeasurements.Measurements.MAX,
+                ObjectMeasurements.Measurements.STD_DEV);
+
+        if (!detections.isEmpty()) {
+            logger.info("Making measurements");
+            var stains = imageData.getColorDeconvolutionStains();
+            var builder = new TransformedServerBuilder(server);
+            if (stains != null) {
+                List<Integer> stainNumbers = new ArrayList<>();
+                for (int s = 1; s <= 3; s++) {
+                    if (!stains.getStain(s).isResidual())
+                        stainNumbers.add(s);
+                }
+                builder.deconvolveStains(stains, stainNumbers.stream().mapToInt(i -> i).toArray());
+            }
+
+            try (var server2 = builder.build()) {
+
+                double downsample = resolution.getAveragedPixelSize().doubleValue() / pixelCal.getAveragedPixelSize().doubleValue();
+
+                detections.parallelStream().forEach(cell -> {
+                    try {
+                        ObjectMeasurements.addIntensityMeasurements(server2, cell, downsample, measurements, compartments);
+                    } catch (IOException e) {
+                        logger.info(e.getLocalizedMessage(), e);
+                    }
+                });
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+        }
+    }
+
 
     @FXML
     private void selectAllAnnotations() {
