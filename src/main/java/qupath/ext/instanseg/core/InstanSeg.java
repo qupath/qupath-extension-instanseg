@@ -171,10 +171,12 @@ public class InstanSeg {
          * @return A modified builder
          */
         public Builder allChannels() {
-            return channelIndices(
-                    IntStream.of(imageData.getServer().nChannels())
+            // assignment is just to suppress IDE suggestion for void return val
+            var tmp = channelIndices(
+                    IntStream.range(0, imageData.getServer().nChannels())
                             .boxed()
                             .toList());
+            return this;
         }
 
         /**
@@ -317,7 +319,8 @@ public class InstanSeg {
                 throw new IllegalStateException("imageData cannot be null!");
             }
             if (channels == null) {
-                 allChannels();
+                // assignment is just to suppress IDE suggestion for void return
+                var tmp = allChannels();
             }
             return new InstanSeg(
                     this.tileDims,
