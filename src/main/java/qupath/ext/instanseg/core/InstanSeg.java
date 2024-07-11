@@ -12,6 +12,7 @@ import qupath.lib.plugins.TaskRunnerUtils;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -158,8 +159,10 @@ public class InstanSeg {
          * @param channels Channels to be used in inference
          * @return A modified builder
          */
-        public Builder channels(ColorTransforms.ColorTransform... channels) {
-            this.channels = List.of(channels);
+        public Builder channels(ColorTransforms.ColorTransform channel, ColorTransforms.ColorTransform... channels) {
+            var l = Arrays.asList(channels);
+            l.add(channel);
+            this.channels = l;
             return this;
         }
 
@@ -191,10 +194,13 @@ public class InstanSeg {
          * @param channels Integers used to specify the channels used
          * @return A modified builder
          */
-        public Builder channelIndices(int... channels) {
-            this.channels = Arrays.stream(channels).boxed()
-                    .map(ColorTransforms::createChannelExtractor)
-                    .toList();
+        public Builder channelIndices(int channel, int... channels) {
+            List<ColorTransforms.ColorTransform> l = new ArrayList<>();
+            l.add(ColorTransforms.createChannelExtractor(channel));
+            for (int i: channels) {
+                l.add(ColorTransforms.createChannelExtractor(i));
+            }
+            this.channels = l;
             return this;
         }
 
@@ -215,10 +221,13 @@ public class InstanSeg {
          * @param channels A set of channel names
          * @return A modified builder
          */
-        public Builder channelNames(String... channels) {
-            this.channels = Arrays.stream(channels)
-                    .map(ColorTransforms::createChannelExtractor)
-                    .toList();
+        public Builder channelNames(String channel, String... channels) {
+            List<ColorTransforms.ColorTransform> l = new ArrayList<>();
+            l.add(ColorTransforms.createChannelExtractor(channel));
+            for (String s: channels) {
+                l.add(ColorTransforms.createChannelExtractor(s));
+            }
+            this.channels = l;
             return this;
         }
 
