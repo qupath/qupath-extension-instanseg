@@ -444,7 +444,7 @@ public class InstanSegController extends BorderPane {
                 ObjectMeasurements.Measurements.STD_DEV);
 
         if (!detections.isEmpty()) {
-            logger.info("Making measurements");
+            logger.info("Making measurements for {} objects", detections.size());
             var stains = imageData.getColorDeconvolutionStains();
             var builder = new TransformedServerBuilder(server);
             if (stains != null) {

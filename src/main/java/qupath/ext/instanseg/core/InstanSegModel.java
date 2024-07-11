@@ -31,7 +31,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -132,7 +131,7 @@ public class InstanSegModel {
     public void runInstanSeg(
             Collection<PathObject> pathObjects,
             ImageData<BufferedImage> imageData,
-            List<ColorTransforms.ColorTransform> channels,
+            Collection<ColorTransforms.ColorTransform> channels,
             int tileSize,
             double downsample,
             String deviceName,
