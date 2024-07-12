@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -141,6 +142,7 @@ public class InstanSegModel {
             int boundary,
             Device device,
             boolean nucleiOnly,
+            List<Class<? extends PathObject>> outputClasses,
             TaskRunner taskRunner) {
 
         nFailed = 0;
@@ -189,7 +191,7 @@ public class InstanSegModel {
                                 .cropTiles(false)
                                 .build()
                         )
-                        .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(), boundary))
+                        .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(outputClasses), boundary))
                         .padding(padding)
                         .merger(ObjectMerger.createIoUMerger(0.2))
                         .downsample(downsample)

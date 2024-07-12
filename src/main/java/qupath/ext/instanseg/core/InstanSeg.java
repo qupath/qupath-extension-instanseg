@@ -5,6 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
+import qupath.lib.objects.PathAnnotationObject;
+import qupath.lib.objects.PathCellObject;
+import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.TaskRunner;
 import qupath.lib.plugins.TaskRunnerUtils;
@@ -31,6 +34,7 @@ public class InstanSeg {
     private final InstanSegModel model;
     private final Device device;
     private final TaskRunner taskRunner;
+    private final List<Class<? extends PathObject>> outputClasses;
 
 
     /**
@@ -62,6 +66,7 @@ public class InstanSeg {
                 boundary,
                 device,
                 numOutputChannels == 1,
+                outputClasses,
                 taskRunner
         );
     }
@@ -81,6 +86,7 @@ public class InstanSeg {
         private ImageData<BufferedImage> imageData;
         private Collection<ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
+        private List<Class<? extends PathObject>> outputClasses;
 
         Builder() {}
 
@@ -310,6 +316,26 @@ public class InstanSeg {
             return this;
         }
 
+        public Builder outputClasses(List<Class<? extends PathObject>> outputClasses) {
+            this.outputClasses = outputClasses;
+            return this;
+        }
+
+        public Builder outputCells() {
+            this.outputClasses = List.of(PathCellObject.class);
+            return this;
+        }
+
+        public Builder outputDetections() {
+            this.outputClasses = List.of(PathDetectionObject.class);
+            return this;
+        }
+
+        public Builder outputAnnotations() {
+            this.outputClasses = List.of(PathAnnotationObject.class);
+            return this;
+        }
+
         /**
          * Build the InstanSeg instance.
          * @return An InstanSeg instance ready for object detection.
@@ -332,13 +358,17 @@ public class InstanSeg {
                     this.channels,
                     this.model,
                     this.device,
-                    this.taskRunner);
+                    this.taskRunner,
+                    this.outputClasses);
         }
 
     }
 
+
+
     private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
-                      Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner) {
+                      Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner,
+                      List<Class<? extends PathObject>> outputClasses) {
         this.tileDims = tileDims;
         this.downsample = downsample;
         this.padding = padding;
@@ -349,5 +379,6 @@ public class InstanSeg {
         this.model = model;
         this.device = device;
         this.taskRunner = taskRunner;
+        this.outputClasses = outputClasses;
     }
 }
