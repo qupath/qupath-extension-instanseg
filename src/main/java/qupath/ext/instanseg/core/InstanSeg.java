@@ -316,21 +316,40 @@ public class InstanSeg {
             return this;
         }
 
+        /**
+         * Specify the output class(es)
+         * @param outputClasses A list specifying what type the output should be.
+         *                      eg, [PathDetectionObject.class, PathAnnotationObject.class]
+         *                      specifies to create detections nested inside annotations.
+         * @return A modified builder
+         */
         public Builder outputClasses(List<Class<? extends PathObject>> outputClasses) {
             this.outputClasses = outputClasses;
             return this;
         }
 
+        /**
+         * Specify cells as the output class, possibly without nuclei
+         * @return A modified builder
+         */
         public Builder outputCells() {
             this.outputClasses = List.of(PathCellObject.class);
             return this;
         }
 
+        /**
+         * Specify (possibly nested) detections as the output class
+         * @return A modified builder
+         */
         public Builder outputDetections() {
             this.outputClasses = List.of(PathDetectionObject.class);
             return this;
         }
 
+        /**
+         * Specify (possibly nested) annotations as the output class
+         * @return A modified builder
+         */
         public Builder outputAnnotations() {
             this.outputClasses = List.of(PathAnnotationObject.class);
             return this;
@@ -347,6 +366,9 @@ public class InstanSeg {
             if (channels == null) {
                 // assignment is just to suppress IDE suggestion for void return
                 var tmp = allChannels();
+            }
+            if (outputClasses == null) {
+                var tmp = outputCells();
             }
             return new InstanSeg(
                     this.tileDims,
