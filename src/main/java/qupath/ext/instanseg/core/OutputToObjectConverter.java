@@ -75,21 +75,25 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         }
     }
 
-    private ROI processGeometry(Geometry p, Parameters<Mat, Mat> parameters) {
-        if (p == null) return null;
-        int numGeoms = p.getNumGeometries();
+    private ROI processGeometry(Geometry geom, Parameters<Mat, Mat> parameters) {
+        if (geom == null) return null;
+        int numGeoms = geom.getNumGeometries();
         int maxInd = 0;
         double maxArea = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < numGeoms; i++) {
-            var thisArea = p.getGeometryN(i).getArea();
-            if (thisArea > maxArea) {
-                maxArea = thisArea;
-                maxInd = i;
+        if (numGeoms > 1) {
+            // keep only the largest single fragment of a multipolygon
+            for (int i = 0; i < numGeoms; i++) {
+                var thisArea = geom.getGeometryN(i).getArea();
+                if (thisArea > maxArea) {
+                    maxArea = thisArea;
+                    maxInd = i;
+                }
             }
+            geom = geom.getGeometryN(maxInd);
+            // fill holes
+            geom = geom.getFactory().createPolygon(((Polygon)geom).getExteriorRing());
         }
-        var geom = p.getGeometryN(maxInd);
-        var poly = geom.getFactory().createPolygon(((Polygon)geom).getExteriorRing());
-        return GeometryTools.geometryToROI(poly, parameters.getRegionRequest().getImagePlane());
+        return GeometryTools.geometryToROI(geom, parameters.getRegionRequest().getImagePlane());
     }
 
 
