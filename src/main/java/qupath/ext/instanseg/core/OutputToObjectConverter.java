@@ -54,17 +54,12 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         }
         var rng = new Random(seed);
 
-        // if of length 1, can be
-        // cellObject (with or without nucleus)
-        // annotations
-        // detections
-        // if of length 2, then can be:
-        // detection <- annotation
-        // annotation <- annotation
-        // detection <- detection
         BiFunction<ROI, ROI, PathObject> function;
         if (classes.size() == 1) {
-            // todo
+            // if of length 1, can be
+            // cellObject (with or without nucleus)
+            // annotations
+            // detections
             if (classes.get(0) == PathAnnotationObject.class) {
                 function = createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
             } else if (classes.get(0) == PathDetectionObject.class) {
@@ -76,6 +71,10 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                 logger.warn("Unknown output {}, defaulting to cells", classes.get(0));
             }
         } else {
+            // if of length 2, then can be:
+            // detection <- annotation
+            // annotation <- annotation
+            // detection <- detection
             assert classes.size() == 2;
             if (classes.get(0) == PathDetectionObject.class && classes.get(1) == PathAnnotationObject.class) {
                 function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createAnnotationObject, rng);
