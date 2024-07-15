@@ -1,7 +1,15 @@
 package qupath.ext.instanseg.core;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.stream.Collectors;
+
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Polygon;
 import qupath.lib.analysis.images.ContourTracing;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
@@ -11,12 +19,6 @@ import qupath.lib.objects.PathObjects;
 import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
 import qupath.opencv.tools.OpenCVTools;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.stream.Collectors;
 
 class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
@@ -31,11 +33,11 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         if (nChannels < 1 || nChannels > 2)
             throw new IllegalArgumentException("Expected 1 or 2 channels, but found " + nChannels);
 
-        List<Map<Number, ROI>> roiMaps = new ArrayList<>();
+        List<Map<Number, Geometry>> roiMaps = new ArrayList<>();
         for (var mat : OpenCVTools.splitChannels(output)) {
             var image = OpenCVTools.matToSimpleImage(mat, 0);
             roiMaps.add(
-                    ContourTracing.createROIs(image, params.getRegionRequest(), 1, -1)
+                    ContourTracing.createGeometries(image, params.getRegionRequest(), 1, -1)
             );
         }
         var rng = new Random(seed);
@@ -43,7 +45,7 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
             // One-channel detected, represent using detection objects
             return roiMaps.get(0).values().stream()
                     .map(p -> {
-                        var obj = PathObjects.createDetectionObject(p);
+                        var obj = PathObjects.createDetectionObject(processGeometry(p, params));
                         obj.setColor(
                                 rng.nextInt(255),
                                 rng.nextInt(255),
@@ -55,12 +57,12 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         } else {
             // Two channels detected, represent using cell objects
             // We assume that the labels are matched - and we can't have a nucleus without a cell
-            Map<Number, ROI> nucleusROIs = roiMaps.get(0);
-            Map<Number, ROI> cellROIs = roiMaps.get(1);
+            Map<Number, Geometry> nucleusROIs = roiMaps.get(0);
+            Map<Number, Geometry> cellROIs = roiMaps.get(1);
             List<PathObject> cells = new ArrayList<>();
             for (var entry : cellROIs.entrySet()) {
-                var cell = entry.getValue();
-                var nucleus = nucleusROIs.getOrDefault(entry.getKey(), null);
+                var cell = processGeometry(entry.getValue(), params);
+                var nucleus = processGeometry(nucleusROIs.getOrDefault(entry.getKey(), null), params);
                 var cellObject = PathObjects.createCellObject(cell, nucleus);
                 cellObject.setColor(
                         rng.nextInt(255),
@@ -72,6 +74,24 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
             return cells;
         }
     }
+
+    private ROI processGeometry(Geometry p, Parameters<Mat, Mat> parameters) {
+        if (p == null) return null;
+        int numGeoms = p.getNumGeometries();
+        int maxInd = 0;
+        double maxArea = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < numGeoms; i++) {
+            var thisArea = p.getGeometryN(i).getArea();
+            if (thisArea > maxArea) {
+                maxArea = thisArea;
+                maxInd = i;
+            }
+        }
+        var geom = p.getGeometryN(maxInd);
+        var poly = geom.getFactory().createPolygon(((Polygon)geom).getExteriorRing());
+        return GeometryTools.geometryToROI(poly, parameters.getRegionRequest().getImagePlane());
+    }
+
 
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
 
