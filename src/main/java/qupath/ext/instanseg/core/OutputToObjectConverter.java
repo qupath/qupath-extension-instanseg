@@ -5,6 +5,7 @@ import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.analysis.images.ContourTracing;
+import qupath.lib.common.ColorTools;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
 import qupath.lib.experimental.pixels.PixelProcessorUtils;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
@@ -64,41 +66,33 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         if (classes.size() == 1) {
             // todo
             if (classes.get(0) == PathAnnotationObject.class) {
-                function = OutputToObjectConverter::annotationInsideAnnotation;
+                function = createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
             } else if (classes.get(0) == PathDetectionObject.class) {
-                function = OutputToObjectConverter::detectionInsideDetection;
+                function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createDetectionObject, rng);
             } else if (classes.get(0) == PathCellObject.class) {
-                function = OutputToObjectConverter::createCell;
+                function = createCellFun(rng);
             } else {
-                function = OutputToObjectConverter::createCell;
-                logger.warn("Unknown output {}", classes.get(0));
+                function = createCellFun(rng);
+                logger.warn("Unknown output {}, defaulting to cells", classes.get(0));
             }
         } else {
             assert classes.size() == 2;
             if (classes.get(0) == PathDetectionObject.class && classes.get(1) == PathAnnotationObject.class) {
-                function = OutputToObjectConverter::detectionInsideAnnotation;
+                function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createAnnotationObject, rng);
             } else if (classes.get(0) == PathAnnotationObject.class && classes.get(1) == PathAnnotationObject.class) {
-                function = OutputToObjectConverter::annotationInsideAnnotation;
+                function = createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
             } else if (classes.get(0) == PathDetectionObject.class && classes.get(1) == PathDetectionObject.class) {
-                function = OutputToObjectConverter::detectionInsideDetection;
+                function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createDetectionObject, rng);
             } else {
-                logger.warn("Unknown combination of outputs {} <- {}", classes.get(0), classes.get(1));
-                function = OutputToObjectConverter::createCell;
+                logger.warn("Unknown combination of outputs {} <- {}, defaulting to cells", classes.get(0), classes.get(1));
+                function = createCellFun(rng);
             }
         }
 
         if (roiMaps.size() == 1) {
             // One-channel detected, represent using detection objects
             return roiMaps.get(0).values().stream()
-                    .map(roi -> {
-                        var obj = function.apply(roi, null);
-                        obj.setColor(
-                                rng.nextInt(255),
-                                rng.nextInt(255),
-                                rng.nextInt(255)
-                        );
-                        return obj;
-                    })
+                    .map(roi -> function.apply(roi, null))
                     .collect(Collectors.toList());
         } else {
             // Two channels detected, represent using cell objects
@@ -110,46 +104,33 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                 var parent = entry.getValue();
                 var child = childROIs.getOrDefault(entry.getKey(), null);
                 var outputObject = function.apply(parent, child);
-                outputObject.setColor(
-                        rng.nextInt(255),
-                        rng.nextInt(255),
-                        rng.nextInt(255)
-                );
                 cells.add(outputObject);
             }
             return cells;
         }
     }
 
-    private static PathObject detectionInsideDetection(ROI parent, ROI child) {
-        var parentDetection = PathObjects.createDetectionObject(parent);
-        if (child != null) {
-            var childDetection = PathObjects.createDetectionObject(child);
-            parentDetection.addChildObject(childDetection);
-        }
-        return parentDetection;
+    private static BiFunction<ROI, ROI, PathObject> createCellFun(Random rng) {
+        return (parent, child) -> {
+            var cell = PathObjects.createCellObject(parent, child);
+            var color = ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
+            cell.setColor(color);
+            return cell;
+        };
     }
 
-    private static PathObject detectionInsideAnnotation(ROI parent, ROI child) {
-        var parentAnnotation = PathObjects.createAnnotationObject(parent);
-        if (child != null) {
-            var childDetection = PathObjects.createDetectionObject(child);
-            parentAnnotation.addChildObject(childDetection);
-        }
-        return parentAnnotation;
-    }
-
-    private static PathObject annotationInsideAnnotation(ROI parent, ROI child) {
-        var parentAnnotation = PathObjects.createAnnotationObject(parent);
-        if (child != null) {
-            var childAnnotation = PathObjects.createAnnotationObject(child);
-            parentAnnotation.addChildObject(childAnnotation);
-        }
-        return parentAnnotation;
-    }
-
-    private static PathObject createCell(ROI parent, ROI child) {
-        return PathObjects.createCellObject(parent, child);
+    private static BiFunction<ROI, ROI, PathObject> createObjectsFun(Function<ROI, PathObject> createParentFun, Function<ROI, PathObject> createChildFun, Random rng) {
+        return (parent, child) -> {
+            var parentObj = createParentFun.apply(parent);
+            var color = ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
+            parentObj.setColor(color);
+            if (child != null) {
+                var childObj = createChildFun.apply(child);
+                childObj.setColor(color);
+                parentObj.addChildObject(childObj);
+            }
+            return parentObj;
+        };
     }
 
     static class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
