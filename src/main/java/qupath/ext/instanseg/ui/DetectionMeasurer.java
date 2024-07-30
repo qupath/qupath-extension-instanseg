@@ -17,17 +17,18 @@ import java.util.List;
 public class DetectionMeasurer {
     private static final Logger logger = LoggerFactory.getLogger(DetectionMeasurer.class);
 
-    private final boolean addShapeMeasurements;
     private final double pixelSize;
     private final ImageData<BufferedImage> imageData;
     private final Collection<ObjectMeasurements.Compartments> compartments;
     private final Collection<ObjectMeasurements.Measurements> measurements;
+    private final Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures;
 
     private DetectionMeasurer(ImageData<BufferedImage> imageData,
                               Collection<ObjectMeasurements.Compartments> compartments,
                               Collection<ObjectMeasurements.Measurements> measurements,
-                              double pixelSize, boolean addShapeMeasurements) {
-        this.addShapeMeasurements = addShapeMeasurements;
+                              Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures,
+                              double pixelSize) {
+        this.shapeFeatures = shapeFeatures;
         this.pixelSize = pixelSize;
         this.imageData = imageData;
         this.compartments = compartments;
@@ -47,10 +48,8 @@ public class DetectionMeasurer {
             double downsample = pixelSize / resolution.getAveragedPixelSize().doubleValue();
             resolution = resolution.createScaledInstance(downsample, downsample);
         }
-
-        if (addShapeMeasurements) {
-            detections.parallelStream().forEach(c -> ObjectMeasurements.addShapeMeasurements(c, pixelCal));
-        }
+        ObjectMeasurements.ShapeFeatures[] featuresArray = shapeFeatures.toArray(new ObjectMeasurements.ShapeFeatures[0]);
+        detections.parallelStream().forEach(c -> ObjectMeasurements.addShapeMeasurements(c, pixelCal, featuresArray));
 
         if (!detections.isEmpty()) {
             logger.info("Making measurements for {} objects", detections.size());
@@ -88,8 +87,8 @@ public class DetectionMeasurer {
         private ImageData<BufferedImage> imageData;
         private Collection<ObjectMeasurements.Compartments> compartments = Arrays.asList(ObjectMeasurements.Compartments.values());
         private Collection<ObjectMeasurements.Measurements> measurements = Arrays.asList(ObjectMeasurements.Measurements.values());
+        private Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures = Arrays.asList(ObjectMeasurements.ShapeFeatures.values());
         private double pixelSize;
-        private boolean addShapeMeasurements = true;
 
         public Builder imageData(ImageData<BufferedImage> imageData) {
             this.imageData = imageData;
@@ -111,12 +110,13 @@ public class DetectionMeasurer {
             return this;
         }
 
-        public Builder addShapeMeasurements(boolean addShapeMeasurements) {
-            this.addShapeMeasurements = addShapeMeasurements;
+        public Builder shapeFeatures(Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures) {
+            this.shapeFeatures = shapeFeatures;
             return this;
         }
+
         public DetectionMeasurer build() {
-            return new DetectionMeasurer(imageData, compartments, measurements, pixelSize, addShapeMeasurements);
+            return new DetectionMeasurer(imageData, compartments, measurements, shapeFeatures, pixelSize);
         }
     }
 }
