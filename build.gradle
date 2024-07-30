@@ -35,7 +35,6 @@ ext.qupathJavaVersion = 21
  *   but shouldn't be bundled up for use in the extension.
  */
 dependencies {
-
     // Main QuPath user interface jar.
     // Automatically includes other QuPath jars as subdependencies.
     shadow "io.github.qupath:qupath-gui-fx:${qupathVersion}"
