@@ -15,7 +15,6 @@ class ChannelSelectItem {
     private final ColorTransforms.ColorTransform transform;
     private final String constructor;
 
-    // todo: public method to get a constructor for the colortransform
     ChannelSelectItem(String name) {
         this.name = name;
         this.transform = ColorTransforms.createChannelExtractor(name);
