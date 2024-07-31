@@ -1,4 +1,4 @@
-package qupath.ext.instanseg.ui;
+package qupath.ext.instanseg.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +76,7 @@ public class DetectionMeasurer {
                     }
                 });
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                logger.error("Unable to create transformed server, can't make intensity measurements", e);
             }
 
         }
