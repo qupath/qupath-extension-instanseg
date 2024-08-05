@@ -17,29 +17,37 @@ import java.util.List;
 public class DetectionMeasurer {
     private static final Logger logger = LoggerFactory.getLogger(DetectionMeasurer.class);
 
-    private final double pixelSize;
-    private final ImageData<BufferedImage> imageData;
     private final Collection<ObjectMeasurements.Compartments> compartments;
     private final Collection<ObjectMeasurements.Measurements> measurements;
     private final Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures;
+    private final double pixelSize;
 
-    private DetectionMeasurer(ImageData<BufferedImage> imageData,
-                              Collection<ObjectMeasurements.Compartments> compartments,
+
+    private DetectionMeasurer(Collection<ObjectMeasurements.Compartments> compartments,
                               Collection<ObjectMeasurements.Measurements> measurements,
                               Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures,
                               double pixelSize) {
         this.shapeFeatures = shapeFeatures;
         this.pixelSize = pixelSize;
-        this.imageData = imageData;
         this.compartments = compartments;
         this.measurements = measurements;
     }
 
+    /**
+     * Create a builder object for a DetectionMeasurer.
+     * @return A builder that may or may not be valid.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
-    public void makeMeasurements(Collection<PathObject> detections) {
+    /**
+     * Make and add measurements for the specified objects using the builder's
+     * existing (immutable?) configuration.
+     * @param imageData The imageData to be used for measuring the pathobject with.
+     * @param objects The objects to be measured.
+     */
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> objects) {
         var server = imageData.getServer();
         var resolution = server.getPixelCalibration();
         var pixelCal = server.getPixelCalibration();
@@ -49,10 +57,10 @@ public class DetectionMeasurer {
             resolution = resolution.createScaledInstance(downsample, downsample);
         }
         ObjectMeasurements.ShapeFeatures[] featuresArray = shapeFeatures.toArray(new ObjectMeasurements.ShapeFeatures[0]);
-        detections.parallelStream().forEach(c -> ObjectMeasurements.addShapeMeasurements(c, pixelCal, featuresArray));
+        objects.parallelStream().forEach(c -> ObjectMeasurements.addShapeMeasurements(c, pixelCal, featuresArray));
 
-        if (!detections.isEmpty()) {
-            logger.info("Making measurements for {} objects", detections.size());
+        if (!objects.isEmpty()) {
+            logger.info("Making measurements for {} objects", objects.size());
             var stains = imageData.getColorDeconvolutionStains();
             var builder = new TransformedServerBuilder(server);
             if (stains != null) {
@@ -68,7 +76,7 @@ public class DetectionMeasurer {
 
                 double downsample = resolution.getAveragedPixelSize().doubleValue() / pixelCal.getAveragedPixelSize().doubleValue();
 
-                detections.parallelStream().forEach(cell -> {
+                objects.parallelStream().forEach(cell -> {
                     try {
                         ObjectMeasurements.addIntensityMeasurements(server2, cell, downsample, measurements, compartments);
                     } catch (IOException e) {
@@ -83,40 +91,61 @@ public class DetectionMeasurer {
     }
 
 
+    /**
+     * A builder class for DetectionMeasurer.
+     */
     public static class Builder {
-        private ImageData<BufferedImage> imageData;
         private Collection<ObjectMeasurements.Compartments> compartments = Arrays.asList(ObjectMeasurements.Compartments.values());
         private Collection<ObjectMeasurements.Measurements> measurements = Arrays.asList(ObjectMeasurements.Measurements.values());
         private Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures = Arrays.asList(ObjectMeasurements.ShapeFeatures.values());
         private double pixelSize;
 
-        public Builder imageData(ImageData<BufferedImage> imageData) {
-            this.imageData = imageData;
-            return this;
-        }
-
+        /**
+         * Set the pixel size that measurements should be made at.
+         * @param pixelSize The pixel size that detections/annotations/etc were made at.
+         * @return A modified builder.
+         */
         public Builder pixelSize(double pixelSize) {
             this.pixelSize = pixelSize;
             return this;
         }
 
+        /**
+         * Change the compartments used in measuring.
+         * @param compartments The compartments that should be used for measuring.
+         * @return A modified builder.
+         */
         public Builder compartments(Collection<ObjectMeasurements.Compartments> compartments) {
             this.compartments = compartments;
             return this;
         }
 
+        /**
+         * Change the intensity measurements to be made.
+         * @param measurements The intensity measurements to be made.
+         * @return A modified builder.
+         */
         public Builder measurements(Collection<ObjectMeasurements.Measurements> measurements) {
             this.measurements = measurements;
             return this;
         }
 
+        /**
+         * Change the shape measurements to be made.
+         * @param shapeFeatures The shape measurements to be made.
+         * @return A modified builder.
+         */
         public Builder shapeFeatures(Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures) {
             this.shapeFeatures = shapeFeatures;
             return this;
         }
 
+        /**
+         * Build the measurer.
+         * @return An immutable detection measurer.
+         */
         public DetectionMeasurer build() {
-            return new DetectionMeasurer(imageData, compartments, measurements, shapeFeatures, pixelSize);
+            return new DetectionMeasurer(compartments, measurements, shapeFeatures, pixelSize);
         }
     }
 }
