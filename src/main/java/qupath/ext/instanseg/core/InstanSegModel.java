@@ -191,7 +191,7 @@ public class InstanSegModel {
                                 .cropTiles(false)
                                 .build()
                         )
-                        .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(outputClasses), boundary))
+                        .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(outputClasses), boundary))
                         .padding(padding)
                         .merger(ObjectMerger.createIoUMerger(0.2))
                         .downsample(downsample)
