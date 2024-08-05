@@ -1,6 +1,7 @@
 package qupath.ext.instanseg.core;
 
 import org.bytedeco.opencv.opencv_core.Mat;
+import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.analysis.images.ContourTracing;
@@ -12,6 +13,8 @@ import qupath.lib.objects.PathCellObject;
 import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
+import qupath.lib.regions.ImagePlane;
+import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
 import qupath.opencv.tools.OpenCVTools;
 
@@ -43,44 +46,53 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             throw new IllegalArgumentException("Expected 1 or 2 channels, but found " + nChannels);
 
 
-        List<Map<Number, ROI>> roiMaps = new ArrayList<>();
+        List<Map<Number, Geometry>> geomMaps = new ArrayList<>();
         for (var mat : OpenCVTools.splitChannels(output)) {
             var image = OpenCVTools.matToSimpleImage(mat, 0);
-            roiMaps.add(
-                    ContourTracing.createROIs(image, params.getRegionRequest(), 1, -1)
+            geomMaps.add(
+                    ContourTracing.createGeometries(image, params.getRegionRequest(), 1, -1)
             );
         }
         var rng = new Random(seed);
 
-        BiFunction<ROI, ROI, PathObject> function;
+        BiFunction<ROI, ROI, PathObject> roisToPathObjectsFunction;
+        ImagePlane plane = params.getRegionRequest().getImagePlane();
         if (classes.size() == 1) {
-            function = getOneClassBiFunction(classes, rng);
+            roisToPathObjectsFunction = getOneClassBiFunction(classes, rng);
         } else {
             // if of length 2, then can be:
             // detection <- annotation, annotation <- annotation, detection <- detection
             assert classes.size() == 2;
-            function = getTwoClassBiFunction(classes, rng);
+            roisToPathObjectsFunction = getTwoClassBiFunction(classes, rng);
         }
 
-        if (roiMaps.size() == 1) {
+        if (geomMaps.size() == 1) {
             // One-channel detected, represent using detection objects
-            return roiMaps.get(0).values().stream()
-                    .map(roi -> function.apply(roi, null))
+            return geomMaps.get(0).values().stream()
+                    .map(geom -> roisToPathObjectsFunction.apply(geometryToFilledROI(geom, plane), null))
                     .collect(Collectors.toList());
         } else {
             // Two channels detected, represent using cell objects
             // We assume that the labels are matched - and we can't have a nucleus without a cell
-            Map<Number, ROI> childROIs = roiMaps.get(0);
-            Map<Number, ROI> parentROIs = roiMaps.get(1);
+            Map<Number, Geometry> childGeoms = geomMaps.get(0);
+            Map<Number, Geometry> parentGeoms = geomMaps.get(1);
             List<PathObject> cells = new ArrayList<>();
-            for (var entry : parentROIs.entrySet()) {
-                var parent = entry.getValue();
-                var child = childROIs.getOrDefault(entry.getKey(), null);
-                var outputObject = function.apply(parent, child);
+            for (var entry : parentGeoms.entrySet()) {
+                var parent = geometryToFilledROI(entry.getValue(), plane);
+                var child = geometryToFilledROI(childGeoms.getOrDefault(entry.getKey(), null), plane);
+                var outputObject = roisToPathObjectsFunction.apply(parent, child);
                 cells.add(outputObject);
             }
             return cells;
         }
+    }
+
+    private static ROI geometryToFilledROI(Geometry geom, ImagePlane plane) {
+        if (geom == null)
+            return null;
+        geom = GeometryTools.fillHoles(geom);
+        geom = GeometryTools.findLargestPolygon(geom);
+        return GeometryTools.geometryToROI(geom, plane);
     }
 
     private static BiFunction<ROI, ROI, PathObject> getOneClassBiFunction(List<Class<? extends PathObject>> classes, Random rng) {
