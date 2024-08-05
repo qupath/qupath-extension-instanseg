@@ -9,13 +9,13 @@ import java.util.stream.Collectors;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygon;
 import qupath.lib.analysis.images.ContourTracing;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
 import qupath.lib.experimental.pixels.PixelProcessorUtils;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
+import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
 import qupath.opencv.tools.OpenCVTools;
@@ -40,12 +40,13 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
                     ContourTracing.createGeometries(image, params.getRegionRequest(), 1, -1)
             );
         }
+        var plane = params.getRegionRequest().getImagePlane();
         var rng = new Random(seed);
         if (roiMaps.size() == 1) {
             // One-channel detected, represent using detection objects
             return roiMaps.get(0).values().stream()
                     .map(p -> {
-                        var obj = PathObjects.createDetectionObject(processGeometry(p, params));
+                        var obj = PathObjects.createDetectionObject(geometryToFilledROI(p, plane));
                         obj.setColor(
                                 rng.nextInt(255),
                                 rng.nextInt(255),
@@ -61,8 +62,8 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
             Map<Number, Geometry> cellROIs = roiMaps.get(1);
             List<PathObject> cells = new ArrayList<>();
             for (var entry : cellROIs.entrySet()) {
-                var cell = processGeometry(entry.getValue(), params);
-                var nucleus = processGeometry(nucleusROIs.getOrDefault(entry.getKey(), null), params);
+                var cell = geometryToFilledROI(entry.getValue(), plane);
+                var nucleus = geometryToFilledROI(nucleusROIs.getOrDefault(entry.getKey(), null), plane);
                 var cellObject = PathObjects.createCellObject(cell, nucleus);
                 cellObject.setColor(
                         rng.nextInt(255),
@@ -75,25 +76,12 @@ class OutputToObjectConverter implements OutputHandler.OutputToObjectConverter<M
         }
     }
 
-    private ROI processGeometry(Geometry geom, Parameters<Mat, Mat> parameters) {
-        if (geom == null) return null;
-        int numGeoms = geom.getNumGeometries();
-        int maxInd = 0;
-        double maxArea = Double.NEGATIVE_INFINITY;
-        if (numGeoms > 1) {
-            // keep only the largest single fragment of a multipolygon
-            for (int i = 0; i < numGeoms; i++) {
-                var thisArea = geom.getGeometryN(i).getArea();
-                if (thisArea > maxArea) {
-                    maxArea = thisArea;
-                    maxInd = i;
-                }
-            }
-            geom = geom.getGeometryN(maxInd);
-            // fill holes
-            geom = geom.getFactory().createPolygon(((Polygon)geom).getExteriorRing());
-        }
-        return GeometryTools.geometryToROI(geom, parameters.getRegionRequest().getImagePlane());
+    private static ROI geometryToFilledROI(Geometry geom, ImagePlane plane) {
+        if (geom == null)
+            return null;
+        geom = GeometryTools.fillHoles(geom);
+        geom = GeometryTools.findLargestPolygon(geom);
+        return GeometryTools.geometryToROI(geom, plane);
     }
 
 
