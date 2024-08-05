@@ -53,6 +53,14 @@ public class InstanSeg {
     }
 
     /**
+     * Get the imageData from an InstanSeg object.
+     * @return The imageData used for the model.
+     */
+    public ImageData<BufferedImage> getImageData() {
+        return imageData;
+    }
+
+    /**
      * Run inference for a collection of PathObjects.
      */
     public void detectObjects(Collection<PathObject> pathObjects) {
@@ -389,6 +397,16 @@ public class InstanSeg {
 
     }
 
+    /**
+     * Utility function to make measurements for the objects created by InstanSeg.
+     * @param imageData The ImageData for making measurements.
+     * @param detections The objects to measure.
+     */
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections) {
+        DetectionMeasurer.builder()
+                .pixelSize(model.getPixelSizeX())
+                .build().makeMeasurements(imageData, detections);
+    }
 
 
     private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
