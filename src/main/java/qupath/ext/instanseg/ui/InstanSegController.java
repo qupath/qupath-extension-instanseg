@@ -419,17 +419,18 @@ public class InstanSegController extends BorderPane {
 
             String cmd = String.format("""
                             import qupath.ext.instanseg.core.InstanSeg
+                            import static qupath.lib.gui.scripting.QPEx.*
 
-                            def instanSegObjects = QP.getSelectedObjects();
+                            def instanSegObjects = getSelectedObjects();
                             def instanSeg = InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
                                 .numOutputChannels(%d)
                                 .channels(%s)
                                 .tileDims(%d)
-                                .imageData(QP.getCurrentImageData())
+                                .imageData(getCurrentImageData())
                                 .downsample(%f)
-                                .nThreads(QPEx.createTaskRunner(%d))
+                                .nThreads(%d)
                                 .build();
                             instanSeg.detectObjects(instanSegObjects);
                             for (PathObject po: instanSegObjects) {
