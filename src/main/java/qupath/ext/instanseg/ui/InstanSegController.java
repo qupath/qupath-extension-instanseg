@@ -5,7 +5,6 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
-import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
@@ -397,34 +396,6 @@ public class InstanSegController extends BorderPane {
             if (!PytorchManager.hasPyTorchEngine()) {
                 downloadPyTorch();
             }
-            String cmd = String.format("""
-                            import qupath.ext.instanseg.core.InstanSeg
-
-                            def channels = %s;
-                            def instanSeg = InstanSeg.builder()
-                                .modelPath("%s")
-                                .device("%s")
-                                .numOutputChannels(%d)
-                                .channels(channels)
-                                .tileDims(%d)
-                                .imageData(QP.getCurrentImageData())
-                                .downsample(%f)
-                                .nThreads(QPEx.createTaskRunner(%d))
-                                .build();
-                            instanSeg.detectObjects();
-                            """,
-                    ChannelSelectItem.toConstructorString(channels),
-                    model.getPath(),
-                    deviceChoices.getSelectionModel().getSelectedItem(),
-                    nucleiOnlyCheckBox.isSelected() ? 1 : 2,
-                    InstanSegPreferences.tileSizeProperty().get(),
-                    model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                    InstanSegPreferences.numThreadsProperty().getValue()
-            );
-            qupath.getImageData().getHistoryWorkflow()
-                    .addStep(
-                            new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
-                    );
             var taskRunner = new TaskRunnerFX(
                     QuPathGUI.getInstance(),
                     InstanSegPreferences.numThreadsProperty().getValue());
@@ -446,6 +417,40 @@ public class InstanSegController extends BorderPane {
             for (PathObject po: selectedObjects) {
                 makeMeasurements(imageData, po.getChildObjects(), model);
             }
+
+            String cmd = String.format("""
+                            import qupath.ext.instanseg.core.InstanSeg
+
+                            def objects = QP.getSelectedObjects();
+                            def imageData = QP.getCurrentImageData();
+                            def channels = %s;
+                            def instanSeg = InstanSeg.builder()
+                                .modelPath("%s")
+                                .device("%s")
+                                .numOutputChannels(%d)
+                                .channels(channels)
+                                .tileDims(%d)
+                                .imageData(imageData)
+                                .downsample(%f)
+                                .nThreads(QPEx.createTaskRunner(%d))
+                                .build();
+                            instanSeg.detectObjects(objects);
+                            for (PathObject po: objects) {
+                                makeMeasurements(imageData, po.getChildObjects(), model);
+                            }
+                            """,
+                    ChannelSelectItem.toConstructorString(channels),
+                    model.getPath(),
+                    deviceChoices.getSelectionModel().getSelectedItem(),
+                    nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                    InstanSegPreferences.tileSizeProperty().get(),
+                    model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                    InstanSegPreferences.numThreadsProperty().getValue()
+            );
+            qupath.getImageData().getHistoryWorkflow()
+                    .addStep(
+                            new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
+                    );
             if (model.nFailed() > 0) {
                 var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
                 logger.error(errorMessage);
@@ -465,8 +470,7 @@ public class InstanSegController extends BorderPane {
     public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections, InstanSegModel model) {
         DetectionMeasurer.builder()
                 .pixelSize(model.getPixelSizeX())
-                .imageData(imageData)
-                .build().makeMeasurements(detections);
+                .build().makeMeasurements(imageData, detections);
     }
 
 
