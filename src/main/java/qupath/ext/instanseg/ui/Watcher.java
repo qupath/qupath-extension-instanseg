@@ -88,7 +88,7 @@ class Watcher {
 
                 if (kind == ENTRY_CREATE && InstanSegModel.isValidModel(name)) {
                     try {
-                        modelChoiceBox.getItems().add(InstanSegModel.createModel(child));
+                        modelChoiceBox.getItems().add(InstanSegModel.fromPath(child));
                     } catch (IOException e) {
                         logger.error("Unable to add model", e);
                     }
