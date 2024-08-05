@@ -1,11 +1,9 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
-import ai.djl.MalformedModelException;
 import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
-import ai.djl.repository.zoo.ModelNotFoundException;
 import ai.djl.training.util.ProgressBar;
 import com.google.gson.internal.LinkedTreeMap;
 import org.bytedeco.opencv.opencv_core.Mat;
@@ -51,13 +49,30 @@ public class InstanSegModel {
         this.name = model.getName();
     }
 
-    public InstanSegModel(URL modelURL, String name) {
+
+    private InstanSegModel(URL modelURL, String name) {
         this.modelURL = modelURL;
         this.name = name;
     }
 
-    public static InstanSegModel createModel(Path path) throws IOException {
+    /**
+     * Create an InstanSeg model from an existing path.
+     * @param path The path to the folder that contains the model .pt file and the config YAML file.
+     * @return A handle on the model that can be used for inference.
+     * @throws IOException If the directory can't be found or isn't a valid model directory.
+     */
+    public static InstanSegModel fromPath(Path path) throws IOException {
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
+    }
+
+    /**
+     * Request an InstanSeg model from the set of available models
+     * @param name The model name
+     * @return The specified model.
+     */
+    public static InstanSegModel fromName(String name) {
+        // todo: instantiate built-in models somehow
+        throw new UnsupportedOperationException("Fetching models by name is not yet implemented!");
     }
 
     public BioimageIoSpec.BioimageIoModel getModel() {
@@ -129,26 +144,24 @@ public class InstanSegModel {
         return getName();
     }
 
-    public void runInstanSeg(
-            Collection<PathObject> pathObjects,
+    void runInstanSeg(
             ImageData<BufferedImage> imageData,
-            List<ColorTransforms.ColorTransform> channels,
-            int tileSize,
+            Collection<PathObject> pathObjects,
+            Collection<ColorTransforms.ColorTransform> channels,
+            int tileDims,
             double downsample,
-            String deviceName,
+            int padding,
+            int boundary,
+            Device device,
             boolean nucleiOnly,
-            TaskRunner taskRunner) throws ModelNotFoundException, MalformedModelException, IOException, InterruptedException {
+            List<Class<? extends PathObject>> outputClasses,
+            TaskRunner taskRunner) {
 
         nFailed = 0;
         Path modelPath = getPath().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
-        int padding = 40; // todo: setting? or just based on tile size. Should discuss.
-        int boundary = 20;
-        if (tileSize == 128) {
-            padding = 25;
-            boundary = 15;
-        }
+
         // Optionally pad images to the required size
         boolean padToInputSize = true;
         String layout = "CHW";
@@ -156,7 +169,6 @@ public class InstanSegModel {
         // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
         String layoutOutput = "CHW";
 
-        var device = Device.fromName(deviceName);
 
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
@@ -166,6 +178,7 @@ public class InstanSegModel {
                 .optTranslator(new MatTranslator(layout, layoutOutput, nucleiOnly))
                 .build()
                 .loadModel()) {
+
 
             BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
             printResourceCount("Resource count before prediction",
@@ -181,9 +194,9 @@ public class InstanSegModel {
                 printResourceCount("Resource count after creating predictors",
                         (BaseNDManager)baseManager.getParentManager());
 
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileSize - (double) padding));
+                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding));
                 var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                        layout, layoutOutput, channels, tileSize, tileSize, padToInputSize);
+                        layout, layoutOutput, channels, tileDims, tileDims, padToInputSize);
                 var processor = OpenCVProcessor.builder(predictionProcessor)
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(Tiler.builder(sizeWithoutPadding)
@@ -191,7 +204,7 @@ public class InstanSegModel {
                                 .cropTiles(false)
                                 .build()
                         )
-                        .outputHandler(new OutputToObjectConverter.PruneObjectOutputHandler<>(new OutputToObjectConverter(), boundary))
+                        .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(outputClasses), boundary))
                         .padding(padding)
                         .merger(ObjectMerger.createIoUMerger(0.2))
                         .downsample(downsample)
