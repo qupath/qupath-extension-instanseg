@@ -27,7 +27,6 @@ import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.ext.instanseg.core.DetectionMeasurer;
 import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.fx.dialogs.Dialogs;
@@ -413,36 +412,34 @@ public class InstanSegController extends BorderPane {
                     .taskRunner(taskRunner)
                     .build();
             instanSeg.detectObjects(selectedObjects);
-            qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
             for (PathObject po: selectedObjects) {
-                makeMeasurements(imageData, po.getChildObjects(), model);
+                instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
             }
+            qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
 
             String cmd = String.format("""
                             import qupath.ext.instanseg.core.InstanSeg
 
-                            def objects = QP.getSelectedObjects();
-                            def imageData = QP.getCurrentImageData();
-                            def channels = %s;
+                            def instanSegObjects = QP.getSelectedObjects();
                             def instanSeg = InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
                                 .numOutputChannels(%d)
-                                .channels(channels)
+                                .channels(%s)
                                 .tileDims(%d)
-                                .imageData(imageData)
+                                .imageData(QP.getCurrentImageData())
                                 .downsample(%f)
                                 .nThreads(QPEx.createTaskRunner(%d))
                                 .build();
-                            instanSeg.detectObjects(objects);
-                            for (PathObject po: objects) {
-                                makeMeasurements(imageData, po.getChildObjects(), model);
+                            instanSeg.detectObjects(instanSegObjects);
+                            for (PathObject po: instanSegObjects) {
+                                instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
                             }
                             """,
-                    ChannelSelectItem.toConstructorString(channels),
                     model.getPath(),
                     deviceChoices.getSelectionModel().getSelectedItem(),
                     nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                    ChannelSelectItem.toConstructorString(channels),
                     InstanSegPreferences.tileSizeProperty().get(),
                     model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                     InstanSegPreferences.numThreadsProperty().getValue()
@@ -466,13 +463,6 @@ public class InstanSegController extends BorderPane {
         PytorchManager.getEngineOnline();
         Platform.runLater(this::addDeviceChoices);
     }
-
-    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections, InstanSegModel model) {
-        DetectionMeasurer.builder()
-                .pixelSize(model.getPixelSizeX())
-                .build().makeMeasurements(imageData, detections);
-    }
-
 
 
     @FXML
