@@ -42,6 +42,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         if (nChannels < 1 || nChannels > 2)
             throw new IllegalArgumentException("Expected 1 or 2 channels, but found " + nChannels);
 
+
         List<Map<Number, ROI>> roiMaps = new ArrayList<>();
         for (var mat : OpenCVTools.splitChannels(output)) {
             var image = OpenCVTools.matToSimpleImage(mat, 0);

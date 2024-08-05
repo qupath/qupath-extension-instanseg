@@ -370,6 +370,9 @@ public class InstanSeg {
             if (outputClasses == null) {
                 var tmp = outputCells();
             }
+            if (outputClasses.size() > 1 && numOutputChannels == 1) {
+                throw new IllegalArgumentException("Cannot have multiple output types when using only one output channel.");
+            }
             return new InstanSeg(
                     this.tileDims,
                     this.downsample,
