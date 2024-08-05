@@ -53,32 +53,12 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
         BiFunction<ROI, ROI, PathObject> function;
         if (classes.size() == 1) {
-            // if of length 1, can be
-            // cellObject (with or without nucleus), annotations, detections
-            if (classes.get(0) == PathAnnotationObject.class) {
-                function = createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
-            } else if (classes.get(0) == PathDetectionObject.class) {
-                function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createDetectionObject, rng);
-            } else if (classes.get(0) == PathCellObject.class) {
-                function = createCellFun(rng);
-            } else {
-                function = createCellFun(rng);
-                logger.warn("Unknown output {}, defaulting to cells", classes.get(0));
-            }
+            function = getOneClassBiFunction(classes, rng);
         } else {
             // if of length 2, then can be:
             // detection <- annotation, annotation <- annotation, detection <- detection
             assert classes.size() == 2;
-            if (classes.get(0) == PathDetectionObject.class && classes.get(1) == PathAnnotationObject.class) {
-                function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createAnnotationObject, rng);
-            } else if (classes.get(0) == PathAnnotationObject.class && classes.get(1) == PathAnnotationObject.class) {
-                function = createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
-            } else if (classes.get(0) == PathDetectionObject.class && classes.get(1) == PathDetectionObject.class) {
-                function = createObjectsFun(PathObjects::createDetectionObject, PathObjects::createDetectionObject, rng);
-            } else {
-                logger.warn("Unknown combination of outputs {} <- {}, defaulting to cells", classes.get(0), classes.get(1));
-                function = createCellFun(rng);
-            }
+            function = getTwoClassBiFunction(classes, rng);
         }
 
         if (roiMaps.size() == 1) {
@@ -100,6 +80,41 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             }
             return cells;
         }
+    }
+
+    private static BiFunction<ROI, ROI, PathObject> getOneClassBiFunction(List<Class<? extends PathObject>> classes, Random rng) {
+        // if of length 1, can be
+        // cellObject (with or without nucleus), annotations, detections
+        if (classes.get(0) == PathAnnotationObject.class) {
+            return createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
+        } else if (classes.get(0) == PathDetectionObject.class) {
+            return createObjectsFun(PathObjects::createDetectionObject, PathObjects::createDetectionObject, rng);
+        } else if (classes.get(0) == PathCellObject.class) {
+            return createCellFun(rng);
+        } else {
+            logger.warn("Unknown output {}, defaulting to cells", classes.get(0));
+            return createCellFun(rng);
+        }
+    }
+
+    private static BiFunction<ROI, ROI, PathObject> getTwoClassBiFunction(List<Class<? extends PathObject>> classes, Random rng) {
+        Function<ROI, PathObject> fun0, fun1;
+        var knownClasses = List.of(PathDetectionObject.class, PathAnnotationObject.class);
+        if (!knownClasses.contains(classes.get(0)) || !knownClasses.contains(classes.get(1))) {
+            logger.warn("Unknown combination of outputs {} <- {}, defaulting to cells", classes.get(0), classes.get(1));
+            return createCellFun(rng);
+        }
+        if (classes.get(0) == PathDetectionObject.class) {
+            fun0 = PathObjects::createDetectionObject;
+        } else {
+            fun0 = PathObjects::createAnnotationObject;
+        }
+        if (classes.get(1) == PathDetectionObject.class) {
+            fun1 = PathObjects::createDetectionObject;
+        } else {
+            fun1 = PathObjects::createAnnotationObject;
+        }
+        return createObjectsFun(fun0, fun1, rng);
     }
 
     private static BiFunction<ROI, ROI, PathObject> createCellFun(Random rng) {
