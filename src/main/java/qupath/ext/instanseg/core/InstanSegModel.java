@@ -49,15 +49,27 @@ public class InstanSegModel {
         this.name = model.getName();
     }
 
-    public InstanSegModel(URL modelURL, String name) {
+
+    private InstanSegModel(URL modelURL, String name) {
         this.modelURL = modelURL;
         this.name = name;
     }
 
+    /**
+     * Create an InstanSeg model from an existing path.
+     * @param path The path to the folder that contains the model .pt file and the config YAML file.
+     * @return A handle on the model that can be used for inference.
+     * @throws IOException If the directory can't be found or isn't a valid model directory.
+     */
     public static InstanSegModel fromPath(Path path) throws IOException {
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
     }
 
+    /**
+     * Request an InstanSeg model from the set of available models
+     * @param name The model name
+     * @return The specified model.
+     */
     public static InstanSegModel fromName(String name) {
         // todo: instantiate built-in models somehow
         throw new UnsupportedOperationException("Fetching models by name is not yet implemented!");
@@ -166,6 +178,7 @@ public class InstanSegModel {
                 .optTranslator(new MatTranslator(layout, layoutOutput, nucleiOnly))
                 .build()
                 .loadModel()) {
+
 
             BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
             printResourceCount("Resource count before prediction",
