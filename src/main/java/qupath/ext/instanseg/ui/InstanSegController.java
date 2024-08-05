@@ -1,12 +1,11 @@
 package qupath.ext.instanseg.ui;
 
-import ai.djl.MalformedModelException;
-import ai.djl.repository.zoo.ModelNotFoundException;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
@@ -30,6 +29,7 @@ import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.DetectionMeasurer;
+import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
@@ -37,13 +37,12 @@ import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
-import qupath.lib.gui.scripting.QPEx;
+import qupath.lib.gui.TaskRunnerFX;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
-import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
-import qupath.lib.scripting.QP;
+import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -167,6 +166,11 @@ public class InstanSegController extends BorderPane {
             var channelNames = activeChannels.stream()
                     .map(ChannelDisplayInfo::getName)
                     .toList();
+            if (qupath.getImageData() != null && !qupath.getImageData().getServer().isRGB()) {
+                channelNames = channelNames.stream()
+                        .map(s -> s.replaceAll(" \\(C\\d+\\)$", ""))
+                        .toList();
+            }
             var comboItems = comboChannels.getItems();
             for (int i = 0; i < comboItems.size(); i++) {
                 if (channelNames.contains(comboItems.get(i).getName())) {
@@ -192,9 +196,9 @@ public class InstanSegController extends BorderPane {
         var server = imageData.getServer();
         int i = 1;
         boolean hasDuplicates = false;
+        ChannelSelectItem item;
         for (var channel : server.getMetadata().getChannels()) {
             var name = channel.getName();
-            var transform = ColorTransforms.createChannelExtractor(name);
             if (names.contains(name)) {
                 logger.warn("Found duplicate channel name! Channel " + i + " (name '" + name + "').");
                 logger.warn("Using channel indices instead of names because of duplicated channel names.");
@@ -202,19 +206,17 @@ public class InstanSegController extends BorderPane {
             }
             names.add(name);
             if (hasDuplicates) {
-                transform = ColorTransforms.createChannelExtractor(i - 1);
+                item = new ChannelSelectItem(name, i - 1);
+            } else {
+                item = new ChannelSelectItem(name);
             }
-            if (!server.isRGB()) {
-                name += " (C" + i + ")";
-            }
-            list.add(new ChannelSelectItem(name, transform));
+            list.add(item);
             i++;
         }
         var stains = imageData.getColorDeconvolutionStains();
         if (stains != null) {
             for (i = 1; i < 4; i++) {
-                var transform = ColorTransforms.createColorDeconvolvedChannel(stains, i);
-                list.add(new ChannelSelectItem(transform.getName(), transform));
+                list.add(new ChannelSelectItem(stains, i));
             }
         }
         return list;
@@ -334,7 +336,7 @@ public class InstanSegController extends BorderPane {
         try (var ps = Files.list(path)) {
             for (var file: ps.toList()) {
                 if (InstanSegModel.isValidModel(file)) {
-                    box.getItems().add(InstanSegModel.createModel(file));
+                    box.getItems().add(InstanSegModel.fromPath(file));
                 }
             }
         } catch (IOException e) {
@@ -358,50 +360,14 @@ public class InstanSegController extends BorderPane {
 
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
-        List<ColorTransforms.ColorTransform> selectedChannels = comboChannels
+        // todo: how to record this in workflow?
+        List<ChannelSelectItem> selectedChannels = comboChannels
                 .getCheckModel().getCheckedItems()
                 .stream()
                 .filter(Objects::nonNull)
-                .map(ChannelSelectItem::getTransform)
                 .toList();
 
-        var task = new Task<Void>() {
-            @Override
-            protected Void call() {
-                // Ensure PyTorch engine is available
-                if (!PytorchManager.hasPyTorchEngine()) {
-                    downloadPyTorch();
-                }
-                var objects = QP.getSelectedObjects();
-                var imageData = QP.getCurrentImageData();
-                try {
-                    model.runInstanSeg(
-                            objects,
-                            imageData,
-                            selectedChannels,
-                            InstanSegPreferences.tileSizeProperty().get(),
-                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                            deviceChoices.getSelectionModel().getSelectedItem(),
-                            nucleiOnlyCheckBox.isSelected(),
-                            QPEx.createTaskRunner(InstanSegPreferences.numThreadsProperty().getValue()));
-                } catch (ModelNotFoundException | MalformedModelException |
-                         IOException | InterruptedException e) {
-                    Dialogs.showErrorMessage("Unable to run InstanSeg", e);
-                    logger.error("Unable to run InstanSeg", e);
-                }
-                for (PathObject po: objects) {
-                    makeMeasurements(imageData, po.getChildObjects(), model);
-                }
-                QP.fireHierarchyUpdate();
-                if (model.nFailed() > 0) {
-                    var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
-                    logger.error(errorMessage);
-                    Dialogs.showErrorMessage(resources.getString("title"),
-                            errorMessage);
-                }
-                return null;
-            }
-        };
+        var task = new InstanSegTask(server, model, selectedChannels);
         pendingTask.set(task);
         // Reset the pending task when it completes (either successfully or not)
         task.stateProperty().addListener((observable, oldValue, newValue) -> {
@@ -410,6 +376,84 @@ public class InstanSegController extends BorderPane {
                     pendingTask.set(null);
             }
         });
+    }
+
+    private class InstanSegTask extends Task<Void> {
+
+        private final List<ChannelSelectItem> channels;
+        private final ImageServer<?> server;
+        private final InstanSegModel model;
+
+        InstanSegTask(ImageServer<?> server, InstanSegModel model, List<ChannelSelectItem> channels) {
+            this.server = server;
+            this.model = model;
+            this.channels = channels;
+        }
+
+
+        @Override
+        protected Void call() {
+            // Ensure PyTorch engine is available
+            if (!PytorchManager.hasPyTorchEngine()) {
+                downloadPyTorch();
+            }
+            String cmd = String.format("""
+                            import qupath.ext.instanseg.core.InstanSeg
+
+                            def channels = %s;
+                            def instanSeg = InstanSeg.builder()
+                                .modelPath("%s")
+                                .device("%s")
+                                .numOutputChannels(%d)
+                                .channels(channels)
+                                .tileDims(%d)
+                                .imageData(QP.getCurrentImageData())
+                                .downsample(%f)
+                                .nThreads(QPEx.createTaskRunner(%d))
+                                .build();
+                            instanSeg.detectObjects();
+                            """,
+                    ChannelSelectItem.toConstructorString(channels),
+                    model.getPath(),
+                    deviceChoices.getSelectionModel().getSelectedItem(),
+                    nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                    InstanSegPreferences.tileSizeProperty().get(),
+                    model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                    InstanSegPreferences.numThreadsProperty().getValue()
+            );
+            qupath.getImageData().getHistoryWorkflow()
+                    .addStep(
+                            new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
+                    );
+            var taskRunner = new TaskRunnerFX(
+                    QuPathGUI.getInstance(),
+                    InstanSegPreferences.numThreadsProperty().getValue());
+
+            var imageData = qupath.getImageData();
+            var selectedObjects = qupath.getImageData().getHierarchy().getSelectionModel().getSelectedObjects();
+            var instanSeg = InstanSeg.builder()
+                    .model(model)
+                    .imageData(imageData)
+                    .device(deviceChoices.getSelectionModel().getSelectedItem())
+                    .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
+                    .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
+                    .tileDims(InstanSegPreferences.tileSizeProperty().get())
+                    .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                    .taskRunner(taskRunner)
+                    .build();
+            instanSeg.detectObjects(selectedObjects);
+            qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
+            for (PathObject po: selectedObjects) {
+                makeMeasurements(imageData, po.getChildObjects(), model);
+            }
+            if (model.nFailed() > 0) {
+                var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
+                logger.error(errorMessage);
+                Dialogs.showErrorMessage(resources.getString("title"),
+                        errorMessage);
+            }
+            return null;
+        }
     }
 
     private void downloadPyTorch() {
@@ -429,12 +473,14 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private void selectAllAnnotations() {
-        QP.selectAnnotations();
+        var hierarchy = qupath.getImageData().getHierarchy();
+        hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getAnnotationObjects(), null);
     }
 
     @FXML
     private void selectAllTMACores() {
-        QP.selectTMACores();
+        var hierarchy = qupath.getImageData().getHierarchy();
+        hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getTMAGrid().getTMACoreList(), null);
     }
 
     /**
