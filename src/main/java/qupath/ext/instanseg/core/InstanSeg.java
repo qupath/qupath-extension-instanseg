@@ -11,6 +11,7 @@ import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.TaskRunner;
 import qupath.lib.plugins.TaskRunnerUtils;
+import qupath.lib.scripting.QP;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -157,6 +158,16 @@ public class InstanSeg {
             this.imageData = imageData;
             return this;
         }
+
+        /**
+         * Set the imageData to be used as the current image data.
+         * @return A modified builder
+         */
+        public Builder currentImageData() {
+            this.imageData = QP.getCurrentImageData();
+            return this;
+        }
+
 
         /**
          * Set the channels to be used in inference
@@ -369,10 +380,10 @@ public class InstanSeg {
          */
         public InstanSeg build() {
             if (imageData == null) {
-                throw new IllegalStateException("imageData cannot be null!");
+                // assignment is just to suppress IDE suggestion for void return
+                var tmp = currentImageData();
             }
             if (channels == null) {
-                // assignment is just to suppress IDE suggestion for void return
                 var tmp = allChannels();
             }
             if (outputClasses == null) {
