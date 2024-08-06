@@ -1,8 +1,6 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathAnnotationObject;
@@ -22,7 +20,6 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 public class InstanSeg {
-    private static final Logger logger = LoggerFactory.getLogger(InstanSeg.class);
 
     private final int tileDims;
     private final double downsample;

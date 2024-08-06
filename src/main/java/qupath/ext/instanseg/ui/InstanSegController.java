@@ -149,10 +149,10 @@ public class InstanSegController extends BorderPane {
                 .toList()
                 .size();
         if (n == 0)
-            return "No channels selected!";
+            return resources.getString("ui.options.noChannelSelected");
         if (n == 1)
-            return "1 channel selected";
-        return n + " channels selected";
+            return resources.getString("ui.options.oneChannelSelected");
+        return String.format(resources.getString("ui.options.nChannelSelected"), n);
     }
 
     private void addSetFromVisible(CheckComboBox<ChannelSelectItem> comboChannels) {

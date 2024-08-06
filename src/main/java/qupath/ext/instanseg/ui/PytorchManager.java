@@ -51,7 +51,7 @@ class PytorchManager {
     }
 
     /**
-     * Query if the PyTorch engine is already available, without a need to downlaod.
+     * Query if the PyTorch engine is already available, without a need to download.
      * @return
      */
     static boolean hasPyTorchEngine() {
