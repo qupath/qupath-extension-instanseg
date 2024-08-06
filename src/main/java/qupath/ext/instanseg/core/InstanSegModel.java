@@ -138,8 +138,8 @@ public class InstanSegModel {
     }
 
     /**
-     * Retrieve
-     * @return
+     * Retrieve the BioImage model spec.
+     * @return The BioImageIO model spec for this InstanSeg model.
      */
     BioimageIoSpec.BioimageIoModel getModel() {
         if (model == null) {
