@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
+import qupath.ext.instanseg.core.PytorchManager;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
 import qupath.fx.utils.FXUtils;
@@ -90,18 +91,19 @@ public class InstanSegController extends BorderPane {
     private CheckBox nucleiOnlyCheckBox;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
-    private final QuPathGUI qupath = QuPathGUI.getInstance();
+    private final QuPathGUI qupath;
     private ObjectProperty<FutureTask<?>> pendingTask = new SimpleObjectProperty<>();
     private MessageTextHelper messageTextHelper;
 
     private final Watcher watcher = new Watcher(modelChoiceBox);
     private ExecutorService executor;
 
-    public static InstanSegController createInstance() throws IOException {
-        return new InstanSegController();
+    public static InstanSegController createInstance(QuPathGUI qupath) throws IOException {
+        return new InstanSegController(qupath);
     }
 
-    private InstanSegController() throws IOException {
+    private InstanSegController(QuPathGUI qupath) throws IOException {
+        this.qupath = qupath;
         var url = InstanSegController.class.getResource("instanseg_control.fxml");
         FXMLLoader loader = new FXMLLoader(url, resources);
         loader.setRoot(this);
@@ -118,6 +120,38 @@ public class InstanSegController extends BorderPane {
 
         configureChannelPicker();
     }
+
+
+    void interrupt() {
+        watcher.interrupt();
+    }
+
+    /**
+     * Open the model directory in the system file browser when double-clicked.
+     * @param event
+     */
+    @FXML
+    void handleModelDirectoryLabelClick(MouseEvent event) {
+        if (event.getClickCount() != 2) {
+            return;
+        }
+        var path = InstanSegPreferences.modelDirectoryProperty().get();
+        if (path == null || path.isEmpty()) {
+            return;
+        }
+        var file = new File(path);
+        if (file.exists()) {
+            GuiTools.browseDirectory(file);
+        } else {
+            logger.debug("Can't browse directory for {}", file);
+        }
+    }
+
+    @FXML
+    void promptForModelDirectory() {
+        promptToUpdateDirectory(InstanSegPreferences.modelDirectoryProperty());
+    }
+
 
     private void configureChannelPicker() {
         updateChannelPicker(qupath.getImageData());
@@ -155,6 +189,16 @@ public class InstanSegController extends BorderPane {
         return n + " channels selected";
     }
 
+    /**
+     * Add an option to the ContextMenu of the CheckComboBox to select all
+     * currently-visible channels.
+     * <p>
+     * Particularly useful for images with many channels - it's possible
+     * to preview a subset of channels using the brightness and contrast
+     * window, and to then transfer this selection to InstanSeg by simply
+     * right-clicking and choosing "Set from visible".
+     * @param comboChannels The CheckComboBox for selecting channels.
+     */
     private void addSetFromVisible(CheckComboBox<ChannelSelectItem> comboChannels) {
         var mi = new MenuItem();
         mi.setText("Set from visible");
@@ -231,7 +275,7 @@ public class InstanSegController extends BorderPane {
                 qupath.imageDataProperty().isNull()
                         .or(pendingTask.isNotNull())
                         .or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
-                        .or(messageTextHelper.warningText().isNotEmpty())
+                        .or(messageTextHelper.hasWarning())
                         .or(deviceChoices.getSelectionModel().selectedItemProperty().isNull())
         );
         pendingTask.addListener((observable, oldValue, newValue) -> {
@@ -270,10 +314,6 @@ public class InstanSegController extends BorderPane {
     // This allows us to use a segmented button with the appearance of regular, non-toggle buttons
     private static void overrideToggleSelected(ToggleButton button) {
         button.selectedProperty().addListener((value, oldValue, newValue) -> button.setSelected(false));
-    }
-
-    public void interrupt() {
-        watcher.interrupt();
     }
 
     private void handleModelDirectory(String n) {
@@ -342,7 +382,7 @@ public class InstanSegController extends BorderPane {
         }
     }
 
-    public void restart() {
+    void restart() {
         executor = Executors.newSingleThreadExecutor();
         executor.submit(watcher::processEvents);
     }
@@ -417,6 +457,7 @@ public class InstanSegController extends BorderPane {
             }
             qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
 
+
             String cmd = String.format("""
                             import qupath.ext.instanseg.core.InstanSeg
                             import static qupath.lib.gui.scripting.QPEx.*
@@ -478,31 +519,6 @@ public class InstanSegController extends BorderPane {
         hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getTMAGrid().getTMACoreList(), null);
     }
 
-    /**
-     * Open the model directory in the system file browser when double-clicked.
-     * @param event
-     */
-    @FXML
-    public void handleModelDirectoryLabelClick(MouseEvent event) {
-        if (event.getClickCount() != 2) {
-            return;
-        }
-        var path = InstanSegPreferences.modelDirectoryProperty().get();
-        if (path == null || path.isEmpty()) {
-            return;
-        }
-        var file = new File(path);
-        if (file.exists()) {
-            GuiTools.browseDirectory(file);
-        } else {
-            logger.debug("Can't browse directory for {}", file);
-        }
-    }
-
-    @FXML
-    public void promptForModelDirectory() {
-        promptToUpdateDirectory(InstanSegPreferences.modelDirectoryProperty());
-    }
 
     private void promptToUpdateDirectory(StringProperty dirPath) {
         var modelDirPath = dirPath.get();

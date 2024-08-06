@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.ui;
 
+import javafx.application.Platform;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,14 +88,18 @@ class Watcher {
                 logger.debug("{}: {}", event.kind().name(), child);
 
                 if (kind == ENTRY_CREATE && InstanSegModel.isValidModel(name)) {
-                    try {
-                        modelChoiceBox.getItems().add(InstanSegModel.fromPath(child));
-                    } catch (IOException e) {
-                        logger.error("Unable to add model", e);
-                    }
+                    Platform.runLater(() -> {
+                        try {
+                            modelChoiceBox.getItems().add(InstanSegModel.fromPath(child));
+                        } catch (IOException e) {
+                            logger.error("Unable to add model from path", e);
+                        }
+                    });
                 }
                 if (kind == ENTRY_DELETE && InstanSegModel.isValidModel(name)) {
-                    modelChoiceBox.getItems().removeIf(model -> model.getPath().equals(child));
+                    Platform.runLater(() -> {
+                        modelChoiceBox.getItems().removeIf(model -> model.getPath().equals(child));
+                    });
                 }
 
             }

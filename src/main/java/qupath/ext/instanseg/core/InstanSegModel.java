@@ -49,7 +49,6 @@ public class InstanSegModel {
         this.name = model.getName();
     }
 
-
     private InstanSegModel(URL modelURL, String name) {
         this.modelURL = modelURL;
         this.name = name;
@@ -75,24 +74,78 @@ public class InstanSegModel {
         throw new UnsupportedOperationException("Fetching models by name is not yet implemented!");
     }
 
-    public BioimageIoSpec.BioimageIoModel getModel() {
-        if (model == null) {
-            try {
-                fetchModel();
-            } catch (IOException e) {
-                // todo: exception handling here, or...?
-                throw new RuntimeException(e);
-            }
-        }
-        return model;
-    }
-
+    /**
+     * Get the pixel size in the X dimension.
+     * @return the pixel size in the X dimension.
+     */
     public Double getPixelSizeX() {
         return getPixelSize().get("x");
     }
 
+    /**
+     * Get the pixel size in the Y dimension.
+     * @return the pixel size in the Y dimension.
+     */
     public Double getPixelSizeY() {
         return getPixelSize().get("y");
+    }
+
+    /**
+     * Get the path where the model is stored on disk.
+     * @return A path on disk, or an exception if it can't be found.
+     */
+    public Path getPath() {
+        if (path == null) {
+            fetchModel();
+        }
+        return path;
+    }
+
+    @Override
+    public String toString() {
+        return getName();
+    }
+
+    /**
+     * Check if a path is (likely) a valid InstanSeg model.
+     * @param path The path to a folder.
+     * @return True if the folder contains an instanseg.pt file and an accompanying rdf.yaml.
+     * Does not currently validate the contents of either, but may in future check
+     * the yaml contents and the checksum of the pt file.
+     */
+    public static boolean isValidModel(Path path) {
+        // return path.toString().endsWith(".pt"); // if just looking at pt files
+        if (Files.isDirectory(path)) {
+            return Files.exists(path.resolve("instanseg.pt")) && Files.exists(path.resolve("rdf.yaml"));
+        }
+        return false;
+    }
+
+    /**
+     * The number of tiles that failed during processing.
+     * @return The count of the number of failed tiles.
+     */
+    public int nFailed() {
+        return nFailed;
+    }
+
+    /**
+     * Get the model name
+     * @return A string
+     */
+    String getName() {
+        return name;
+    }
+
+    /**
+     * Retrieve
+     * @return
+     */
+    BioimageIoSpec.BioimageIoModel getModel() {
+        if (model == null) {
+            fetchModel();
+        }
+        return model;
     }
 
     private Map<String, Double> getPixelSize() {
@@ -105,43 +158,21 @@ public class InstanSegModel {
         return map;
     }
 
-    private void fetchModel() throws IOException {
+    private void fetchModel() {
         if (modelURL == null) {
             throw new NullPointerException("Model URL should not be null for a local model!");
         }
         downloadAndUnzip(modelURL, getUserDir().resolve("instanseg"));
     }
 
-    private static void downloadAndUnzip(URL url, Path localDirectory) throws IOException {
+    private static void downloadAndUnzip(URL url, Path localDirectory) {
         // todo: implement
     }
-
 
     private static Path getUserDir() {
         Path userPath = UserDirectoryManager.getInstance().getUserPath();
         Path cachePath = Paths.get(System.getProperty("user.dir"), ".cache", "QuPath");
         return userPath == null || userPath.toString().isEmpty() ?  cachePath : userPath;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public Path getPath() {
-        if (path == null) {
-            try {
-                fetchModel();
-            } catch (IOException e) {
-                // todo: handle here, or...?
-                throw new RuntimeException(e);
-            }
-        }
-        return path;
-    }
-
-    @Override
-    public String toString() {
-        return getName();
     }
 
     void runInstanSeg(
@@ -158,7 +189,8 @@ public class InstanSegModel {
             TaskRunner taskRunner) {
 
         nFailed = 0;
-        Path modelPath = getPath().resolve("instanseg.pt");
+        Path modelPath;
+        modelPath = getPath().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
 
@@ -225,29 +257,6 @@ public class InstanSegModel {
     private static void printResourceCount(String title, BaseNDManager manager) {
         logger.info(title);
         manager.debugDump(2);
-    }
-
-    /**
-     * Check if a path is (likely) a valid InstanSeg model.
-     * @param path The path to a folder.
-     * @return True if the folder contains an instanseg.pt file and an accompanying rdf.yaml.
-     * Does not currently validate the contents of either, but may in future check
-     * the yaml contents and the checksum of the pt file.
-     */
-    public static boolean isValidModel(Path path) {
-        // return path.toString().endsWith(".pt"); // if just looking at pt files
-        if (Files.isDirectory(path)) {
-            return Files.exists(path.resolve("instanseg.pt")) && Files.exists(path.resolve("rdf.yaml"));
-        }
-        return false;
-    }
-
-    /**
-     * The number of tiles that failed during processing.
-     * @return The count of the number of failed tiles.
-     */
-    public int nFailed() {
-        return nFailed;
     }
 
 }
