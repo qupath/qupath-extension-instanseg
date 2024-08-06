@@ -11,8 +11,9 @@ import qupath.ext.djl.DjlTools;
 
 class MatTranslator implements Translator<Mat, Mat> {
 
-    private String inputLayoutNd, outputLayoutNd;
-    private boolean nucleiOnly = false;
+    private final String inputLayoutNd;
+    private final String outputLayoutNd;
+    private final boolean nucleiOnly;
 
     public MatTranslator(String inputLayoutNd, String outputLayoutNd, boolean nucleiOnly) {
         this.inputLayoutNd = inputLayoutNd;
@@ -26,7 +27,7 @@ class MatTranslator implements Translator<Mat, Mat> {
      * Specifically, 16-bit types should be avoided.
      */
     @Override
-    public NDList processInput(TranslatorContext ctx, Mat input) throws Exception {
+    public NDList processInput(TranslatorContext ctx, Mat input) {
         var manager = ctx.getNDManager();
         var ndarray = DjlTools.matToNDArray(manager, input, inputLayoutNd);
         var out = new NDList(ndarray);
@@ -41,7 +42,7 @@ class MatTranslator implements Translator<Mat, Mat> {
     }
 
     @Override
-    public Mat processOutput(TranslatorContext ctx, NDList list) throws Exception {
+    public Mat processOutput(TranslatorContext ctx, NDList list) {
         var array = list.get(0);
         return DjlTools.ndArrayToMat(array, outputLayoutNd);
     }
