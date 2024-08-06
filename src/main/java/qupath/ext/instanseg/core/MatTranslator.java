@@ -13,7 +13,7 @@ class MatTranslator implements Translator<Mat, Mat> {
 
     private final String inputLayoutNd;
     private final String outputLayoutNd;
-    private boolean nucleiOnly = false;
+    private final boolean firstChannelOnly;
 
     /**
      * Create a translator from InstanSeg input to output.
@@ -24,7 +24,7 @@ class MatTranslator implements Translator<Mat, Mat> {
     MatTranslator(String inputLayoutNd, String outputLayoutNd, boolean firstChannelOnly) {
         this.inputLayoutNd = inputLayoutNd;
         this.outputLayoutNd = outputLayoutNd;
-        this.nucleiOnly = firstChannelOnly;
+        this.firstChannelOnly = firstChannelOnly;
     }
 
     /**
@@ -37,7 +37,7 @@ class MatTranslator implements Translator<Mat, Mat> {
         var manager = ctx.getNDManager();
         var ndarray = DjlTools.matToNDArray(manager, input, inputLayoutNd);
         var out = new NDList(ndarray);
-        if (nucleiOnly) {
+        if (firstChannelOnly) {
             var inds = new int[]{1, 0};
             var array = manager.create(inds, new Shape(2));
             var arrayCPU = array.toDevice(Device.cpu(), false);
