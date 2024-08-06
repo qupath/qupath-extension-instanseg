@@ -124,15 +124,15 @@ class MessageTextHelper {
         return null;
     }
 
-    public StringBinding messageLabelText() {
+    StringBinding messageLabelText() {
         return messageLabelText;
     }
 
-    public BooleanBinding hasWarning() {
+    BooleanBinding hasWarning() {
         return hasWarning;
     }
 
-    public StringBinding warningText() {
+    StringBinding warningText() {
         return warningText;
     }
 

@@ -53,16 +53,16 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 	private void addMenuItem(QuPathGUI qupath) {
 		var menu = qupath.getMenu("Extensions>" + EXTENSION_NAME, true);
 		MenuItem menuItem = new MenuItem("Run InstanSeg");
-		menuItem.setOnAction(e -> createStage());
+		menuItem.setOnAction(e -> createStage(qupath));
 		menuItem.disableProperty().bind(enableExtensionProperty.not());
 		menu.getItems().add(menuItem);
 	}
 
-	private void createStage() {
+	private void createStage(QuPathGUI qupath) {
 		if (stage == null) {
 			try {
 				stage = new Stage();
-				var pane = InstanSegController.createInstance();
+				var pane = InstanSegController.createInstance(qupath);
 				Scene scene = new Scene(pane);
 				pane.heightProperty().addListener((v, o, n) -> handleStageHeightChange());
 				stage.setScene(scene);

@@ -165,7 +165,6 @@ public class InstanSeg {
             return this;
         }
 
-
         /**
          * Set the channels to be used in inference
          * @param channels A collection of channels to be used in inference

@@ -53,6 +53,14 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         this.doPadding = doPadding;
     }
 
+    /**
+     * The number of tiles that failed during processing.
+     * @return The count of the number of failed tiles.
+     */
+    public int nFailed() {
+        return nFailed;
+    }
+
     @Override
     public Mat process(Parameters<Mat, Mat> params) throws IOException {
 
@@ -169,11 +177,5 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         return defaults;
     }
 
-    /**
-     * The number of tiles that failed during processing.
-     * @return The count of the number of failed tiles.
-     */
-    public int nFailed() {
-        return nFailed;
-    }
+
 }

@@ -22,7 +22,6 @@ public class DetectionMeasurer {
     private final Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures;
     private final double pixelSize;
 
-
     private DetectionMeasurer(Collection<ObjectMeasurements.Compartments> compartments,
                               Collection<ObjectMeasurements.Measurements> measurements,
                               Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures,

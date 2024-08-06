@@ -13,12 +13,18 @@ class MatTranslator implements Translator<Mat, Mat> {
 
     private final String inputLayoutNd;
     private final String outputLayoutNd;
-    private final boolean nucleiOnly;
+    private final boolean firstChannelOnly;
 
-    public MatTranslator(String inputLayoutNd, String outputLayoutNd, boolean nucleiOnly) {
+    /**
+     * Create a translator from InstanSeg input to output.
+     * @param inputLayoutNd N-dimensional output specification
+     * @param outputLayoutNd N-dimensional output specification
+     * @param firstChannelOnly Should the model only be concerned with the first output channel?
+     */
+    MatTranslator(String inputLayoutNd, String outputLayoutNd, boolean firstChannelOnly) {
         this.inputLayoutNd = inputLayoutNd;
         this.outputLayoutNd = outputLayoutNd;
-        this.nucleiOnly = nucleiOnly;
+        this.firstChannelOnly = firstChannelOnly;
     }
 
     /**
@@ -31,9 +37,8 @@ class MatTranslator implements Translator<Mat, Mat> {
         var manager = ctx.getNDManager();
         var ndarray = DjlTools.matToNDArray(manager, input, inputLayoutNd);
         var out = new NDList(ndarray);
-        if (nucleiOnly) {
-            var inds = new int[]{1, 1};
-            inds[1] = 0;
+        if (firstChannelOnly) {
+            var inds = new int[]{1, 0};
             var array = manager.create(inds, new Shape(2));
             var arrayCPU = array.toDevice(Device.cpu(), false);
             out.add(arrayCPU);

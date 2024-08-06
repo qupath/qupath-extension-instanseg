@@ -5,12 +5,11 @@ import javafx.beans.property.Property;
 import javafx.beans.property.StringProperty;
 import qupath.lib.gui.prefs.PathPrefs;
 
-public class InstanSegPreferences {
+class InstanSegPreferences {
 
     private InstanSegPreferences() {
         throw new AssertionError("Cannot instantiate this class");
     }
-
 
     private static final StringProperty modelDirectoryProperty = PathPrefs.createPersistentPreference(
             "instanseg.model.dir",
@@ -28,19 +27,19 @@ public class InstanSegPreferences {
             "intanseg.tile.size",
             256);
 
-    public static StringProperty modelDirectoryProperty() {
+    static StringProperty modelDirectoryProperty() {
         return modelDirectoryProperty;
     }
 
-    public static StringProperty preferredDeviceProperty() {
+    static StringProperty preferredDeviceProperty() {
         return preferredDeviceProperty;
     }
 
-    public static Property<Integer> numThreadsProperty() {
+    static Property<Integer> numThreadsProperty() {
         return numThreadsProperty;
     }
 
-    public static IntegerProperty tileSizeProperty() {
+    static IntegerProperty tileSizeProperty() {
         return tileSizeProperty;
     }
 }

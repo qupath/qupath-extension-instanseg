@@ -1,4 +1,4 @@
-package qupath.ext.instanseg.ui;
+package qupath.ext.instanseg.core;
 
 import ai.djl.engine.Engine;
 import ai.djl.engine.EngineException;
@@ -15,15 +15,28 @@ import java.util.concurrent.Callable;
 /**
  * Helper class to manage access to PyTorch via Deep Java Library.
  */
-class PytorchManager {
+public class PytorchManager {
 
     private static final Logger logger = LoggerFactory.getLogger(PytorchManager.class);
+
+    /**
+     * Get the PyTorch engine, downloading if necessary.
+     * @return the engine if available, or null if this failed
+     */
+    public static Engine getEngineOnline() {
+        try {
+            return callOnline(() -> Engine.getEngine("PyTorch"));
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            return null;
+        }
+    }
 
     /**
      * Get the available devices for PyTorch, including MPS if Apple Silicon.
      * @return Only "cpu" if no local engine is found.
      */
-    static Collection<String> getAvailableDevices() {
+    public static Collection<String> getAvailableDevices() {
         try {
             Set<String> availableDevices = new LinkedHashSet<>();
 
@@ -54,7 +67,7 @@ class PytorchManager {
      * Query if the PyTorch engine is already available, without a need to download.
      * @return
      */
-    static boolean hasPyTorchEngine() {
+    public static boolean hasPyTorchEngine() {
         return getEngineOffline() != null;
     }
 
@@ -67,19 +80,6 @@ class PytorchManager {
             return callOffline(() -> Engine.getEngine("PyTorch"));
         } catch (Exception e) {
             logger.info("Failed to fetch offline engine", e);
-            return null;
-        }
-    }
-
-    /**
-     * Get the PyTorch engine, downloading if necessary.
-     * @return the engine if available, or null if this failed
-     */
-    static Engine getEngineOnline() {
-        try {
-            return callOnline(() -> Engine.getEngine("PyTorch"));
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
             return null;
         }
     }
