@@ -141,6 +141,15 @@
                                 </CheckComboBox>
                             </children>
                         </HBox>
+                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                            <children>
+                                <CheckBox styleClass="regular" fx:id="makeMeasurementsCheckBox" text="%ui.options.makeMeasurements">
+                                    <tooltip>
+                                        <Tooltip text="%ui.options.makeMeasurements.tooltip" />
+                                    </tooltip>
+                                </CheckBox>
+                            </children>
+                        </HBox>
                         <Separator prefWidth="200.0" />
 
         <!--            Model Directory Selection-->

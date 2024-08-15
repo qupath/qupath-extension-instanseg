@@ -89,6 +89,8 @@ public class InstanSegController extends BorderPane {
     private ToggleButton selectAllTMACoresButton;
     @FXML
     private CheckBox nucleiOnlyCheckBox;
+    @FXML
+    private CheckBox makeMeasurementsCheckBox;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
@@ -440,7 +442,7 @@ public class InstanSegController extends BorderPane {
                     InstanSegPreferences.numThreadsProperty().getValue());
 
             var imageData = qupath.getImageData();
-            var selectedObjects = qupath.getImageData().getHierarchy().getSelectionModel().getSelectedObjects();
+            var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
@@ -452,10 +454,6 @@ public class InstanSegController extends BorderPane {
                     .taskRunner(taskRunner)
                     .build();
             instanSeg.detectObjects(selectedObjects);
-            for (PathObject po: selectedObjects) {
-                instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
-            }
-            qupath.getImageData().getHierarchy().fireHierarchyChangedEvent(this);
 
 
             String cmd = String.format("""
@@ -474,19 +472,27 @@ public class InstanSegController extends BorderPane {
                                 .nThreads(%d)
                                 .build();
                             instanSeg.detectObjects(instanSegObjects);
+                            """,
+                            model.getPath(),
+                            deviceChoices.getSelectionModel().getSelectedItem(),
+                            nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                            ChannelSelectItem.toConstructorString(channels),
+                            InstanSegPreferences.tileSizeProperty().get(),
+                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                            InstanSegPreferences.numThreadsProperty().getValue()
+                    );
+                    if (makeMeasurementsCheckBox.isSelected()) {
+                        cmd += """
                             for (PathObject po: instanSegObjects) {
                                 instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
                             }
-                            """,
-                    model.getPath(),
-                    deviceChoices.getSelectionModel().getSelectedItem(),
-                    nucleiOnlyCheckBox.isSelected() ? 1 : 2,
-                    ChannelSelectItem.toConstructorString(channels),
-                    InstanSegPreferences.tileSizeProperty().get(),
-                    model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                    InstanSegPreferences.numThreadsProperty().getValue()
-            );
-            qupath.getImageData().getHistoryWorkflow()
+                            """;
+                        for (PathObject po: selectedObjects) {
+                            instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
+                        }
+                    }
+            imageData.getHierarchy().fireHierarchyChangedEvent(this);
+            imageData.getHistoryWorkflow()
                     .addStep(
                             new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
                     );
