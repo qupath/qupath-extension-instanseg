@@ -66,25 +66,27 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             roisToPathObjectsFunction = getTwoClassBiFunction(classes, rng);
         }
 
+        List<PathObject> cells;
         if (geomMaps.size() == 1) {
             // One-channel detected, represent using detection objects
-            return geomMaps.get(0).values().stream()
-                    .map(geom -> roisToPathObjectsFunction.apply(geometryToFilledROI(geom, plane), null))
+            cells = geomMaps.get(0).values().parallelStream()
+                    .map(geom -> roisToPathObjectsFunction.
+                            apply(geometryToFilledROI(geom, plane), null))
                     .collect(Collectors.toList());
         } else {
             // Two channels detected, represent using cell objects
             // We assume that the labels are matched - and we can't have a nucleus without a cell
             Map<Number, Geometry> childGeoms = geomMaps.get(0);
             Map<Number, Geometry> parentGeoms = geomMaps.get(1);
-            List<PathObject> cells = new ArrayList<>();
-            for (var entry : parentGeoms.entrySet()) {
+            cells = parentGeoms.entrySet().parallelStream().map(entry -> {
                 var parent = geometryToFilledROI(entry.getValue(), plane);
                 var child = geometryToFilledROI(childGeoms.getOrDefault(entry.getKey(), null), plane);
-                var outputObject = roisToPathObjectsFunction.apply(parent, child);
-                cells.add(outputObject);
-            }
-            return cells;
+                return roisToPathObjectsFunction.apply(parent, child);
+
+            }).collect(Collectors.toList());
         }
+        return cells;
+
     }
 
     private static ROI geometryToFilledROI(Geometry geom, ImagePlane plane) {
