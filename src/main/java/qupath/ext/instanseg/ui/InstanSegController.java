@@ -158,17 +158,6 @@ public class InstanSegController extends BorderPane {
     private void configureChannelPicker() {
         updateChannelPicker(qupath.getImageData());
         qupath.imageDataProperty().addListener((v, o, n) -> updateChannelPicker(n));
-        // comboChannels.disableProperty().bind(Bindings.createBooleanBinding(
-        //         () -> {
-        //             var model = modelChoiceBox.getSelectionModel().getSelectedItem();
-        //             var imageData = qupath.getImageData();
-        //             if (model == null || imageData == null) {
-        //                 return false;
-        //             }
-        //             return !(model.getNumChannels() == Integer.MAX_VALUE || model.getNumChannels() == imageData.getServer().nChannels());
-        //         },
-        //         qupath.imageDataProperty(),
-        //         modelChoiceBox.getSelectionModel().selectedItemProperty()));
         comboChannels.setTitle(getCheckComboBoxText(comboChannels));
         comboChannels.getItems().addListener((ListChangeListener<ChannelSelectItem>) c -> {
             comboChannels.setTitle(getCheckComboBoxText(comboChannels));
