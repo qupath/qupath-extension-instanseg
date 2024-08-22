@@ -188,12 +188,11 @@
                                 <Label onMouseClicked="#handleModelDirectoryLabelClick" styleClass="regular" text="%ui.options.directory" />
                                 <HBox styleClass="standard-spacing">
                                     <children>
-                                        <TextField fx:id="tfModelDirectory">
+                                        <TextField fx:id="tfModelDirectory" HBox.hgrow="ALWAYS">
                                             <tooltip>
                                                 <Tooltip text="%ui.options.directory.tooltip" />
                                             </tooltip>
                                         </TextField>
-                                        <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
                                         <Button fx:id="modelDirButton" mnemonicParsing="false" onAction="#promptForModelDirectory">
                                             <tooltip>
                                                 <Tooltip text="%ui.options.directory.tooltip" />
