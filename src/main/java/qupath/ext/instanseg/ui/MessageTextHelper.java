@@ -110,8 +110,7 @@ class MessageTextHelper {
                 comboChannels.getCheckModel().getCheckedItems(),
                 deviceChoiceBox.getSelectionModel().selectedItemProperty(),
                 selectedObjectCounter.numSelectedAnnotations,
-                selectedObjectCounter.numSelectedTMACores,
-                selectedObjectCounter.numSelectedDetections);
+                selectedObjectCounter.numSelectedTMACores);
     }
 
     private String getWarningText() {
@@ -120,7 +119,6 @@ class MessageTextHelper {
         if (modelChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-model");
         if (selectedObjectCounter.numSelectedAnnotations.get() == 0 &&
-                selectedObjectCounter.numSelectedDetections.get() == 0 &&
                 selectedObjectCounter.numSelectedTMACores.get() == 0)
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
