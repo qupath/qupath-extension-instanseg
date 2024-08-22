@@ -11,6 +11,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.scene.control.ChoiceBox;
+import org.controlsfx.control.CheckComboBox;
 import org.controlsfx.control.SearchableComboBox;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.lib.gui.QuPathGUI;
@@ -32,6 +33,7 @@ class MessageTextHelper {
     private final SelectedObjectCounter selectedObjectCounter;
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
     private final ChoiceBox<String> deviceChoiceBox;
+    private final CheckComboBox<ChannelSelectItem> comboChannels;
 
     /**
      * Text to display a warning (because inference can't be run)
@@ -53,9 +55,10 @@ class MessageTextHelper {
      */
     private BooleanBinding hasWarning;
 
-    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox) {
+    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<ChannelSelectItem> comboChannels) {
         this.modelChoiceBox = modelChoiceBox;
         this.deviceChoiceBox = deviceChoiceBox;
+        this.comboChannels = comboChannels;
         this.selectedObjectCounter = new SelectedObjectCounter(qupath.imageDataProperty());
         configureMessageTextBindings();
     }
@@ -104,6 +107,7 @@ class MessageTextHelper {
         return Bindings.createStringBinding(this::getWarningText,
                 qupath.imageDataProperty(),
                 modelChoiceBox.getSelectionModel().selectedItemProperty(),
+                comboChannels.getCheckModel().getCheckedItems(),
                 deviceChoiceBox.getSelectionModel().selectedItemProperty(),
                 selectedObjectCounter.numSelectedAnnotations,
                 selectedObjectCounter.numSelectedTMACores,
@@ -121,6 +125,16 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
+        int modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
+        int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
+        if (modelChannels != Integer.MAX_VALUE) {
+            if (modelChannels != selectedChannels) {
+                return String.format(
+                        resources.getString("ui.error.num-channels-dont-match"),
+                        modelChannels,
+                        selectedChannels);
+            }
+        }
         return null;
     }
 

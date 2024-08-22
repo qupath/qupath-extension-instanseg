@@ -158,7 +158,17 @@ public class InstanSegController extends BorderPane {
     private void configureChannelPicker() {
         updateChannelPicker(qupath.getImageData());
         qupath.imageDataProperty().addListener((v, o, n) -> updateChannelPicker(n));
-        comboChannels.disableProperty().bind(qupath.imageDataProperty().isNull());
+        // comboChannels.disableProperty().bind(Bindings.createBooleanBinding(
+        //         () -> {
+        //             var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        //             var imageData = qupath.getImageData();
+        //             if (model == null || imageData == null) {
+        //                 return false;
+        //             }
+        //             return !(model.getNumChannels() == Integer.MAX_VALUE || model.getNumChannels() == imageData.getServer().nChannels());
+        //         },
+        //         qupath.imageDataProperty(),
+        //         modelChoiceBox.getSelectionModel().selectedItemProperty()));
         comboChannels.setTitle(getCheckComboBoxText(comboChannels));
         comboChannels.getItems().addListener((ListChangeListener<ChannelSelectItem>) c -> {
             comboChannels.setTitle(getCheckComboBoxText(comboChannels));
@@ -170,13 +180,24 @@ public class InstanSegController extends BorderPane {
         addSetFromVisible(comboChannels);
     }
 
+
     private void updateChannelPicker(ImageData<BufferedImage> imageData) {
         if (imageData == null) {
             return;
         }
+        comboChannels.getCheckModel().clearChecks();
         comboChannels.getItems().clear();
         comboChannels.getItems().setAll(getAvailableChannels(imageData));
-        comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+        if (imageData.isBrightfield()) {
+            comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
+            var model = modelChoiceBox.getSelectionModel().selectedItemProperty().get();
+            if (model != null && model.getNumChannels() != Integer.MAX_VALUE) {
+                comboChannels.getCheckModel().clearChecks();
+                comboChannels.getCheckModel().checkIndices(0, 1, 2);
+            }
+        } else {
+            comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+        }
     }
 
     private static String getCheckComboBoxText(CheckComboBox<ChannelSelectItem> comboBox) {
@@ -279,6 +300,15 @@ public class InstanSegController extends BorderPane {
                         .or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
                         .or(messageTextHelper.hasWarning())
                         .or(deviceChoices.getSelectionModel().selectedItemProperty().isNull())
+                        .or(Bindings.createBooleanBinding(() -> {
+                            var model = modelChoiceBox.getSelectionModel().selectedItemProperty().get();
+                            if (model == null) {
+                                return true;
+                            }
+                            int numSelected = comboChannels.getCheckModel().getCheckedIndices().size();
+                            int numAllowed = model.getNumChannels();
+                            return !(numSelected == numAllowed || numAllowed == Integer.MAX_VALUE);
+                        }, modelChoiceBox.getSelectionModel().selectedItemProperty()))
         );
         pendingTask.addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
@@ -292,6 +322,13 @@ public class InstanSegController extends BorderPane {
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
         handleModelDirectory(tfModelDirectory.getText());
         tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
+        // for brightfield models, we want to disable the picker and set it to use RGB only
+        modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
+            if (qupath.getImageData().isBrightfield() && n != null && n.getNumChannels() != Integer.MAX_VALUE) {
+                comboChannels.getCheckModel().clearChecks();
+                comboChannels.getCheckModel().checkIndices(0, 1, 2);
+            }
+        });
     }
 
     private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {
@@ -352,7 +389,7 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureMessageLabel() {
-        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices);
+        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels);
         labelMessage.textProperty().bind(messageTextHelper.messageLabelText());
         if (messageTextHelper.hasWarning().get()) {
             labelMessage.getStyleClass().setAll("warning-message");
@@ -455,7 +492,6 @@ public class InstanSegController extends BorderPane {
                     .build();
             instanSeg.detectObjects(selectedObjects);
 
-
             String cmd = String.format("""
                             import qupath.ext.instanseg.core.InstanSeg
                             import static qupath.lib.gui.scripting.QPEx.*
@@ -499,8 +535,7 @@ public class InstanSegController extends BorderPane {
             if (model.nFailed() > 0) {
                 var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
                 logger.error(errorMessage);
-                Dialogs.showErrorMessage(resources.getString("title"),
-                        errorMessage);
+                Dialogs.showErrorMessage(resources.getString("title"), errorMessage);
             }
             return null;
         }
