@@ -158,6 +158,15 @@ public class InstanSegModel {
         return map;
     }
 
+    public int getNumChannels() {
+        assert getModel().getInputs().getFirst().getAxes().equals("bcyx");
+        int numChannels = getModel().getInputs().getFirst().getShape().getShapeMin()[1];
+        if (getModel().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
+            numChannels = Integer.MAX_VALUE;
+        }
+        return numChannels;
+    }
+
     private void fetchModel() {
         if (modelURL == null) {
             throw new NullPointerException("Model URL should not be null for a local model!");

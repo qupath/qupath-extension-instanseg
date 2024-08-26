@@ -6,6 +6,7 @@
 <?import javafx.scene.text.*?>
 <?import org.controlsfx.control.*?>
 
+<?import javafx.geometry.Insets?>
 <fx:root type="BorderPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
     <center>
         <VBox fx:id="vBox">
@@ -86,19 +87,28 @@
             <TitledPane animated="false" maxHeight="Infinity" text="%ui.options.pane" VBox.vgrow="NEVER">
                 <VBox alignment="TOP_CENTER" spacing="7.5" styleClass="standard-padding">
                     <children>
+
         <!--            Device Selection-->
-                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" top="10"/>
+                            </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.device" />
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
                                 <ChoiceBox fx:id="deviceChoices">
                                     <tooltip><Tooltip text="%ui.options.device.tooltip" /></tooltip>
                                 </ChoiceBox>
                             </children>
                         </HBox>
         <!--            Thread Selection-->
-                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" />
+                            </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.threads" />
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
                                 <Spinner fx:id="threadSpinner" prefWidth="75.0">
                                     <tooltip>
                                         <Tooltip text="%ui.options.threads.tooltip" />
@@ -109,10 +119,14 @@
                                 </Spinner>
                             </children>
                         </HBox>
-                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" />
+                            </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.nuclei-only" />
-                                <CheckBox fx:id="nucleiOnlyCheckBox" prefWidth="75.0">
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
+                                <CheckBox fx:id="nucleiOnlyCheckBox">
                                     <tooltip>
                                         <Tooltip text="%ui.options.nuclei-only.tooltip" />
                                     </tooltip>
@@ -120,9 +134,13 @@
                             </children>
                         </HBox>
         <!--            Tile Size Selection-->
-                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" />
+                            </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.tilesize" />
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
                                 <ChoiceBox prefWidth="75.0" fx:id="tileSizeChoiceBox">
                                     <tooltip>
                                         <Tooltip text="%ui.options.tilesize.tooltip" />
@@ -131,9 +149,13 @@
                             </children>
                         </HBox>
         <!--            Channel Selection-->
-                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" />
+                            </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.channel" />
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
                                 <CheckComboBox fx:id="comboChannels">
                                     <tooltip>
                                         <Tooltip text="%ui.options.channel.tooltip" />
@@ -141,15 +163,23 @@
                                 </CheckComboBox>
                             </children>
                         </HBox>
-                        <HBox alignment="CENTER" styleClass="standard-spacing">
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" bottom="10"/>
+                            </padding>
                             <children>
-                                <CheckBox styleClass="regular" fx:id="makeMeasurementsCheckBox" text="%ui.options.makeMeasurements">
+                                <Label text="%ui.options.makeMeasurements"/>
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
+                                <CheckBox styleClass="regular" fx:id="makeMeasurementsCheckBox">
                                     <tooltip>
                                         <Tooltip text="%ui.options.makeMeasurements.tooltip" />
                                     </tooltip>
                                 </CheckBox>
                             </children>
                         </HBox>
+
+
+
                         <Separator prefWidth="200.0" />
 
         <!--            Model Directory Selection-->
@@ -173,11 +203,6 @@
                                         </Button>
                                     </children>
                                 </HBox>
-                            </children>
-                        </VBox>
-                        <VBox alignment="CENTER" styleClass="standard-spacing">
-                            <children>
-                                <HBox styleClass="standard-spacing" />
                             </children>
                         </VBox>
                     </children>
