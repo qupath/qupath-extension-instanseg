@@ -325,7 +325,11 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureTileSizes() {
-        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024, 1536, 2048, 3072, 4096);
+        // Because of the use of 32-bit signed ints for coordinates of the intermediate sparse matrix,
+        // we can't have very large tile sizes.
+        // We can estimate the total number of instances supported as 2^31 / (tileSize^2) -
+        // if we have large tiles, we likely have many instances and we can have errors.
+        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
         tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
         tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
@@ -477,6 +481,7 @@ public class InstanSegController extends BorderPane {
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
                     .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+//                    .outputAnnotations()
                     .taskRunner(taskRunner)
                     .build();
             instanSeg.detectObjects(selectedObjects);
