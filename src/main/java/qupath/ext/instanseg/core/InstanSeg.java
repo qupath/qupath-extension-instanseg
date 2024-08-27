@@ -383,7 +383,7 @@ public class InstanSeg {
                 var tmp = allChannels();
             }
             if (outputClasses == null) {
-                var tmp = outputCells();
+                var tmp = numOutputChannels == 2 ? outputCells() : outputDetections();
             }
             if (outputClasses.size() > 1 && numOutputChannels == 1) {
                 throw new IllegalArgumentException("Cannot have multiple output types when using only one output channel.");

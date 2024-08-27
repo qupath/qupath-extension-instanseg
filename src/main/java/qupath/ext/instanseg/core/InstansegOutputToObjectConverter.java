@@ -69,7 +69,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         List<PathObject> cells;
         if (geomMaps.size() == 1) {
             // One-channel detected, represent using detection objects
-            cells = geomMaps.get(0).values().parallelStream()
+            cells = geomMaps.getFirst().values().stream()
                     .map(geom -> roisToPathObjectsFunction.
                             apply(geometryToFilledROI(geom, plane), null))
                     .collect(Collectors.toList());
@@ -78,7 +78,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             // We assume that the labels are matched - and we can't have a nucleus without a cell
             Map<Number, Geometry> childGeoms = geomMaps.get(0);
             Map<Number, Geometry> parentGeoms = geomMaps.get(1);
-            cells = parentGeoms.entrySet().parallelStream().map(entry -> {
+            cells = parentGeoms.entrySet().stream().map(entry -> {
                 var parent = geometryToFilledROI(entry.getValue(), plane);
                 var child = geometryToFilledROI(childGeoms.getOrDefault(entry.getKey(), null), plane);
                 return roisToPathObjectsFunction.apply(parent, child);
@@ -100,14 +100,14 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     private static BiFunction<ROI, ROI, PathObject> getOneClassBiFunction(List<Class<? extends PathObject>> classes, Random rng) {
         // if of length 1, can be
         // cellObject (with or without nucleus), annotations, detections
-        if (classes.get(0) == PathAnnotationObject.class) {
+        if (classes.getFirst() == PathAnnotationObject.class) {
             return createObjectsFun(PathObjects::createAnnotationObject, PathObjects::createAnnotationObject, rng);
-        } else if (classes.get(0) == PathDetectionObject.class) {
+        } else if (classes.getFirst() == PathDetectionObject.class) {
             return createObjectsFun(PathObjects::createDetectionObject, PathObjects::createDetectionObject, rng);
-        } else if (classes.get(0) == PathCellObject.class) {
+        } else if (classes.getFirst() == PathCellObject.class) {
             return createCellFun(rng);
         } else {
-            logger.warn("Unknown output {}, defaulting to cells", classes.get(0));
+            logger.warn("Unknown output {}, defaulting to cells", classes.getFirst());
             return createCellFun(rng);
         }
     }
@@ -135,7 +135,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     private static BiFunction<ROI, ROI, PathObject> createCellFun(Random rng) {
         return (parent, child) -> {
             var cell = PathObjects.createCellObject(parent, child);
-            var color = ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
+            var color = randomRGB(rng);
             cell.setColor(color);
             return cell;
         };
@@ -144,7 +144,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     private static BiFunction<ROI, ROI, PathObject> createObjectsFun(Function<ROI, PathObject> createParentFun, Function<ROI, PathObject> createChildFun, Random rng) {
         return (parent, child) -> {
             var parentObj = createParentFun.apply(parent);
-            var color = ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
+            var color = randomRGB(rng);
             parentObj.setColor(color);
             if (child != null) {
                 var childObj = createChildFun.apply(child);
@@ -153,6 +153,10 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             }
             return parentObj;
         };
+    }
+
+    private static int randomRGB(Random rng) {
+        return ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
     }
 
 }
