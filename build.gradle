@@ -20,9 +20,6 @@ base {
 
 ext.qupathVersion = gradle.ext.qupathVersion
 
-// Should be Java 21 for QuPath v0.6.0
-ext.qupathJavaVersion = 21
-
 /**
  * Define dependencies.
  * - Using 'shadow' indicates that they are already part of QuPath, so you don't need
@@ -108,7 +105,7 @@ tasks.register("copyDependencies", Copy) {
  */
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(qupathJavaVersion)
+        languageVersion = JavaLanguageVersion.of(libs.versions.jdk.get())
     }
     withSourcesJar()
     withJavadocJar()
