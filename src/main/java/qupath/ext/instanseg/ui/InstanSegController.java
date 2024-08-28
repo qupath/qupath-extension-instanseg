@@ -120,6 +120,12 @@ public class InstanSegController extends BorderPane {
     private final Watcher watcher = new Watcher(modelChoiceBox);
     private ExecutorService executor;
 
+    /**
+     * Create an instance of the InstanSeg GUI pane.
+     * @param qupath The QuPath GUI it should be attached to.
+     * @return A handle on the UI element.
+     * @throws IOException If the FXML or resources fail to load.
+     */
     public static InstanSegController createInstance(QuPathGUI qupath) throws IOException {
         return new InstanSegController(qupath);
     }
@@ -373,12 +379,10 @@ public class InstanSegController extends BorderPane {
 
 
     private static void parseMarkdown(InstanSegModel model, WebView webView, Button infoButton, PopOver infoPopover) {
-        String body = null;
-        try {
-            body = model.getREADME();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        Optional<String> readme = model.getREADME();
+        if (readme.isEmpty()) return;
+        String body = readme.get();
+
         // Parse the initial markdown only, to extract any YAML front matter
         var parser = org.commonmark.parser.Parser.builder().build();
         var doc = parser.parse(body);

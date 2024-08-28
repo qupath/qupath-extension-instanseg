@@ -79,8 +79,34 @@ public class InstanSegModel {
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
     }
 
+    /**
+     * Create an InstanSeg model from a remote URL.
+     * @param name The model name
+     * @param browserDownloadUrl The download URL from eg GitHub
+     * @param localModelPath The path that models should be downloaded to
+     * @return A handle on the created model
+     */
     public static InstanSegModel fromURL(String name, URL browserDownloadUrl, Path localModelPath) {
         return new InstanSegModel(name, browserDownloadUrl, localModelPath);
+    }
+
+
+    /**
+     * Check if the model has been downloaded already.
+     * @return True if a flag has been set.
+     */
+    public boolean isDownloaded() {
+        // todo: this should also check if the contents are what we expect
+        return downloaded;
+    }
+
+    /**
+     * Extract the README from a local file
+     * @return The README as a String, if possible. If not present, or an error
+     * occurs when reading, nothing.
+     */
+    public Optional<String> getREADME() {
+        return getPath().map(this::getREADMEString);
     }
 
     /**
@@ -145,6 +171,39 @@ public class InstanSegModel {
     }
 
     /**
+     * Trigger a download for a model
+     * @throws IOException If an error occurs when downloading, unzipping, etc.
+     */
+    public void download() throws IOException {
+        if (downloaded) return;
+        var zipFile = downloadZip(
+                this.modelURL,
+                localModelPath,
+                name);
+        this.path = unzip(zipFile);
+        this.model = BioimageIoSpec.parseModel(path.toFile());
+        this.downloaded = true;
+    }
+
+    /**
+     * Try to check the number of channels in the model.
+     * @return The integer if the model is downloaded, otherwise empty
+     * @throws IOException
+     */
+    public Optional<Integer> getNumChannels() {
+        var model = getModel();
+        if (model.isEmpty()) {
+            return Optional.empty();
+        }
+        assert model.get().getInputs().getFirst().getAxes().equals("bcyx");
+        int numChannels = model.get().getInputs().getFirst().getShape().getShapeMin()[1];
+        if (model.get().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
+            numChannels = Integer.MAX_VALUE;
+        }
+        return Optional.of(numChannels);
+    }
+
+    /**
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
@@ -152,16 +211,6 @@ public class InstanSegModel {
         return Optional.ofNullable(model);
     }
 
-    public void download() throws IOException {
-        if (downloaded) return;
-        var zipFile = downloadZip(
-            this.modelURL,
-            localModelPath,
-            name);
-        this.path = unzip(zipFile);
-        this.model = BioimageIoSpec.parseModel(path.toFile());
-        this.downloaded = true;
-    }
 
     private static Path downloadZip(URL url, Path localDirectory, String filename) {
         var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
@@ -233,23 +282,7 @@ public class InstanSegModel {
         return Optional.of(map);
     }
 
-    /**
-     * Try to check the number of channels in the model.
-     * @return The integer if the model is downloaded, otherwise empty
-     * @throws IOException
-     */
-    public Optional<Integer> getNumChannels() {
-        var model = getModel();
-        if (model.isEmpty()) {
-            return Optional.empty();
-        }
-        assert model.get().getInputs().getFirst().getAxes().equals("bcyx");
-        int numChannels = model.get().getInputs().getFirst().getShape().getShapeMin()[1];
-        if (model.get().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
-            numChannels = Integer.MAX_VALUE;
-        }
-        return Optional.of(numChannels);
-    }
+
 
     void runInstanSeg(
             ImageData<BufferedImage> imageData,
@@ -336,20 +369,14 @@ public class InstanSegModel {
         manager.debugDump(2);
     }
 
-    public boolean isDownloaded() {
-        return downloaded;
-    }
 
-    /**
-     * Extract the README from a local file
-     * @return
-     * @throws IOException
-     */
-    public String getREADME() throws IOException {
-        if (!downloaded) {
-            download();
-        }
+    private String getREADMEString(Path path) {
         var file = path.resolve(name + "_README.md");
-        return Files.readString(file, StandardCharsets.UTF_8);
+        try {
+            return Files.readString(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            logger.error("Unable to find README", e);
+            return null;
+        }
     }
 }
