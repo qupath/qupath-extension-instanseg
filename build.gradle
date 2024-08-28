@@ -11,6 +11,7 @@ plugins {
 }
 
 ext.moduleName = 'io.github.qupath.extension.instanseg'
+ext.blah = aj
 
 base {
     archivesName = rootProject.name
