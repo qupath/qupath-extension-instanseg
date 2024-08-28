@@ -5,6 +5,7 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.ObjectBinding;
 import javafx.beans.binding.StringBinding;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -21,6 +22,7 @@ import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.ResourceBundle;
 
@@ -34,6 +36,7 @@ class MessageTextHelper {
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
     private final ChoiceBox<String> deviceChoiceBox;
     private final CheckComboBox<ChannelSelectItem> comboChannels;
+    private final BooleanProperty needsUpdating;
 
     /**
      * Text to display a warning (because inference can't be run)
@@ -55,10 +58,11 @@ class MessageTextHelper {
      */
     private BooleanBinding hasWarning;
 
-    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<ChannelSelectItem> comboChannels) {
+    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<ChannelSelectItem> comboChannels, BooleanProperty needsUpdating) {
         this.modelChoiceBox = modelChoiceBox;
         this.deviceChoiceBox = deviceChoiceBox;
         this.comboChannels = comboChannels;
+        this.needsUpdating = needsUpdating;
         this.selectedObjectCounter = new SelectedObjectCounter(qupath.imageDataProperty());
         configureMessageTextBindings();
     }
@@ -110,7 +114,8 @@ class MessageTextHelper {
                 comboChannels.getCheckModel().getCheckedItems(),
                 deviceChoiceBox.getSelectionModel().selectedItemProperty(),
                 selectedObjectCounter.numSelectedAnnotations,
-                selectedObjectCounter.numSelectedTMACores);
+                selectedObjectCounter.numSelectedTMACores,
+                needsUpdating);
     }
 
     private String getWarningText() {
@@ -123,14 +128,22 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
-        int modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
-        int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
-        if (modelChannels != Integer.MAX_VALUE) {
-            if (modelChannels != selectedChannels) {
-                return String.format(
-                        resources.getString("ui.error.num-channels-dont-match"),
-                        modelChannels,
-                        selectedChannels);
+        if (modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded()) {
+            // shouldn't happen if downloaded anyway!
+            int modelChannels = 0;
+            try {
+                modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
+            if (modelChannels != Integer.MAX_VALUE) {
+                if (modelChannels != selectedChannels) {
+                    return String.format(
+                            resources.getString("ui.error.num-channels-dont-match"),
+                            modelChannels,
+                            selectedChannels);
+                }
             }
         }
         return null;

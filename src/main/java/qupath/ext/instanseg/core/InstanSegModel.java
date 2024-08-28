@@ -10,8 +10,8 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
+
 import qupath.lib.experimental.pixels.OpenCVProcessor;
-import qupath.lib.gui.UserDirectoryManager;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathObject;
@@ -21,8 +21,16 @@ import qupath.lib.plugins.TaskRunner;
 import qupath.opencv.ops.ImageOps;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -33,12 +41,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class InstanSegModel {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
+    private Path localModelPath;
+    private URL modelURL = null;
+    private boolean downloaded = false;
 
     private Path path = null;
-    private URL modelURL = null;
     private BioimageIoSpec.BioimageIoModel model = null;
     private final String name;
     private int nFailed = 0;
@@ -47,11 +59,13 @@ public class InstanSegModel {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
         this.name = model.getName();
+        this.downloaded = true;
     }
 
-    private InstanSegModel(URL modelURL, String name) {
+    private InstanSegModel(String name, URL modelURL, Path localModelPath) {
         this.modelURL = modelURL;
         this.name = name;
+        this.localModelPath = localModelPath;
     }
 
     /**
@@ -64,21 +78,16 @@ public class InstanSegModel {
         return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
     }
 
-    /**
-     * Request an InstanSeg model from the set of available models
-     * @param name The model name
-     * @return The specified model.
-     */
-    public static InstanSegModel fromName(String name) {
-        // todo: instantiate built-in models somehow
-        throw new UnsupportedOperationException("Fetching models by name is not yet implemented!");
+    public static InstanSegModel fromURL(String name, URL browserDownloadUrl, Path localModelPath) {
+        // todo: this constructor should initialise a
+        return new InstanSegModel(name, browserDownloadUrl, localModelPath);
     }
 
     /**
      * Get the pixel size in the X dimension.
      * @return the pixel size in the X dimension.
      */
-    public Double getPixelSizeX() {
+    public Double getPixelSizeX() throws IOException {
         return getPixelSize().get("x");
     }
 
@@ -86,7 +95,7 @@ public class InstanSegModel {
      * Get the pixel size in the Y dimension.
      * @return the pixel size in the Y dimension.
      */
-    public Double getPixelSizeY() {
+    public Double getPixelSizeY() throws IOException {
         return getPixelSize().get("y");
     }
 
@@ -94,9 +103,9 @@ public class InstanSegModel {
      * Get the path where the model is stored on disk.
      * @return A path on disk, or an exception if it can't be found.
      */
-    public Path getPath() {
+    public Path getPath() throws IOException {
         if (path == null) {
-            fetchModel();
+            download();
         }
         return path;
     }
@@ -133,7 +142,7 @@ public class InstanSegModel {
      * Get the model name
      * @return A string
      */
-    String getName() {
+    public String getName() {
         return name;
     }
 
@@ -141,15 +150,85 @@ public class InstanSegModel {
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
-    BioimageIoSpec.BioimageIoModel getModel() {
+    BioimageIoSpec.BioimageIoModel getModel() throws IOException {
         if (model == null) {
-            fetchModel();
+            download();
         }
         return model;
     }
 
-    private Map<String, Double> getPixelSize() {
-        // todo: this code is horrendous
+    public void download() throws IOException {
+        if (downloaded) return;
+        var zipFile = downloadZip(
+            this.modelURL,
+            localModelPath,
+            name);
+        this.path = unzip(zipFile);
+        this.model = BioimageIoSpec.parseModel(path.toFile());
+        this.downloaded = true;
+    }
+
+    private static Path downloadZip(URL url, Path localDirectory, String filename) {
+        // "https://github.com/instanseg/instanseg/releases/download/instanseg_models_v1/fluorescence_nuclei_and_cells.zip"
+        var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
+        if (!Files.exists(zipFile)) {
+            try (InputStream stream = url.openStream()) {
+                try (ReadableByteChannel readableByteChannel = Channels.newChannel(stream)) {
+                    try (FileOutputStream fos = new FileOutputStream(zipFile.toFile())) {
+                        fos.getChannel().transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return zipFile;
+    }
+
+    private static Path unzip(Path zipFile) {
+        var outdir = zipFile.resolveSibling(zipFile.getFileName().toString().replace(".zip", ""));
+        if (!Files.exists(outdir)) {
+            try {
+                unzip(zipFile, zipFile.getParent());
+                // Files.delete(zipFile);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return outdir;
+    }
+
+    private static void unzip(Path zipFile, Path destination) throws IOException {
+        if (!Files.exists(destination)) {
+            Files.createDirectory(destination);
+        }
+        ZipInputStream zipIn = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile.toFile())));
+        ZipEntry entry = zipIn.getNextEntry();
+        while (entry != null) {
+            Path filePath = destination.resolve(entry.getName());
+            if (entry.isDirectory()) {
+                Files.createDirectory(filePath);
+            } else {
+                extractFile(zipIn, filePath);
+            }
+            zipIn.closeEntry();
+            entry = zipIn.getNextEntry();
+        }
+        zipIn.close();
+    }
+
+    private static void extractFile(ZipInputStream zipIn, Path filePath) throws IOException {
+        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath.toFile()));
+        byte[] bytesIn = new byte[4096];
+        int read = 0;
+        while ((read = zipIn.read(bytesIn)) != -1) {
+            bos.write(bytesIn, 0, read);
+        }
+        bos.close();
+    }
+
+
+    private Map<String, Double> getPixelSize() throws IOException {
         var map = new HashMap<String, Double>();
         var config = (LinkedTreeMap)getModel().getConfig().get("qupath");
         var axes = (ArrayList)config.get("axes");
@@ -158,30 +237,13 @@ public class InstanSegModel {
         return map;
     }
 
-    public int getNumChannels() {
+    public int getNumChannels() throws IOException {
         assert getModel().getInputs().getFirst().getAxes().equals("bcyx");
         int numChannels = getModel().getInputs().getFirst().getShape().getShapeMin()[1];
         if (getModel().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
             numChannels = Integer.MAX_VALUE;
         }
         return numChannels;
-    }
-
-    private void fetchModel() {
-        if (modelURL == null) {
-            throw new NullPointerException("Model URL should not be null for a local model!");
-        }
-        downloadAndUnzip(modelURL, getUserDir().resolve("instanseg"));
-    }
-
-    private static void downloadAndUnzip(URL url, Path localDirectory) {
-        // todo: implement
-    }
-
-    private static Path getUserDir() {
-        Path userPath = UserDirectoryManager.getInstance().getUserPath();
-        Path cachePath = Paths.get(System.getProperty("user.dir"), ".cache", "QuPath");
-        return userPath == null || userPath.toString().isEmpty() ?  cachePath : userPath;
     }
 
     void runInstanSeg(
@@ -199,7 +261,11 @@ public class InstanSegModel {
 
         nFailed = 0;
         Path modelPath;
-        modelPath = getPath().resolve("instanseg.pt");
+        try {
+            modelPath = getPath().resolve("instanseg.pt");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         int nPredictors = 1; // todo: change me?
 
 
@@ -268,4 +334,13 @@ public class InstanSegModel {
         manager.debugDump(2);
     }
 
+    public boolean isDownloaded() {
+        return downloaded;
+    }
+
+    public String getREADME() throws IOException {
+        var file = path.resolve(name + "_README.md");
+        return Files.readString(file, StandardCharsets.UTF_8);
+
+    }
 }

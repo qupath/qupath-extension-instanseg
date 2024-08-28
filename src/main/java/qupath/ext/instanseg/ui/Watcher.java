@@ -37,7 +37,7 @@ class Watcher {
         keys.put(key, dir);
     }
 
-    private void unregister(Path dir) {
+    void unregister(Path dir) {
         for (var es: keys.entrySet()) {
             if (es.getValue().equals(dir)) {
                 logger.debug("Unregister: {}", es.getValue());
@@ -98,7 +98,13 @@ class Watcher {
                 }
                 if (kind == ENTRY_DELETE && InstanSegModel.isValidModel(name)) {
                     Platform.runLater(() -> {
-                        modelChoiceBox.getItems().removeIf(model -> model.getPath().equals(child));
+                        modelChoiceBox.getItems().removeIf(model -> {
+                            try {
+                                return model.getPath().equals(child);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
                     });
                 }
 

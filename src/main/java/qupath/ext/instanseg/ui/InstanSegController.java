@@ -1,8 +1,11 @@
 package qupath.ext.instanseg.ui;
 
+import com.google.gson.Gson;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -23,7 +26,10 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.web.WebView;
+import org.commonmark.renderer.html.HtmlRenderer;
 import org.controlsfx.control.CheckComboBox;
+import org.controlsfx.control.PopOver;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +44,7 @@ import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.TaskRunnerFX;
 import qupath.lib.gui.tools.GuiTools;
+import qupath.lib.gui.tools.WebViews;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
@@ -46,10 +53,17 @@ import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -76,6 +90,8 @@ public class InstanSegController extends BorderPane {
     @FXML
     private Button runButton;
     @FXML
+    private Button downloadButton;
+    @FXML
     private Label labelMessage;
     @FXML
     private ChoiceBox<String> deviceChoices;
@@ -91,12 +107,15 @@ public class InstanSegController extends BorderPane {
     private CheckBox nucleiOnlyCheckBox;
     @FXML
     private CheckBox makeMeasurementsCheckBox;
+    @FXML
+    private Button infoButton;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
     private ObjectProperty<FutureTask<?>> pendingTask = new SimpleObjectProperty<>();
     private MessageTextHelper messageTextHelper;
 
+    private final BooleanProperty needsUpdating = new SimpleBooleanProperty();
     private final Watcher watcher = new Watcher(modelChoiceBox);
     private ExecutorService executor;
 
@@ -180,9 +199,18 @@ public class InstanSegController extends BorderPane {
         if (imageData.isBrightfield()) {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
             var model = modelChoiceBox.getSelectionModel().selectedItemProperty().get();
-            if (model != null && model.getNumChannels() != Integer.MAX_VALUE) {
-                comboChannels.getCheckModel().clearChecks();
-                comboChannels.getCheckModel().checkIndices(0, 1, 2);
+            if (model != null && model.isDownloaded()) {
+                int numChannels;
+                try {
+                    numChannels = model.getNumChannels();
+                } catch (IOException e) {
+                    // shouldn't happen if downloaded anyway
+                    throw new RuntimeException(e);
+                }
+                if (numChannels != Integer.MAX_VALUE) {
+                    comboChannels.getCheckModel().clearChecks();
+                    comboChannels.getCheckModel().checkIndices(0, 1, 2);
+                }
             }
         } else {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
@@ -286,7 +314,6 @@ public class InstanSegController extends BorderPane {
         runButton.disableProperty().bind(
                 qupath.imageDataProperty().isNull()
                         .or(pendingTask.isNotNull())
-                        .or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
                         .or(messageTextHelper.hasWarning())
                         .or(deviceChoices.getSelectionModel().selectedItemProperty().isNull())
                         .or(Bindings.createBooleanBinding(() -> {
@@ -294,10 +321,11 @@ public class InstanSegController extends BorderPane {
                             if (model == null) {
                                 return true;
                             }
+                            if (!model.isDownloaded()) return false; // to enable "download and run"
                             int numSelected = comboChannels.getCheckModel().getCheckedIndices().size();
                             int numAllowed = model.getNumChannels();
                             return !(numSelected == numAllowed || numAllowed == Integer.MAX_VALUE);
-                        }, modelChoiceBox.getSelectionModel().selectedItemProperty()))
+                        }, modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating))
         );
         pendingTask.addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
@@ -307,22 +335,89 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureModelChoices() {
-        addRemoteModels(modelChoiceBox);
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
         handleModelDirectory(tfModelDirectory.getText());
-        tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
-        // for brightfield models, we want to disable the picker and set it to use RGB only
+        addRemoteModels(modelChoiceBox);
+        tfModelDirectory.textProperty().addListener((v, o, n) -> {
+            watcher.unregister(Path.of(o));
+            handleModelDirectory(n);
+            addRemoteModels(modelChoiceBox);
+        });
         modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
-            if (qupath.getImageData().isBrightfield() && n != null && n.getNumChannels() != Integer.MAX_VALUE) {
-                comboChannels.getCheckModel().clearChecks();
-                comboChannels.getCheckModel().checkIndices(0, 1, 2);
+            if (n == null) return;
+            downloadButton.setDisable(n.isDownloaded());
+            infoButton.setDisable(!n.isDownloaded());
+            if (!n.isDownloaded() || qupath.getImageData() == null) return;
+            try {
+                if (qupath.getImageData().isBrightfield() && n.getNumChannels() != Integer.MAX_VALUE) {
+                    comboChannels.getCheckModel().clearChecks();
+                    comboChannels.getCheckModel().checkIndices(0, 1, 2);
+                }
+            } catch (IOException e) {
+                // shouldn't happen if model is downloaded...
+                throw new RuntimeException(e);
             }
+        });
+        downloadButton.setOnAction(e -> {
+            try {
+                var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+                model.download();
+                Dialogs.showInfoNotification(resources.getString("title"),
+                        String.format(resources.getString("ui.popup.available"), model.getName()));
+                infoButton.setDisable(false);
+                downloadButton.setDisable(true);
+                needsUpdating.set(!needsUpdating.get());
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+        WebView webView = WebViews.create(true);
+        PopOver infoPopover = new PopOver(webView);
+        infoButton.setOnAction(e -> {
+            parseMarkdown(modelChoiceBox.getSelectionModel().getSelectedItem(), webView, infoButton, infoPopover);
         });
     }
 
-    private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {
-        // todo: list models from eg a JSON file
+
+    private static void parseMarkdown(InstanSegModel model, WebView webView, Button infoButton, PopOver infoPopover) {
+        String body = null;
+        try {
+            body = model.getREADME();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        // Parse the initial markdown only, to extract any YAML front matter
+        var parser = org.commonmark.parser.Parser.builder().build();
+        var doc = parser.parse(body);
+
+        // If the markdown doesn't start with a title, pre-pending the model title & description (if available)
+        if (!body.startsWith("#")) {
+            var sb = new StringBuilder();
+            sb.append("## ").append(model.getName()).append("\n\n");
+            sb.append("----\n\n");
+            doc.prependChild(parser.parse(sb.toString()));
+        }
+        webView.getEngine().loadContent(HtmlRenderer.builder().build().render(doc));
+        infoPopover.show(infoButton);
     }
+
+    private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {
+        var releases = getReleases();
+        if (releases.isEmpty()) {
+            logger.info("No releases found");
+            return;
+        }
+        var release = releases.getFirst();
+        var assets = getAssets(release);
+        assets.forEach(asset -> {
+            comboBox.getItems().add(
+                    InstanSegModel.fromURL(
+                            asset.name.replace(".zip", ""),
+                            asset.browser_download_url,
+                            Path.of(InstanSegPreferences.modelDirectoryProperty().get())));
+        });
+    }
+
 
     private void configureTileSizes() {
         tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024, 1536, 2048, 3072, 4096);
@@ -349,8 +444,9 @@ public class InstanSegController extends BorderPane {
         var path = Path.of(n);
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
-                watcher.register(path); // todo: unregister
-                addModelsFromPath(n, modelChoiceBox);
+                var localPath = path.resolve("local");
+                watcher.register(localPath); // todo: unregister
+                addModelsFromPath(localPath, modelChoiceBox);
             } catch (IOException e) {
                 logger.error("Unable to watch directory", e);
             }
@@ -378,7 +474,7 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureMessageLabel() {
-        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels);
+        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels, needsUpdating);
         labelMessage.textProperty().bind(messageTextHelper.messageLabelText());
         if (messageTextHelper.hasWarning().get()) {
             labelMessage.getStyleClass().setAll("warning-message");
@@ -393,12 +489,10 @@ public class InstanSegController extends BorderPane {
         });
     }
 
-    static void addModelsFromPath(String dir, ComboBox<InstanSegModel> box) {
-        if (dir == null || dir.isEmpty()) return;
+    static void addModelsFromPath(Path path, ComboBox<InstanSegModel> box) {
+        if (path == null || !Files.exists(path) || !Files.isDirectory(path)) return;
         // See https://github.com/controlsfx/controlsfx/issues/1320
         box.setItems(FXCollections.observableArrayList());
-        var path = Path.of(dir);
-        if (!Files.exists(path)) return;
         try (var ps = Files.list(path)) {
             for (var file: ps.toList()) {
                 if (InstanSegModel.isValidModel(file)) {
@@ -423,15 +517,40 @@ public class InstanSegController extends BorderPane {
                 return;
             }
         }
-
-        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         ImageServer<?> server = qupath.getImageData().getServer();
-        // todo: how to record this in workflow?
         List<ChannelSelectItem> selectedChannels = comboChannels
                 .getCheckModel().getCheckedItems()
                 .stream()
                 .filter(Objects::nonNull)
                 .toList();
+
+
+        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        if (!model.isDownloaded()) {
+            if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup"))) return;
+            Dialogs.showInfoNotification(resources.getString("title"), String.format(resources.getString("ui.popup.fetching"), model.getName()));
+            try {
+                model.download();
+            } catch (IOException e) {
+                Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+                return;
+            }
+        }
+
+        try {
+            int imageChannels = selectedChannels.size();
+            int modelChannels = model.getNumChannels();
+            if (modelChannels != Integer.MAX_VALUE || model.getNumChannels() != imageChannels) {
+                Dialogs.showErrorNotification(resources.getString("title"), String.format(
+                        resources.getString("ui.error.num-channels-dont-match"),
+                        modelChannels, imageChannels));
+                return;
+            }
+        } catch (IOException e) {
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.fetching"));
+            return;
+        }
+
 
         var task = new InstanSegTask(server, model, selectedChannels);
         pendingTask.set(task);
@@ -469,6 +588,14 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
+            double pixelSize;
+            Path path;
+            try {
+                pixelSize = model.getPixelSizeX();
+                path = model.getPath();
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to fetch model pixel size", e);
+            }
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
@@ -476,7 +603,7 @@ public class InstanSegController extends BorderPane {
                     .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                    .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                    .downsample(pixelSize / (double) server.getPixelCalibration().getAveragedPixelSize())
                     .taskRunner(taskRunner)
                     .build();
             instanSeg.detectObjects(selectedObjects);
@@ -498,12 +625,12 @@ public class InstanSegController extends BorderPane {
                                 .build();
                             instanSeg.detectObjects(instanSegObjects);
                             """,
-                            model.getPath(),
+                            path,
                             deviceChoices.getSelectionModel().getSelectedItem(),
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
-                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                            pixelSize / (double) server.getPixelCalibration().getAveragedPixelSize(),
                             InstanSegPreferences.numThreadsProperty().getValue()
                     );
                     if (makeMeasurementsCheckBox.isSelected()) {
@@ -549,7 +676,6 @@ public class InstanSegController extends BorderPane {
         hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getTMAGrid().getTMACoreList(), null);
     }
 
-
     private void promptToUpdateDirectory(StringProperty dirPath) {
         var modelDirPath = dirPath.get();
         var dir = modelDirPath == null || modelDirPath.isEmpty() ? null : new File(modelDirPath);
@@ -568,4 +694,85 @@ public class InstanSegController extends BorderPane {
         dirPath.set(newDir.getAbsolutePath());
     }
 
+
+    private static class GitHubRelease {
+        String tag_name;
+        String name;
+        Date published_at;
+        GitHubAsset[] assets;
+        String body;
+
+        String getName() {
+            return name;
+        }
+        String getBody() {
+            return body;
+        }
+        Date getDate() {
+            return published_at;
+        }
+        String getTag() {
+            return tag_name;
+        }
+
+        @Override
+        public String toString() {
+            return name + " with assets:" + Arrays.toString(assets);
+        }
+    }
+
+    private static class GitHubAsset {
+        String name;
+        String content_type;
+        URL browser_download_url;
+        @Override
+        public String toString() {
+            return name;
+        }
+
+        String getType() {
+            return content_type;
+        }
+
+        URL getUrl() {
+            return browser_download_url;
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
+
+    private static List<GitHubRelease> getReleases() {
+        String uString = "https://api.github.com/repos/instanseg/InstanSeg/releases";
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(uString))
+                .GET()
+                .build();
+        String response;
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString()).body();
+        } catch (IOException | InterruptedException e) {
+            logger.error("Unable to fetch GitHub release information", e);
+            return List.of();
+        }
+        Gson gson = new Gson();
+        var releases = gson.fromJson(response, GitHubRelease[].class);
+        if (!(releases.length > 0)) {
+            return List.of();
+        }
+        return List.of(releases);
+    }
+
+    private static List<GitHubAsset> getAssets(GitHubRelease release) {
+        var assets = Arrays.stream(release.assets)
+                .filter(a -> a.getType().equals("application/zip"))
+                .toList();
+        if (assets.isEmpty()) {
+            logger.info("No valid assets identified for {}", release.name);
+        } else if (assets.size() > 1) {
+            logger.info("More than one matching model: {}", release.name);
+        }
+        return assets;
+    }
 }

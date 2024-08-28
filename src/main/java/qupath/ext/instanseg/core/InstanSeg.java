@@ -302,14 +302,14 @@ public class InstanSeg {
             return modelPath(Path.of(path));
         }
 
-        /**
-         * Set the specific model to be used
-         * @param name The name of a built-in model
-         * @return A modified builder
-         */
-        public Builder modelName(String name) {
-            return model(InstanSegModel.fromName(name));
-        }
+        // /**
+        //  * Set the specific model to be used
+        //  * @param name The name of a built-in model
+        //  * @return A modified builder
+        //  */
+        // public Builder modelName(String name) {
+        //     return model(InstanSegModel.fromName(name));
+        // }
 
         /**
          * Set the device to be used
@@ -410,8 +410,14 @@ public class InstanSeg {
      * @param detections The objects to measure.
      */
     public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections) {
+        Double pxSize = null;
+        try {
+            pxSize = model.getPixelSizeX();
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to fetch model pixel size", e);
+        }
         DetectionMeasurer.builder()
-                .pixelSize(model.getPixelSizeX())
+                .pixelSize(pxSize)
                 .build().makeMeasurements(imageData, detections);
     }
 
