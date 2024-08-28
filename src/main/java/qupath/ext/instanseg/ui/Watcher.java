@@ -98,13 +98,8 @@ class Watcher {
                 }
                 if (kind == ENTRY_DELETE && InstanSegModel.isValidModel(name)) {
                     Platform.runLater(() -> {
-                        modelChoiceBox.getItems().removeIf(model -> {
-                            try {
-                                return model.getPath().equals(child);
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
+                        modelChoiceBox.getItems().removeIf(model ->
+                                model.getPath().map(p -> p.equals(child)).orElse(false));
                     });
                 }
 

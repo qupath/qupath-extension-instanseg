@@ -302,15 +302,6 @@ public class InstanSeg {
             return modelPath(Path.of(path));
         }
 
-        // /**
-        //  * Set the specific model to be used
-        //  * @param name The name of a built-in model
-        //  * @return A modified builder
-        //  */
-        // public Builder modelName(String name) {
-        //     return model(InstanSegModel.fromName(name));
-        // }
-
         /**
          * Set the device to be used
          * @param deviceName The name of the device to be used (eg, "gpu", "mps").
@@ -410,14 +401,8 @@ public class InstanSeg {
      * @param detections The objects to measure.
      */
     public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections) {
-        Double pxSize = null;
-        try {
-            pxSize = model.getPixelSizeX();
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to fetch model pixel size", e);
-        }
         DetectionMeasurer.builder()
-                .pixelSize(pxSize)
+                .pixelSize(model.getPixelSizeX().orElse(0.5)) // todo: is this a good default?
                 .build().makeMeasurements(imageData, detections);
     }
 

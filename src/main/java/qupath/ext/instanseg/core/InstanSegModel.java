@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.zip.ZipEntry;
@@ -84,29 +85,27 @@ public class InstanSegModel {
 
     /**
      * Get the pixel size in the X dimension.
+     *
      * @return the pixel size in the X dimension.
      */
-    public Double getPixelSizeX() throws IOException {
-        return getPixelSize().get("x");
+    public Optional<Double> getPixelSizeX() {
+        return getPixelSize().flatMap(p -> Optional.ofNullable(p.get("x")));
     }
 
     /**
      * Get the pixel size in the Y dimension.
      * @return the pixel size in the Y dimension.
      */
-    public Double getPixelSizeY() throws IOException {
-        return getPixelSize().get("y");
+    public Optional<Double> getPixelSizeY() {
+        return getPixelSize().flatMap(p -> Optional.ofNullable(p.get("y")));
     }
 
     /**
      * Get the path where the model is stored on disk.
-     * @return A path on disk, or an exception if it can't be found.
+     * @return A path on disk.
      */
-    public Path getPath() throws IOException {
-        if (path == null) {
-            download();
-        }
-        return path;
+    public Optional<Path> getPath() {
+        return Optional.ofNullable(path);
     }
 
     @Override
@@ -149,11 +148,8 @@ public class InstanSegModel {
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
-    BioimageIoSpec.BioimageIoModel getModel() throws IOException {
-        if (model == null) {
-            download();
-        }
-        return model;
+    Optional<BioimageIoSpec.BioimageIoModel> getModel() {
+        return Optional.ofNullable(model);
     }
 
     public void download() throws IOException {
@@ -168,7 +164,6 @@ public class InstanSegModel {
     }
 
     private static Path downloadZip(URL url, Path localDirectory, String filename) {
-        // "https://github.com/instanseg/instanseg/releases/download/instanseg_models_v1/fluorescence_nuclei_and_cells.zip"
         var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
         if (!Files.exists(zipFile)) {
             try (InputStream stream = url.openStream()) {
@@ -227,22 +222,33 @@ public class InstanSegModel {
     }
 
 
-    private Map<String, Double> getPixelSize() throws IOException {
+    private Optional<Map<String, Double>> getPixelSize() {
+        var model = getModel();
+        if (model.isEmpty()) return Optional.empty();
         var map = new HashMap<String, Double>();
-        var config = (LinkedTreeMap)getModel().getConfig().get("qupath");
+        var config = (LinkedTreeMap)model.get().getConfig().get("qupath");
         var axes = (ArrayList)config.get("axes");
         map.put("x", (Double) ((LinkedTreeMap)(axes.get(0))).get("step"));
         map.put("y", (Double) ((LinkedTreeMap)(axes.get(1))).get("step"));
-        return map;
+        return Optional.of(map);
     }
 
-    public int getNumChannels() throws IOException {
-        assert getModel().getInputs().getFirst().getAxes().equals("bcyx");
-        int numChannels = getModel().getInputs().getFirst().getShape().getShapeMin()[1];
-        if (getModel().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
+    /**
+     * Try to check the number of channels in the model.
+     * @return The integer if the model is downloaded, otherwise empty
+     * @throws IOException
+     */
+    public Optional<Integer> getNumChannels() {
+        var model = getModel();
+        if (model.isEmpty()) {
+            return Optional.empty();
+        }
+        assert model.get().getInputs().getFirst().getAxes().equals("bcyx");
+        int numChannels = model.get().getInputs().getFirst().getShape().getShapeMin()[1];
+        if (model.get().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
             numChannels = Integer.MAX_VALUE;
         }
-        return numChannels;
+        return Optional.of(numChannels);
     }
 
     void runInstanSeg(
@@ -259,12 +265,11 @@ public class InstanSegModel {
             TaskRunner taskRunner) {
 
         nFailed = 0;
-        Path modelPath;
-        try {
-            modelPath = getPath().resolve("instanseg.pt");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        Optional<Path> modelPath = getPath();
+        if (modelPath.isEmpty()) {
+            logger.error("Unable to run model - path is missing!");
         }
+        Path ptPath = modelPath.get().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
 
@@ -276,7 +281,7 @@ public class InstanSegModel {
 
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
-                .optModelUrls(String.valueOf(modelPath.toUri()))
+                .optModelUrls(String.valueOf(ptPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
                 .optTranslator(new MatTranslator(layout, layoutOutput, nucleiOnly))
@@ -335,9 +340,16 @@ public class InstanSegModel {
         return downloaded;
     }
 
+    /**
+     * Extract the README from a local file
+     * @return
+     * @throws IOException
+     */
     public String getREADME() throws IOException {
+        if (!downloaded) {
+            download();
+        }
         var file = path.resolve(name + "_README.md");
         return Files.readString(file, StandardCharsets.UTF_8);
-
     }
 }

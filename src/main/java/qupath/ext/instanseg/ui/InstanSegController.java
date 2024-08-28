@@ -67,6 +67,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -200,17 +201,15 @@ public class InstanSegController extends BorderPane {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
             var model = modelChoiceBox.getSelectionModel().selectedItemProperty().get();
             if (model != null && model.isDownloaded()) {
-                int numChannels;
-                try {
-                    numChannels = model.getNumChannels();
-                } catch (IOException e) {
-                    // shouldn't happen if downloaded anyway
-                    throw new RuntimeException(e);
+                var modelChannels = model.getNumChannels();
+                if (modelChannels.isPresent()) {
+                    int nModelChannels = modelChannels.get();
+                    if (nModelChannels != Integer.MAX_VALUE) {
+                        comboChannels.getCheckModel().clearChecks();
+                        comboChannels.getCheckModel().checkIndices(0, 1, 2);
+                    }
                 }
-                if (numChannels != Integer.MAX_VALUE) {
-                    comboChannels.getCheckModel().clearChecks();
-                    comboChannels.getCheckModel().checkIndices(0, 1, 2);
-                }
+
             }
         } else {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
@@ -322,9 +321,7 @@ public class InstanSegController extends BorderPane {
                                 return true;
                             }
                             if (!model.isDownloaded()) return false; // to enable "download and run"
-                            int numSelected = comboChannels.getCheckModel().getCheckedIndices().size();
-                            int numAllowed = model.getNumChannels();
-                            return !(numSelected == numAllowed || numAllowed == Integer.MAX_VALUE);
+                            return false;
                         }, modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating))
         );
         pendingTask.addListener((observable, oldValue, newValue) -> {
@@ -348,14 +345,10 @@ public class InstanSegController extends BorderPane {
             downloadButton.setDisable(n.isDownloaded());
             infoButton.setDisable(!n.isDownloaded());
             if (!n.isDownloaded() || qupath.getImageData() == null) return;
-            try {
-                if (qupath.getImageData().isBrightfield() && n.getNumChannels() != Integer.MAX_VALUE) {
-                    comboChannels.getCheckModel().clearChecks();
-                    comboChannels.getCheckModel().checkIndices(0, 1, 2);
-                }
-            } catch (IOException e) {
-                // shouldn't happen if model is downloaded...
-                throw new RuntimeException(e);
+            var numChannels = n.getNumChannels();
+            if (qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != Integer.MAX_VALUE) {
+                comboChannels.getCheckModel().clearChecks();
+                comboChannels.getCheckModel().checkIndices(0, 1, 2);
             }
         });
         downloadButton.setOnAction(e -> {
@@ -537,20 +530,19 @@ public class InstanSegController extends BorderPane {
             }
         }
 
-        try {
-            int imageChannels = selectedChannels.size();
-            int modelChannels = model.getNumChannels();
-            if (modelChannels != Integer.MAX_VALUE || model.getNumChannels() != imageChannels) {
-                Dialogs.showErrorNotification(resources.getString("title"), String.format(
-                        resources.getString("ui.error.num-channels-dont-match"),
-                        modelChannels, imageChannels));
-                return;
-            }
-        } catch (IOException e) {
+        int imageChannels = selectedChannels.size();
+        var modelChannels = model.getNumChannels();
+        if (!modelChannels.isPresent()) {
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.fetching"));
             return;
         }
-
+        int nModelChannels = modelChannels.get();
+        if (!(nModelChannels == Integer.MAX_VALUE || nModelChannels != imageChannels)) {
+            Dialogs.showErrorNotification(resources.getString("title"), String.format(
+                    resources.getString("ui.error.num-channels-dont-match"),
+                    nModelChannels, imageChannels));
+            return;
+        }
 
         var task = new InstanSegTask(server, model, selectedChannels);
         pendingTask.set(task);
@@ -588,14 +580,12 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
-            double pixelSize;
-            Path path;
-            try {
-                pixelSize = model.getPixelSizeX();
-                path = model.getPath();
-            } catch (IOException e) {
-                throw new RuntimeException("Unable to fetch model pixel size", e);
+            Optional<Double> pixelSize = model.getPixelSizeX();
+            Optional<Path> path = model.getPath();
+            if (pixelSize.isEmpty() || path.isEmpty()) {
+                Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.querying-local"));
             }
+
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
@@ -603,7 +593,7 @@ public class InstanSegController extends BorderPane {
                     .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                    .downsample(pixelSize / (double) server.getPixelCalibration().getAveragedPixelSize())
+                    .downsample(pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize())
                     .taskRunner(taskRunner)
                     .build();
             instanSeg.detectObjects(selectedObjects);
@@ -630,7 +620,7 @@ public class InstanSegController extends BorderPane {
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
-                            pixelSize / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                            pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                             InstanSegPreferences.numThreadsProperty().getValue()
                     );
                     if (makeMeasurementsCheckBox.isSelected()) {

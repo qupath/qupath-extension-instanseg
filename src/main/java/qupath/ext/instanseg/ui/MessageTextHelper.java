@@ -130,19 +130,17 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-device");
         if (modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded()) {
             // shouldn't happen if downloaded anyway!
-            int modelChannels = 0;
-            try {
-                modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
-            if (modelChannels != Integer.MAX_VALUE) {
-                if (modelChannels != selectedChannels) {
-                    return String.format(
-                            resources.getString("ui.error.num-channels-dont-match"),
-                            modelChannels,
-                            selectedChannels);
+            var modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
+            if (modelChannels.isPresent()) {
+                int nModelChannels = modelChannels.get();
+                int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
+                if (nModelChannels != Integer.MAX_VALUE) {
+                    if (nModelChannels != selectedChannels) {
+                        return String.format(
+                                resources.getString("ui.error.num-channels-dont-match"),
+                                nModelChannels,
+                                selectedChannels);
+                    }
                 }
             }
         }
