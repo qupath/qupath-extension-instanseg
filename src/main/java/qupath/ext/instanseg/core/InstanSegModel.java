@@ -29,12 +29,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class InstanSegModel {
+
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
 
     private Path path = null;
@@ -186,15 +186,15 @@ public class InstanSegModel {
 
     void runInstanSeg(
             ImageData<BufferedImage> imageData,
-            Collection<PathObject> pathObjects,
+            Collection<? extends PathObject> pathObjects,
             Collection<ColorTransforms.ColorTransform> channels,
             int tileDims,
             double downsample,
             int padding,
             int boundary,
             Device device,
-            boolean nucleiOnly,
-            List<Class<? extends PathObject>> outputClasses,
+            int nOutputChannels,
+            Class<? extends PathObject> preferredObjectClass,
             TaskRunner taskRunner) {
 
         nFailed = 0;
@@ -216,7 +216,7 @@ public class InstanSegModel {
                 .optModelUrls(String.valueOf(modelPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
-                .optTranslator(new MatTranslator(layout, layoutOutput, nucleiOnly))
+                .optTranslator(new MatTranslator(layout, layoutOutput, nOutputChannels))
                 .build()
                 .loadModel()) {
 
@@ -245,7 +245,7 @@ public class InstanSegModel {
                                 .cropTiles(false)
                                 .build()
                         )
-                        .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(outputClasses), boundary))
+                        .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(preferredObjectClass), boundary))
                         .padding(padding)
                         .merger(ObjectMerger.createIoUMerger(0.2))
                         .downsample(downsample)
@@ -263,9 +263,17 @@ public class InstanSegModel {
         }
     }
 
+    /**
+     * Print resource count for debugging purposes.
+     * If we are not logging at debug level, do nothing.
+     * @param title
+     * @param manager
+     */
     private static void printResourceCount(String title, BaseNDManager manager) {
-        logger.info(title);
-        manager.debugDump(2);
+        if (logger.isDebugEnabled()) {
+            logger.debug(title);
+            manager.debugDump(2);
+        }
     }
 
 }

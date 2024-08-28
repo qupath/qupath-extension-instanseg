@@ -32,7 +32,7 @@ public class InstanSeg {
     private final InstanSegModel model;
     private final Device device;
     private final TaskRunner taskRunner;
-    private final List<Class<? extends PathObject>> outputClasses;
+    private final Class<? extends PathObject> preferredOutputClass;
 
 
     /**
@@ -51,6 +51,23 @@ public class InstanSeg {
     }
 
     /**
+     * Run inference for the currently selected PathObjects, then measure the new objects that were created.
+     */
+    public void detectObjectsAndMeasure() {
+        detectObjectsAndMeasure(imageData.getHierarchy().getSelectionModel().getSelectedObjects());
+    }
+
+    /**
+     * Run inference for the specified selected PathObjects, then measure the new objects that were created.
+     */
+    public void detectObjectsAndMeasure(Collection<? extends PathObject> pathObjects) {
+        detectObjects(pathObjects);
+        for (var pathObject: pathObjects) {
+            makeMeasurements(imageData, pathObject.getChildObjects());
+        }
+    }
+
+    /**
      * Get the imageData from an InstanSeg object.
      * @return The imageData used for the model.
      */
@@ -61,7 +78,7 @@ public class InstanSeg {
     /**
      * Run inference for a collection of PathObjects.
      */
-    public void detectObjects(Collection<PathObject> pathObjects) {
+    public void detectObjects(Collection<? extends PathObject> pathObjects) {
         model.runInstanSeg(
                 imageData,
                 pathObjects,
@@ -71,8 +88,8 @@ public class InstanSeg {
                 padding,
                 boundary,
                 device,
-                numOutputChannels == 1,
-                outputClasses,
+                numOutputChannels,
+                preferredOutputClass,
                 taskRunner
         );
     }
@@ -82,6 +99,7 @@ public class InstanSeg {
      * A builder class for InstanSeg.
      */
     public static final class Builder {
+
         private int tileDims = 512;
         private double downsample = 1;
         private int padding = 40;
@@ -92,7 +110,7 @@ public class InstanSeg {
         private ImageData<BufferedImage> imageData;
         private Collection<ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
-        private List<Class<? extends PathObject>> outputClasses;
+        private Class<? extends PathObject> preferredOutputClass;
 
         Builder() {}
 
@@ -332,23 +350,11 @@ public class InstanSeg {
         }
 
         /**
-         * Specify the output class(es)
-         * @param outputClasses A list specifying what type the output should be.
-         *                      eg, [PathDetectionObject.class, PathAnnotationObject.class]
-         *                      specifies to create detections nested inside annotations.
-         * @return A modified builder
-         */
-        public Builder outputClasses(List<Class<? extends PathObject>> outputClasses) {
-            this.outputClasses = outputClasses;
-            return this;
-        }
-
-        /**
          * Specify cells as the output class, possibly without nuclei
          * @return A modified builder
          */
         public Builder outputCells() {
-            this.outputClasses = List.of(PathCellObject.class);
+            this.preferredOutputClass = PathCellObject.class;
             return this;
         }
 
@@ -357,7 +363,7 @@ public class InstanSeg {
          * @return A modified builder
          */
         public Builder outputDetections() {
-            this.outputClasses = List.of(PathDetectionObject.class);
+            this.preferredOutputClass = PathDetectionObject.class;
             return this;
         }
 
@@ -366,7 +372,7 @@ public class InstanSeg {
          * @return A modified builder
          */
         public Builder outputAnnotations() {
-            this.outputClasses = List.of(PathAnnotationObject.class);
+            this.preferredOutputClass = PathAnnotationObject.class;
             return this;
         }
 
@@ -382,12 +388,6 @@ public class InstanSeg {
             if (channels == null) {
                 var tmp = allChannels();
             }
-            if (outputClasses == null) {
-                var tmp = outputCells();
-            }
-            if (outputClasses.size() > 1 && numOutputChannels == 1) {
-                throw new IllegalArgumentException("Cannot have multiple output types when using only one output channel.");
-            }
             return new InstanSeg(
                     this.tileDims,
                     this.downsample,
@@ -399,7 +399,7 @@ public class InstanSeg {
                     this.model,
                     this.device,
                     this.taskRunner,
-                    this.outputClasses);
+                    this.preferredOutputClass);
         }
 
     }
@@ -409,16 +409,17 @@ public class InstanSeg {
      * @param imageData The ImageData for making measurements.
      * @param detections The objects to measure.
      */
-    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections) {
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
         DetectionMeasurer.builder()
-                .pixelSize(model.getPixelSizeX())
-                .build().makeMeasurements(imageData, detections);
+                .pixelSize((model.getPixelSizeX() + model.getPixelSizeY()) / 2.0)
+                .build()
+                .makeMeasurements(imageData, detections);
     }
 
 
     private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
                       Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner,
-                      List<Class<? extends PathObject>> outputClasses) {
+                      Class<? extends PathObject> preferredOutputClass) {
         this.tileDims = tileDims;
         this.downsample = downsample;
         this.padding = padding;
@@ -429,6 +430,6 @@ public class InstanSeg {
         this.model = model;
         this.device = device;
         this.taskRunner = taskRunner;
-        this.outputClasses = outputClasses;
+        this.preferredOutputClass = preferredOutputClass;
     }
 }

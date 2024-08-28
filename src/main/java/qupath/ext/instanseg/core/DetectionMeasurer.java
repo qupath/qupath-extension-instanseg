@@ -46,7 +46,7 @@ public class DetectionMeasurer {
      * @param imageData The imageData to be used for measuring the pathobject with.
      * @param objects The objects to be measured.
      */
-    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> objects) {
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> objects) {
         var server = imageData.getServer();
         var resolution = server.getPixelCalibration();
         var pixelCal = server.getPixelCalibration();
