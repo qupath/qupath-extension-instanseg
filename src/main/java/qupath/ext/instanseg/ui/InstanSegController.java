@@ -484,24 +484,19 @@ public class InstanSegController extends BorderPane {
 //                    .outputAnnotations()
                     .taskRunner(taskRunner)
                     .build();
-            instanSeg.detectObjects(selectedObjects);
 
+            boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
             String cmd = String.format("""
-                            import qupath.ext.instanseg.core.InstanSeg
-                            import static qupath.lib.gui.scripting.QPEx.*
-
-                            def instanSegObjects = getSelectedObjects();
-                            def instanSeg = InstanSeg.builder()
+                            qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
                                 .numOutputChannels(%d)
                                 .channels(%s)
                                 .tileDims(%d)
-                                .imageData(getCurrentImageData())
                                 .downsample(%f)
                                 .nThreads(%d)
-                                .build();
-                            instanSeg.detectObjects(instanSegObjects);
+                                .build()
+                                .%s
                             """,
                             model.getPath(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
@@ -509,18 +504,14 @@ public class InstanSegController extends BorderPane {
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
                             model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                            InstanSegPreferences.numThreadsProperty().getValue()
+                            InstanSegPreferences.numThreadsProperty().getValue(),
+                            makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
                     );
-                    if (makeMeasurementsCheckBox.isSelected()) {
-                        cmd += """
-                            for (PathObject po: instanSegObjects) {
-                                instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
-                            }
-                            """;
-                        for (PathObject po: selectedObjects) {
-                            instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
-                        }
-                    }
+            if (makeMeasurements) {
+                instanSeg.detectObjectsAndMeasure(selectedObjects);
+            } else {
+                instanSeg.detectObjects(selectedObjects);
+            }
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
             imageData.getHistoryWorkflow()
                     .addStep(

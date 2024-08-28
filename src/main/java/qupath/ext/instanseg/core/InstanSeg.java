@@ -51,6 +51,23 @@ public class InstanSeg {
     }
 
     /**
+     * Run inference for the currently selected PathObjects, then measure the new objects that were created.
+     */
+    public void detectObjectsAndMeasure() {
+        detectObjectsAndMeasure(imageData.getHierarchy().getSelectionModel().getSelectedObjects());
+    }
+
+    /**
+     * Run inference for the specified selected PathObjects, then measure the new objects that were created.
+     */
+    public void detectObjectsAndMeasure(Collection<? extends PathObject> pathObjects) {
+        detectObjects(pathObjects);
+        for (var pathObject: pathObjects) {
+            makeMeasurements(imageData, pathObject.getChildObjects());
+        }
+    }
+
+    /**
      * Get the imageData from an InstanSeg object.
      * @return The imageData used for the model.
      */
@@ -61,7 +78,7 @@ public class InstanSeg {
     /**
      * Run inference for a collection of PathObjects.
      */
-    public void detectObjects(Collection<PathObject> pathObjects) {
+    public void detectObjects(Collection<? extends PathObject> pathObjects) {
         model.runInstanSeg(
                 imageData,
                 pathObjects,
@@ -392,10 +409,11 @@ public class InstanSeg {
      * @param imageData The ImageData for making measurements.
      * @param detections The objects to measure.
      */
-    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<PathObject> detections) {
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
         DetectionMeasurer.builder()
-                .pixelSize(model.getPixelSizeX())
-                .build().makeMeasurements(imageData, detections);
+                .pixelSize((model.getPixelSizeX() + model.getPixelSizeY()) / 2.0)
+                .build()
+                .makeMeasurements(imageData, detections);
     }
 
 

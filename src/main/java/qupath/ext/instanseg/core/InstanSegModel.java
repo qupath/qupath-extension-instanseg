@@ -186,7 +186,7 @@ public class InstanSegModel {
 
     void runInstanSeg(
             ImageData<BufferedImage> imageData,
-            Collection<PathObject> pathObjects,
+            Collection<? extends PathObject> pathObjects,
             Collection<ColorTransforms.ColorTransform> channels,
             int tileDims,
             double downsample,
@@ -263,9 +263,17 @@ public class InstanSegModel {
         }
     }
 
+    /**
+     * Print resource count for debugging purposes.
+     * If we are not logging at debug level, do nothing.
+     * @param title
+     * @param manager
+     */
     private static void printResourceCount(String title, BaseNDManager manager) {
-        logger.info(title);
-        manager.debugDump(2);
+        if (logger.isDebugEnabled()) {
+            logger.debug(title);
+            manager.debugDump(2);
+        }
     }
 
 }
