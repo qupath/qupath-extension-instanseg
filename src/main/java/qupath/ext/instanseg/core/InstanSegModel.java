@@ -49,7 +49,6 @@ public class InstanSegModel {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
     private Path localModelPath;
     private URL modelURL = null;
-    private boolean downloaded = false;
 
     private Path path = null;
     private BioimageIoSpec.BioimageIoModel model = null;
@@ -60,7 +59,6 @@ public class InstanSegModel {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
         this.name = model.getName();
-        this.downloaded = true;
     }
 
     private InstanSegModel(String name, URL modelURL, Path localModelPath) {
@@ -97,7 +95,7 @@ public class InstanSegModel {
      */
     public boolean isDownloaded() {
         // todo: this should also check if the contents are what we expect
-        return downloaded;
+        return path != null && model != null;
     }
 
     /**
@@ -175,20 +173,18 @@ public class InstanSegModel {
      * @throws IOException If an error occurs when downloading, unzipping, etc.
      */
     public void download() throws IOException {
-        if (downloaded) return;
+        if (path != null && model != null) return;
         var zipFile = downloadZip(
                 this.modelURL,
                 localModelPath,
                 name);
         this.path = unzip(zipFile);
         this.model = BioimageIoSpec.parseModel(path.toFile());
-        this.downloaded = true;
     }
 
     /**
      * Try to check the number of channels in the model.
      * @return The integer if the model is downloaded, otherwise empty
-     * @throws IOException
      */
     public Optional<Integer> getNumChannels() {
         var model = getModel();
@@ -263,7 +259,7 @@ public class InstanSegModel {
     private static void extractFile(ZipInputStream zipIn, Path filePath) throws IOException {
         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath.toFile()));
         byte[] bytesIn = new byte[4096];
-        int read = 0;
+        int read;
         while ((read = zipIn.read(bytesIn)) != -1) {
             bos.write(bytesIn, 0, read);
         }
@@ -275,10 +271,10 @@ public class InstanSegModel {
         var model = getModel();
         if (model.isEmpty()) return Optional.empty();
         var map = new HashMap<String, Double>();
-        var config = (LinkedTreeMap)model.get().getConfig().get("qupath");
-        var axes = (ArrayList)config.get("axes");
-        map.put("x", (Double) ((LinkedTreeMap)(axes.get(0))).get("step"));
-        map.put("y", (Double) ((LinkedTreeMap)(axes.get(1))).get("step"));
+        var config = (LinkedTreeMap<?, ?>)model.get().getConfig().get("qupath");
+        var axes = (ArrayList<?>)config.get("axes");
+        map.put("x", (Double) ((LinkedTreeMap<?, ?>)(axes.get(0))).get("step"));
+        map.put("y", (Double) ((LinkedTreeMap<?, ?>)(axes.get(1))).get("step"));
         return Optional.of(map);
     }
 
@@ -367,8 +363,8 @@ public class InstanSegModel {
     /**
      * Print resource count for debugging purposes.
      * If we are not logging at debug level, do nothing.
-     * @param title
-     * @param manager
+     * @param title The title to put above the log messages
+     * @param manager The NDManager to dump the logs from
      */
     private static void printResourceCount(String title, BaseNDManager manager) {
         if (logger.isDebugEnabled()) {
