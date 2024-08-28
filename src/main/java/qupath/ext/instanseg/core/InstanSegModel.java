@@ -79,7 +79,6 @@ public class InstanSegModel {
     }
 
     public static InstanSegModel fromURL(String name, URL browserDownloadUrl, Path localModelPath) {
-        // todo: this constructor should initialise a
         return new InstanSegModel(name, browserDownloadUrl, localModelPath);
     }
 
@@ -273,9 +272,7 @@ public class InstanSegModel {
         boolean padToInputSize = true;
         String layout = "CHW";
 
-        // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
         String layoutOutput = "CHW";
-
 
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
