@@ -417,7 +417,11 @@ public class InstanSegController extends BorderPane {
 
 
     private void configureTileSizes() {
-        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024, 1536, 2048, 3072, 4096);
+        // Because of the use of 32-bit signed ints for coordinates of the intermediate sparse matrix,
+        // we can't have very large tile sizes.
+        // We can estimate the total number of instances supported as 2^31 / (tileSize^2) -
+        // if we have large tiles, we likely have many instances and we can have errors.
+        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
         tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
         tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
         tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
@@ -600,24 +604,19 @@ public class InstanSegController extends BorderPane {
                     .downsample(pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize())
                     .taskRunner(taskRunner)
                     .build();
-            instanSeg.detectObjects(selectedObjects);
 
+            boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
             String cmd = String.format("""
-                            import qupath.ext.instanseg.core.InstanSeg
-                            import static qupath.lib.gui.scripting.QPEx.*
-
-                            def instanSegObjects = getSelectedObjects();
-                            def instanSeg = InstanSeg.builder()
+                            qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
                                 .numOutputChannels(%d)
                                 .channels(%s)
                                 .tileDims(%d)
-                                .imageData(getCurrentImageData())
                                 .downsample(%f)
                                 .nThreads(%d)
-                                .build();
-                            instanSeg.detectObjects(instanSegObjects);
+                                .build()
+                                .%s
                             """,
                             path,
                             deviceChoices.getSelectionModel().getSelectedItem(),
@@ -627,16 +626,11 @@ public class InstanSegController extends BorderPane {
                             pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                             InstanSegPreferences.numThreadsProperty().getValue()
                     );
-                    if (makeMeasurementsCheckBox.isSelected()) {
-                        cmd += """
-                            for (PathObject po: instanSegObjects) {
-                                instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
-                            }
-                            """;
-                        for (PathObject po: selectedObjects) {
-                            instanSeg.makeMeasurements(instanSeg.getImageData(), po.getChildObjects());
-                        }
-                    }
+            if (makeMeasurements) {
+                instanSeg.detectObjectsAndMeasure(selectedObjects);
+            } else {
+                instanSeg.detectObjects(selectedObjects);
+            }
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
             imageData.getHistoryWorkflow()
                     .addStep(
