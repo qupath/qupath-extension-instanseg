@@ -32,7 +32,6 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
     private static final Logger logger = LoggerFactory.getLogger(InstansegOutputToObjectConverter.class);
 
-    private static final long seed = 1243;
     private final Class<? extends PathObject> preferredObjectClass;
 
     /**
@@ -108,7 +107,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         }
 
         if (assignRandomColors) {
-            var rng = new Random(seed);
+            var rng = new Random(params.getRegionRequest().hashCode());
             pathObjects.forEach(p -> assignRandomColor(p, rng));
         }
 
