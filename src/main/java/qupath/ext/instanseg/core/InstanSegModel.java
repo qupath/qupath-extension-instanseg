@@ -236,8 +236,7 @@ public class InstanSegModel {
                         (BaseNDManager)baseManager.getParentManager());
 
                 int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding));
-                var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                        layout, layoutOutput, channels, tileDims, tileDims, padToInputSize);
+                var predictionProcessor = new TilePredictionProcessor(predictors, channels, tileDims, tileDims, padToInputSize);
                 var processor = OpenCVProcessor.builder(predictionProcessor)
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(Tiler.builder(sizeWithoutPadding)

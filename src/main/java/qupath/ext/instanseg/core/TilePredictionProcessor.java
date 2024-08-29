@@ -17,6 +17,7 @@ import qupath.lib.images.servers.PixelType;
 import qupath.lib.objects.PathObject;
 import qupath.lib.regions.Padding;
 import qupath.lib.regions.RegionRequest;
+import qupath.lib.roi.interfaces.ROI;
 import qupath.opencv.ops.ImageOp;
 import qupath.opencv.ops.ImageOps;
 import qupath.opencv.tools.OpenCVTools;
@@ -24,29 +25,35 @@ import qupath.opencv.tools.OpenCVTools;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
 
 class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
+
     private static final Logger logger = LoggerFactory.getLogger(TilePredictionProcessor.class);
 
     private final BlockingQueue<Predictor<Mat, Mat>> predictors;
 
-    private final NDManager manager;
-    private final String layout;
-    private final String layoutOutput;
     private final int inputWidth;
     private final int inputHeight;
     private final boolean doPadding;
     private final Collection<ColorTransforms.ColorTransform> channels;
     private int nFailed = 0;
 
-    TilePredictionProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors, NDManager manager,
-                            String layout, String layoutOutput, Collection<ColorTransforms.ColorTransform> channels,
+    /**
+     * Cache normalization op so it doesn't need to be recalculated for every tile.
+     * Note that this assumes we don't reuse the TilePredictionProcessor for multiple images that contain
+     * the exact same ROI.
+     * It may be possible to break this rule, but you'd really have to try hard.
+     */
+    private final Map<ROI, ImageOp> normalization = Collections.synchronizedMap(new WeakHashMap<>());
+
+    TilePredictionProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
+                            Collection<ColorTransforms.ColorTransform> channels,
                             int inputWidth, int inputHeight, boolean doPadding) {
         this.predictors = predictors;
-        this.manager = manager;
-        this.layout = layout;
-        this.layoutOutput = layoutOutput;
         this.channels = channels;
         this.inputWidth = inputWidth;
         this.inputHeight = inputHeight;
@@ -67,8 +74,10 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         var mat = params.getImage();
 
         var imageData = params.getImageData();
+
         // Normalize using percentiles (from a sufficiently low-resolution image)
-        ImageOp norm = getNormalization(imageData, params.getParent(), channels, 0.1, 99.9);
+        ImageOp norm = normalization.computeIfAbsent(params.getParent().getROI(),
+                roi -> getNormalization(imageData, roi, channels, 0.1, 99.9));
 
         var preprocessing = ImageOps.Core.sequential(
                 ImageOps.Core.ensureType(PixelType.FLOAT32),
@@ -119,7 +128,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
      * to the same image through InstanSeg in Python as a full image.
      *
      * @param imageData  ImageData for the current image.
-     * @param pathObject The object that we'll be doing segmentation in.
+     * @param roi The ROI defining the region used for normalization.
      * @param channels The channels/color transforms that the segmentation
      *                 will be restricted to.
      * @param lowPerc The lower percentile to use in normalisation.
@@ -127,12 +136,9 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
      * @return Percentile-based normalisation based on the bounding box,
      * or default tile-based percentile normalisation if that fails.
      */
-    private static ImageOp getNormalization(ImageData<BufferedImage> imageData, PathObject pathObject, Collection<ColorTransforms.ColorTransform> channels, double lowPerc, double highPerc) {
+    private static ImageOp getNormalization(ImageData<BufferedImage> imageData, ROI roi, Collection<ColorTransforms.ColorTransform> channels, double lowPerc, double highPerc) {
         var defaults = ImageOps.Normalize.percentile(lowPerc, highPerc, true, 1e-6);
         try {
-            // read the bounding box of the current object
-            var roi = pathObject.getROI();
-
             BufferedImage image;
             double downsample = Math.max(1,  Math.max(roi.getBoundsWidth(), roi.getBoundsHeight()) / 1024);
             var request = RegionRequest.createInstance(imageData.getServerPath(), downsample, roi);
