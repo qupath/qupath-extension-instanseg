@@ -26,6 +26,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
@@ -54,7 +55,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
                             Collection<ColorTransforms.ColorTransform> channels,
                             int inputWidth, int inputHeight, boolean doPadding) {
         this.predictors = predictors;
-        this.channels = channels;
+        this.channels = List.copyOf(channels);
         this.inputWidth = inputWidth;
         this.inputHeight = inputHeight;
         this.doPadding = doPadding;
