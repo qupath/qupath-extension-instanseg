@@ -210,7 +210,7 @@ public class InstanSegModel {
 
     private static Path downloadZip(URL url, Path localDirectory, String filename) {
         var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
-        if (!Files.exists(zipFile)) {
+        if (!isDownloadedAlready(zipFile)) {
             try (InputStream stream = url.openStream()) {
                 try (ReadableByteChannel readableByteChannel = Channels.newChannel(stream)) {
                     try (FileOutputStream fos = new FileOutputStream(zipFile.toFile())) {
@@ -224,9 +224,14 @@ public class InstanSegModel {
         return zipFile;
     }
 
+    private static boolean isDownloadedAlready(Path zipFile) {
+        // todo: validate contents somehow
+        return Files.exists(zipFile);
+    }
+
     private static Path unzip(Path zipFile) {
         var outdir = zipFile.resolveSibling(zipFile.getFileName().toString().replace(".zip", ""));
-        if (!Files.exists(outdir)) {
+        if (!isUnpackedAlready(outdir)) {
             try {
                 unzip(zipFile, zipFile.getParent());
                 // Files.delete(zipFile);
@@ -235,6 +240,10 @@ public class InstanSegModel {
             }
         }
         return outdir;
+    }
+
+    private static boolean isUnpackedAlready(Path outdir) {
+        return Files.exists(outdir) && isValidModel(outdir);
     }
 
     private static void unzip(Path zipFile, Path destination) throws IOException {
