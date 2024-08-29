@@ -1,6 +1,8 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathAnnotationObject;
@@ -100,10 +102,15 @@ public class InstanSeg {
      */
     public static final class Builder {
 
+        private static final Logger logger = LoggerFactory.getLogger(Builder.class);
+
+        private static final int MIN_TILE_DIMS = 128;
+        private static final int MAX_TILE_DIMS = 2048;
+
         private int tileDims = 512;
         private double downsample = 1;
-        private int padding = 40;
-        private int boundary = 20;
+        private int padding = 80; // Previous default of 40 could miss large objects
+        private int boundary = 20; // TODO: Check relationship between padding & boundary
         private int numOutputChannels = 2;
         private Device device = Device.fromName("cpu");
         private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
@@ -120,7 +127,15 @@ public class InstanSeg {
          * @return A modified builder
          */
         public Builder tileDims(int tileDims) {
-            this.tileDims = tileDims;
+            if (tileDims < MIN_TILE_DIMS) {
+                logger.warn("Tile dimensions too small, setting to minimum value of {}", MIN_TILE_DIMS);
+                this.tileDims = MIN_TILE_DIMS;
+            } else if (tileDims > MAX_TILE_DIMS) {
+                logger.warn("Tile dimensions too large, setting to maximum value of {}", MAX_TILE_DIMS);
+                this.tileDims = MAX_TILE_DIMS;
+            } else {
+                this.tileDims = tileDims;
+            }
             return this;
         }
 
@@ -140,7 +155,12 @@ public class InstanSeg {
          * @return A modified builder
          */
         public Builder interTilePadding(int padding) {
-            this.padding = padding;
+            if (padding < 0) {
+                logger.warn("Padding cannot be negative, setting to 0");
+                this.padding = 0;
+            } else {
+                this.padding = padding;
+            }
             return this;
         }
 
