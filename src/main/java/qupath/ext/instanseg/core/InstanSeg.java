@@ -109,7 +109,7 @@ public class InstanSeg {
 
         private int tileDims = 512;
         private double downsample = 1;
-        private int padding = 80; // Previous default of 40 could miss large objects
+        private int padding = 100; // Previous default of 40 could miss large objects
         private int boundary = 20; // TODO: Check relationship between padding & boundary
         private int numOutputChannels = 2;
         private Device device = Device.fromName("cpu");
