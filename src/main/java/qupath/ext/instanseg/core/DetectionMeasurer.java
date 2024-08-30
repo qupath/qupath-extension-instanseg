@@ -95,7 +95,9 @@ public class DetectionMeasurer {
      */
     public static class Builder {
         private Collection<ObjectMeasurements.Compartments> compartments = Arrays.asList(ObjectMeasurements.Compartments.values());
-        private Collection<ObjectMeasurements.Measurements> measurements = Arrays.asList(ObjectMeasurements.Measurements.values());
+        private Collection<ObjectMeasurements.Measurements> measurements = Arrays.stream(ObjectMeasurements.Measurements.values())
+                .filter(m -> m != ObjectMeasurements.Measurements.VARIANCE) // Skip variance - we have standard deviation
+                .toList();
         private Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures = Arrays.asList(ObjectMeasurements.ShapeFeatures.values());
         private double pixelSize;
 
