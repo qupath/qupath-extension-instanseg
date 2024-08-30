@@ -246,7 +246,7 @@ public class InstanSegModel {
                         )
                         .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(preferredObjectClass), boundary))
                         .padding(padding)
-                        .merger(ObjectMerger.createIoUMerger(0.2))
+                        .merger(ObjectMerger.createIoUMerger(0.1))
                         .downsample(downsample)
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);
