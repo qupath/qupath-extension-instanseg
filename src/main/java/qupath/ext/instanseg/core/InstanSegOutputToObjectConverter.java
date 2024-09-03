@@ -28,9 +28,9 @@ import java.util.Random;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
+class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
 
-    private static final Logger logger = LoggerFactory.getLogger(InstansegOutputToObjectConverter.class);
+    private static final Logger logger = LoggerFactory.getLogger(InstanSegOutputToObjectConverter.class);
 
     private final Class<? extends PathObject> preferredObjectClass;
 
@@ -40,7 +40,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
      */
     private boolean assignRandomColors = true;
 
-    InstansegOutputToObjectConverter(Class<? extends PathObject> preferredObjectClass) {
+    InstanSegOutputToObjectConverter(Class<? extends PathObject> preferredObjectClass) {
         this.preferredObjectClass = preferredObjectClass;
     }
 
@@ -140,7 +140,7 @@ class InstansegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         if (preferredObjectClass == null || Objects.equals(PathDetectionObject.class, preferredObjectClass))
             return PathObjects::createDetectionObject;
         else if (Objects.equals(PathAnnotationObject.class, preferredObjectClass))
-            return InstansegOutputToObjectConverter::createLockedAnnotation;
+            return InstanSegOutputToObjectConverter::createLockedAnnotation;
         else if (Objects.equals(PathTileObject.class, preferredObjectClass))
             return PathObjects::createTileObject;
         else
