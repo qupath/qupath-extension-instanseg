@@ -5,7 +5,6 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.training.util.ProgressBar;
-import com.google.gson.internal.LinkedTreeMap;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +25,8 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -36,6 +34,11 @@ import java.util.concurrent.BlockingQueue;
 public class InstanSegModel {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
+
+    /**
+     * Constant to indicate that any number of channels are supported.
+     */
+    public static final int ANY_CHANNELS = -1;
 
     private Path path = null;
     private URL modelURL = null;
@@ -150,21 +153,30 @@ public class InstanSegModel {
 
     private Map<String, Double> getPixelSize() {
         // todo: this code is horrendous
-        var map = new HashMap<String, Double>();
-        var config = (LinkedTreeMap)getModel().getConfig().get("qupath");
-        var axes = (ArrayList)config.get("axes");
-        map.put("x", (Double) ((LinkedTreeMap)(axes.get(0))).get("step"));
-        map.put("y", (Double) ((LinkedTreeMap)(axes.get(1))).get("step"));
-        return map;
+        var config = getModel().getConfig().getOrDefault("qupath", null);
+        if (config instanceof Map configMap) {
+            var axes = (List)configMap.get("axes");
+            return Map.of(
+                    "x", (Double) ((Map) (axes.get(0))).get("step"),
+                    "y", (Double) ((Map) (axes.get(1))).get("step")
+            );
+        }
+        return Map.of("x", 1.0, "y", 1.0);
     }
 
-    public int getNumChannels() {
-        assert getModel().getInputs().getFirst().getAxes().equals("bcyx");
-        int numChannels = getModel().getInputs().getFirst().getShape().getShapeMin()[1];
-        if (getModel().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
-            numChannels = Integer.MAX_VALUE;
+    /**
+     * Get the number of input channels supported by the model.
+     * @return a positive integer, or {@link #ANY_CHANNELS} if any number of channels is supported.
+     */
+    public int getInputChannels() {
+        String axes = getModel().getInputs().getFirst().getAxes().toLowerCase();
+        int ind = axes.indexOf("c");
+        var shape = getModel().getInputs().getFirst().getShape();
+        if (shape.getShapeStep()[ind] == 1) {
+            return ANY_CHANNELS;
+        } else {
+            return shape.getShapeMin()[ind];
         }
-        return numChannels;
     }
 
     private void fetchModel() {
@@ -176,6 +188,7 @@ public class InstanSegModel {
 
     private static void downloadAndUnzip(URL url, Path localDirectory) {
         // todo: implement
+        throw new UnsupportedOperationException("Downloading and unzipping models is not yet implemented!");
     }
 
     private static Path getUserDir() {
@@ -246,7 +259,8 @@ public class InstanSegModel {
                         )
                         .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(preferredObjectClass), boundary))
                         .padding(padding)
-                        .merger(ObjectMerger.createIoUMerger(0.2))
+//                        .merger(ObjectMerger.createIoUMerger(0.5))
+                        .merger(ObjectMerger.createIoMinMerger(0.5))
                         .downsample(downsample)
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);

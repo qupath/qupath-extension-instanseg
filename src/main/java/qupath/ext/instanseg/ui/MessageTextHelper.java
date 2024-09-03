@@ -123,9 +123,9 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
-        int modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
+        int modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getInputChannels();
         int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
-        if (modelChannels != Integer.MAX_VALUE) {
+        if (modelChannels != InstanSegModel.ANY_CHANNELS) {
             if (modelChannels != selectedChannels) {
                 return String.format(
                         resources.getString("ui.error.num-channels-dont-match"),

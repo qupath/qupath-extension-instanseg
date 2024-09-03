@@ -40,7 +40,6 @@ import qupath.lib.gui.TaskRunnerFX;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
-import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
@@ -180,7 +179,7 @@ public class InstanSegController extends BorderPane {
         if (imageData.isBrightfield()) {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
             var model = modelChoiceBox.getSelectionModel().selectedItemProperty().get();
-            if (model != null && model.getNumChannels() != Integer.MAX_VALUE) {
+            if (model != null && model.getInputChannels() != InstanSegModel.ANY_CHANNELS) {
                 comboChannels.getCheckModel().clearChecks();
                 comboChannels.getCheckModel().checkIndices(0, 1, 2);
             }
@@ -295,8 +294,8 @@ public class InstanSegController extends BorderPane {
                                 return true;
                             }
                             int numSelected = comboChannels.getCheckModel().getCheckedIndices().size();
-                            int numAllowed = model.getNumChannels();
-                            return !(numSelected == numAllowed || numAllowed == Integer.MAX_VALUE);
+                            int numAllowed = model.getInputChannels();
+                            return !(numSelected == numAllowed || numAllowed == InstanSegModel.ANY_CHANNELS);
                         }, modelChoiceBox.getSelectionModel().selectedItemProperty()))
         );
         pendingTask.addListener((observable, oldValue, newValue) -> {
@@ -313,7 +312,7 @@ public class InstanSegController extends BorderPane {
         tfModelDirectory.textProperty().addListener((v, o, n) -> handleModelDirectory(n));
         // for brightfield models, we want to disable the picker and set it to use RGB only
         modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
-            if (qupath.getImageData().isBrightfield() && n != null && n.getNumChannels() != Integer.MAX_VALUE) {
+            if (qupath.getImageData().isBrightfield() && n != null && n.getInputChannels() != InstanSegModel.ANY_CHANNELS) {
                 comboChannels.getCheckModel().clearChecks();
                 comboChannels.getCheckModel().checkIndices(0, 1, 2);
             }
