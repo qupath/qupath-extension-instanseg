@@ -2,30 +2,42 @@ package qupath.ext.instanseg.core;
 
 import ai.djl.Device;
 import ai.djl.ndarray.NDList;
-import ai.djl.ndarray.types.Shape;
 import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorContext;
 import org.bytedeco.opencv.opencv_core.Mat;
 import qupath.ext.djl.DjlTools;
+
+import java.util.Arrays;
 
 
 class MatTranslator implements Translator<Mat, Mat> {
 
     private final String inputLayoutNd;
     private final String outputLayoutNd;
-    private final int nOutputChannels;
+    private final int[] outputChannels;
 
     /**
      * Create a translator from InstanSeg input to output.
      * @param inputLayoutNd N-dimensional output specification
      * @param outputLayoutNd N-dimensional output specification
-     * @param nOutputChannels Number of output channels, or -1 if unknown. One use of this is to limit the output
-     *                        to the first channel only, e.g. to detect nuclei only using a cell detection model
+     * @param outputChannels Array of channels to output; if null or empty, output all channels.
+     *                       Values should be true for channels to output, false for channels to ignore.
      */
-    MatTranslator(String inputLayoutNd, String outputLayoutNd, int nOutputChannels) {
+    MatTranslator(String inputLayoutNd, String outputLayoutNd, boolean[] outputChannels) {
         this.inputLayoutNd = inputLayoutNd;
         this.outputLayoutNd = outputLayoutNd;
-        this.nOutputChannels = nOutputChannels;
+        this.outputChannels = convertBooleanArray(outputChannels);
+    }
+
+    private static int[] convertBooleanArray(boolean[] array) {
+        if (array == null || array.length == 0) {
+            return null;
+        }
+        int[] out = new int[array.length];
+        for (int i = 0; i < array.length; i++) {
+            out[i] = array[i] ? 1 : 0;
+        }
+        return out;
     }
 
     /**
@@ -38,9 +50,8 @@ class MatTranslator implements Translator<Mat, Mat> {
         var manager = ctx.getNDManager();
         var ndarray = DjlTools.matToNDArray(manager, input, inputLayoutNd);
         var out = new NDList(ndarray);
-        if (nOutputChannels == 1) {
-            var inds = new int[]{1, 0};
-            var array = manager.create(inds, new Shape(2));
+        if (outputChannels != null) {
+            var array = manager.create(outputChannels);
             var arrayCPU = array.toDevice(Device.cpu(), false);
             out.add(arrayCPU);
         }

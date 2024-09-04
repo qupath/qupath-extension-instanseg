@@ -42,8 +42,7 @@ public class InstanSeg {
     private final int tileDims;
     private final double downsample;
     private final int padding;
-    private final int boundary;
-    private final int numOutputChannels;
+    private final int[] outputChannels;
     private final boolean randomColors;
     private final ImageData<BufferedImage> imageData;
     private final Collection<ColorTransforms.ColorTransform> channels;
@@ -52,14 +51,16 @@ public class InstanSeg {
     private final TaskRunner taskRunner;
     private final Class<? extends PathObject> preferredOutputClass;
 
-    private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
+    // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently
+    private final int boundaryThreshold = 1;
+
+    private InstanSeg(int tileDims, double downsample, int padding, int[] outputChannels, ImageData<BufferedImage> imageData,
                       Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner,
                       Class<? extends PathObject> preferredOutputClass, boolean randomColors) {
         this.tileDims = tileDims;
         this.downsample = downsample; // Optional... and not advised (use the model spec instead); set <= 0 to ignore
         this.padding = padding;
-        this.boundary = boundary;
-        this.numOutputChannels = numOutputChannels;
+        this.outputChannels = outputChannels == null ? null : outputChannels.clone();
         this.imageData = imageData;
         this.channels = channels;
         this.model = model;
@@ -158,12 +159,24 @@ public class InstanSeg {
             logger.debug("Calling InstanSeg with calculated downsample {}", downsample);
         }
 
+        // Create an int[] representing a boolean array of channels to use
+        boolean[] outputChannelArray = null;
+        if (outputChannels != null && outputChannels.length > 0) {
+            outputChannelArray = new boolean[model.getOutputChannels()];;
+            for (int c : outputChannels) {
+                if (c < 0 || c >= outputChannelArray.length) {
+                    throw new IllegalArgumentException("Invalid channel index: " + c);
+                }
+                outputChannelArray[c] = true;
+            }
+        }
+
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
                 .optModelUrls(String.valueOf(modelPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
-                .optTranslator(new MatTranslator(layout, layoutOutput, numOutputChannels))
+                .optTranslator(new MatTranslator(layout, layoutOutput, outputChannelArray))
                 .build()
                 .loadModel()) {
 
@@ -193,7 +206,7 @@ public class InstanSeg {
                         )
                         .outputHandler(
                                 new PruneObjectOutputHandler<>(
-                                        new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundary))
+                                        new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold))
                         .padding(padding)
                         .postProcess(createPostProcessor())
                         .downsample(downsample)
@@ -257,8 +270,7 @@ public class InstanSeg {
         private int tileDims = 512;
         private double downsample = -1; // Optional - we usually get this from the model
         private int padding = 80; // Previous default of 40 could miss large objects
-        private int boundary = 20; // TODO: Check relationship between padding & boundary
-        private int numOutputChannels = 2;
+        private int[] outputChannels = null;
         private boolean randomColors = true;
         private Device device = Device.fromName("cpu");
         private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
@@ -313,22 +325,18 @@ public class InstanSeg {
         }
 
         /**
-         * Set the size of the overlap region between tiles
-         * @param boundary The width in pixels that overlaps between tiles
+         * Set the output channels to be retained.
+         * <p>
+         * For a 2-channel model with cell outputs, use 0 for nuclei and 1 for full cell, or [0, 1] for both.
+         * <p>
+         * These values are converted and passed to InstanSeg, which can optimize the code path accordingly -
+         * so it can be much cheaper to eliminate channels now, rather than discard unwanted detections later.
+         *
+         * @param outputChannels 0-based indices of the output channels, or leave empty to use all channels
          * @return A modified builder
          */
-        public Builder tileBoundary(int boundary) {
-            this.boundary = boundary;
-            return this;
-        }
-
-        /**
-         * Set the number of output channels
-         * @param numOutputChannels The number of output channels (1 or 2 currently)
-         * @return A modified builder
-         */
-        public Builder numOutputChannels(int numOutputChannels) {
-            this.numOutputChannels = numOutputChannels;
+        public Builder outputChannels(int... outputChannels) {
+            this.outputChannels = outputChannels.clone();
             return this;
         }
 
@@ -578,8 +586,7 @@ public class InstanSeg {
                     this.tileDims,
                     this.downsample,
                     this.padding,
-                    this.boundary,
-                    this.numOutputChannels,
+                    this.outputChannels,
                     this.imageData,
                     this.channels,
                     this.model,
