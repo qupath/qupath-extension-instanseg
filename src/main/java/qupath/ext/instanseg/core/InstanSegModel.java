@@ -341,7 +341,7 @@ public class InstanSegModel {
         return getModel().flatMap(model -> {
             var config = model.getConfig().getOrDefault("qupath", null);
             if (config instanceof Map configMap) {
-                var axes = (List)configMap.get("axes");
+                var axes = (List) configMap.get("axes");
                 return Optional.of(Map.of(
                         "x", (Double) ((Map) (axes.get(0))).get("step"),
                         "y", (Double) ((Map) (axes.get(1))).get("step")
@@ -351,22 +351,21 @@ public class InstanSegModel {
         });
     }
 
-    private void fetchModel() {
-        if (modelURL == null) {
-            throw new NullPointerException("Model URL should not be null for a local model!");
-        }
-        downloadAndUnzip(modelURL, getUserDir().resolve("instanseg"));
+    /**
+     * Get the number of output channels provided by the model (typically 1 or 2)
+     * @return a positive integer
+     */
+    public Optional<Integer> getOutputChannels() {
+        return getModel().map(model -> {
+            var output = model.getOutputs().getFirst();
+            String axes = output.getAxes().toLowerCase();
+            int ind = axes.indexOf("c");
+            var shape = output.getShape().getShape();
+            if (shape != null && shape.length > ind)
+                return shape[ind];
+            return (int)Math.round(output.getShape().getOffset()[ind] * 2);
+        });
     }
 
-    private static void downloadAndUnzip(URL url, Path localDirectory) {
-        // todo: implement
-        throw new UnsupportedOperationException("Downloading and unzipping models is not yet implemented!");
-    }
-
-    private static Path getUserDir() {
-        Path userPath = UserDirectoryManager.getInstance().getUserPath();
-        Path cachePath = Paths.get(System.getProperty("user.dir"), ".cache", "QuPath");
-        return userPath == null || userPath.toString().isEmpty() ?  cachePath : userPath;
-    }
 
 }

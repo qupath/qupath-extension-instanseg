@@ -75,6 +75,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.FutureTask;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -621,12 +622,13 @@ public class InstanSegController extends BorderPane {
                 Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.querying-local"));
                 return null;
             }
+            var outputChannels = nucleiOnlyCheckBox.isSelected() ? new int[]{0} : new int[]{};
 
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
                     .device(deviceChoices.getSelectionModel().getSelectedItem())
-                    .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
+                    .outputChannels(outputChannels)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
                     .taskRunner(taskRunner)
@@ -637,7 +639,7 @@ public class InstanSegController extends BorderPane {
                             qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
-                                .numOutputChannels(%d)
+                                .outputChannels(%s)
                                 .channels(%s)
                                 .tileDims(%d)
                                 .nThreads(%d)
@@ -646,7 +648,9 @@ public class InstanSegController extends BorderPane {
                             """,
                             path.get(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
-                            nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                            outputChannels.length == 0 ? "" : Arrays.stream(outputChannels)
+                                    .mapToObj(Integer::toString)
+                                    .collect(Collectors.joining(", ")),
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
