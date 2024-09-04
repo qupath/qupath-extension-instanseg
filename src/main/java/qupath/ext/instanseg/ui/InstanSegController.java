@@ -1,6 +1,9 @@
 package qupath.ext.instanseg.ui;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -387,20 +390,21 @@ public class InstanSegController extends BorderPane {
     }
 
     private void downloadModel() {
-        ForkJoinPool.commonPool().execute(() -> {
-            try {
-                var model = modelChoiceBox.getSelectionModel().getSelectedItem();
-                Dialogs.showInfoNotification(resources.getString("title"),
-                        String.format(resources.getString("ui.popup.fetching"), model.getName()));
-                model.download(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
-                Dialogs.showInfoNotification(resources.getString("title"),
-                        String.format(resources.getString("ui.popup.available"), model.getName()));
-                needsUpdating.set(!needsUpdating.get());
-            } catch (IOException ex) {
-                Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
-            }
-        });
-
+        try (var pool = ForkJoinPool.commonPool()) {
+            pool.execute(() -> {
+                try {
+                    var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+                    Dialogs.showInfoNotification(resources.getString("title"),
+                            String.format(resources.getString("ui.popup.fetching"), model.getName()));
+                    model.download(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+                    Dialogs.showInfoNotification(resources.getString("title"),
+                            String.format(resources.getString("ui.popup.available"), model.getName()));
+                    needsUpdating.set(!needsUpdating.get());
+                } catch (IOException ex) {
+                    Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+                }
+            });
+        }
     }
 
     private static void parseMarkdown(InstanSegModel model, WebView webView, Button infoButton, PopOver infoPopover) {
@@ -573,7 +577,7 @@ public class InstanSegController extends BorderPane {
         }
 
         int nModelChannels = modelChannels.get();
-        if (!(nModelChannels == Integer.MAX_VALUE || nModelChannels != imageChannels)) {
+        if (!(nModelChannels == InstanSegModel.ANY_CHANNELS || nModelChannels != imageChannels)) {
             Dialogs.showErrorNotification(resources.getString("title"), String.format(
                     resources.getString("ui.error.num-channels-dont-match"),
                     nModelChannels, imageChannels));
@@ -779,13 +783,15 @@ public class InstanSegController extends BorderPane {
                 .build();
         HttpResponse<String> response;
         String json;
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         // check GitHub api for releases
         try (HttpClient client = HttpClient.newHttpClient()) {
             response = client.send(request, HttpResponse.BodyHandlers.ofString());
             // if response is okay, then cache it
             if (response.statusCode() == 200) {
                 json = response.body();
-                Files.writeString(cachedReleases, json);
+                JsonElement jsonElement = JsonParser.parseString(json);
+                Files.writeString(cachedReleases, gson.toJson(jsonElement));
             } else {
                 // otherwise problems
                 throw new IOException("Unable to fetch GitHub release information, status " + response.statusCode());
@@ -805,8 +811,7 @@ public class InstanSegController extends BorderPane {
             }
         }
 
-        Gson gson = new Gson();
-        var releases = gson.fromJson(json, GitHubRelease[].class);
+        GitHubRelease[] releases = gson.fromJson(json, GitHubRelease[].class);
         if (!(releases.length > 0)) {
             logger.info("No releases found in JSON string");
             return List.of();

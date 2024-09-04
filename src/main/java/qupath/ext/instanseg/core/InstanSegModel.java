@@ -45,7 +45,7 @@ public class InstanSegModel {
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
-        this.name = model.getName();
+        this.name = model.getName() + " (local)";
     }
 
     private InstanSegModel(String name, URL modelURL) {
@@ -279,14 +279,16 @@ public class InstanSegModel {
         return Files.exists(zipFile);
     }
 
-    private static Path unzipIfNeeded(Path zipFile) {
+    private static Path unzipIfNeeded(Path zipFile) throws IOException {
         var outdir = zipFile.resolveSibling(zipFile.getFileName().toString().replace(".zip", ""));
         if (!isUnpackedAlready(outdir)) {
             try {
                 unzip(zipFile, zipFile.getParent());
                 // Files.delete(zipFile);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                // clean up files just in case!
+                Files.deleteIfExists(zipFile);
+                Files.deleteIfExists(outdir);
             }
         }
         return outdir;
