@@ -23,6 +23,7 @@ import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.ResourceBundle;
 
@@ -128,13 +129,13 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
-        if (modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded()) {
+        if (modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()))) {
             // shouldn't happen if downloaded anyway!
             var modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
             if (modelChannels.isPresent()) {
                 int nModelChannels = modelChannels.get();
                 int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
-                if (nModelChannels != Integer.MAX_VALUE) {
+                if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
                     if (nModelChannels != selectedChannels) {
                         return String.format(
                                 resources.getString("ui.error.num-channels-dont-match"),

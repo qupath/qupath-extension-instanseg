@@ -3,6 +3,7 @@ package qupath.ext.instanseg.ui;
 import com.google.gson.Gson;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
+import qupath.ext.instanseg.core.InstanSegResults;
 import qupath.ext.instanseg.core.PytorchManager;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
@@ -47,7 +49,6 @@ import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.WebViews;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
-import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
@@ -72,6 +73,7 @@ import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.FutureTask;
 import java.util.stream.IntStream;
 
@@ -145,7 +147,18 @@ public class InstanSegController extends BorderPane {
         configureSelectButtons();
         configureRunning();
         configureThreadSpinner();
+        BooleanBinding currentModelIsDownloaded = Bindings.createBooleanBinding(
+                () -> {
+                    var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+                    if (model == null) {
+                        return false;
+                    }
+                    return model.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+                },
+                modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating);
 
+        infoButton.disableProperty().bind(currentModelIsDownloaded.not());
+        downloadButton.disableProperty().bind(currentModelIsDownloaded);
         configureChannelPicker();
     }
 
@@ -206,11 +219,11 @@ public class InstanSegController extends BorderPane {
         if (imageData.isBrightfield()) {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
             var model = modelChoiceBox.getSelectionModel().selectedItemProperty().get();
-            if (model != null && model.isDownloaded()) {
+            if (model != null && model.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()))) {
                 var modelChannels = model.getNumChannels();
                 if (modelChannels.isPresent()) {
                     int nModelChannels = modelChannels.get();
-                    if (nModelChannels != Integer.MAX_VALUE) {
+                    if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
                         comboChannels.getCheckModel().clearChecks();
                         comboChannels.getCheckModel().checkIndices(0, 1, 2);
                     }
@@ -326,7 +339,9 @@ public class InstanSegController extends BorderPane {
                             if (model == null) {
                                 return true;
                             }
-                            if (!model.isDownloaded()) return false; // to enable "download and run"
+                            if (!model.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()))) {
+                                return false; // to enable "download and run"
+                            }
                             return false;
                         }, modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating))
         );
@@ -347,29 +362,20 @@ public class InstanSegController extends BorderPane {
             addRemoteModels(modelChoiceBox);
         });
         modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
-            if (n == null) return;
-            downloadButton.setDisable(n.isDownloaded());
-            infoButton.setDisable(!n.isDownloaded());
-            if (!n.isDownloaded() || qupath.getImageData() == null) return;
+            if (n == null) {
+                return;
+            }
+            boolean isDownloaded = n.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+            if (!isDownloaded || qupath.getImageData() == null) {
+                return;
+            }
             var numChannels = n.getNumChannels();
-            if (qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != Integer.MAX_VALUE) {
+            if (qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != InstanSegModel.ANY_CHANNELS) {
                 comboChannels.getCheckModel().clearChecks();
                 comboChannels.getCheckModel().checkIndices(0, 1, 2);
             }
         });
-        downloadButton.setOnAction(e -> {
-            try {
-                var model = modelChoiceBox.getSelectionModel().getSelectedItem();
-                model.download();
-                Dialogs.showInfoNotification(resources.getString("title"),
-                        String.format(resources.getString("ui.popup.available"), model.getName()));
-                infoButton.setDisable(false);
-                downloadButton.setDisable(true);
-                needsUpdating.set(!needsUpdating.get());
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
-        });
+        downloadButton.setOnAction(e -> downloadModel());
         WebView webView = WebViews.create(true);
         PopOver infoPopover = new PopOver(webView);
         infoButton.setOnAction(e -> {
@@ -377,6 +383,22 @@ public class InstanSegController extends BorderPane {
         });
     }
 
+    private void downloadModel() {
+        ForkJoinPool.commonPool().execute(() -> {
+            try {
+                var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+                Dialogs.showInfoNotification(resources.getString("title"),
+                        String.format(resources.getString("ui.popup.fetching"), model.getName()));
+                model.download(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+                Dialogs.showInfoNotification(resources.getString("title"),
+                        String.format(resources.getString("ui.popup.available"), model.getName()));
+                needsUpdating.set(!needsUpdating.get());
+            } catch (IOException ex) {
+                Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+            }
+        });
+
+    }
 
     private static void parseMarkdown(InstanSegModel model, WebView webView, Button infoButton, PopOver infoPopover) {
         Optional<String> readme = model.getREADME();
@@ -410,19 +432,18 @@ public class InstanSegController extends BorderPane {
             comboBox.getItems().add(
                     InstanSegModel.fromURL(
                             asset.name.replace(".zip", ""),
-                            asset.browser_download_url,
-                            Path.of(InstanSegPreferences.modelDirectoryProperty().get())));
+                            asset.browser_download_url)
+            );
         });
     }
 
 
     private void configureTileSizes() {
-        // Because of the use of 32-bit signed ints for coordinates of the intermediate sparse matrix,
-        // we can't have very large tile sizes.
-        // We can estimate the total number of instances supported as 2^31 / (tileSize^2) -
-        // if we have large tiles, we likely have many instances and we can have errors.
-        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
-        tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
+        // The use of 32-bit signed ints for coordinates of the intermediate sparse matrix *might* be
+        // an issue for very large tile sizes - but I haven't seen any evidence of this.
+        // We definitely can't have very small tiles, because they must be greater than 2 x the padding.
+        tileSizeChoiceBox.getItems().addAll(256, 512, 1024, 2048);
+        tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(512));
         tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
         tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
     }
@@ -527,13 +548,13 @@ public class InstanSegController extends BorderPane {
 
 
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
-        if (!model.isDownloaded()) {
+        var modelPath = Path.of(InstanSegPreferences.modelDirectoryProperty().get());
+        if (!model.isDownloaded(modelPath)) {
             if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup"))) return;
             Dialogs.showInfoNotification(resources.getString("title"), String.format(resources.getString("ui.popup.fetching"), model.getName()));
-            try {
-                model.download();
-            } catch (IOException e) {
-                Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+            downloadModel();
+            if (!model.isDownloaded(modelPath)) {
+                Dialogs.showErrorNotification(resources.getString("title"), String.format(resources.getString("error.localModel")));
                 return;
             }
         }
@@ -590,7 +611,7 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
-            Optional<Double> pixelSize = model.getPixelSizeX();
+            Optional<Number> pixelSize = model.getPixelSizeX();
             Optional<Path> path = model.getPath();
             if (pixelSize.isEmpty() || path.isEmpty()) {
                 Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.querying-local"));
@@ -604,7 +625,7 @@ public class InstanSegController extends BorderPane {
                     .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                    .downsample(pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                    .downsample(pixelSize.get().doubleValue() / (double) server.getPixelCalibration().getAveragedPixelSize())
                     .taskRunner(taskRunner)
                     .build();
 
@@ -616,7 +637,6 @@ public class InstanSegController extends BorderPane {
                                 .numOutputChannels(%d)
                                 .channels(%s)
                                 .tileDims(%d)
-                                .downsample(%f)
                                 .nThreads(%d)
                                 .build()
                                 .%s
@@ -626,14 +646,15 @@ public class InstanSegController extends BorderPane {
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
-                            pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                            pixelSize.get().doubleValue() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
                             makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
                     );
+            InstanSegResults results;
             if (makeMeasurements) {
-                instanSeg.detectObjectsAndMeasure(selectedObjects);
+                results = instanSeg.detectObjectsAndMeasure(selectedObjects);
             } else {
-                instanSeg.detectObjects(selectedObjects);
+                results = instanSeg.detectObjects(selectedObjects);
             }
 
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
@@ -641,9 +662,10 @@ public class InstanSegController extends BorderPane {
                     .addStep(
                             new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
                     );
-
-            if (model.nFailed() > 0) {
-                var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
+            logger.info("Results: {}", results);
+            int nFailed = results.nTilesFailed();
+            if (nFailed > 0) {
+                var errorMessage = String.format(resources.getString("error.tiles-failed"), nFailed);
                 logger.error(errorMessage);
                 Dialogs.showErrorMessage(resources.getString("title"), errorMessage);
             }

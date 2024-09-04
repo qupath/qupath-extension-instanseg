@@ -1,30 +1,17 @@
 package qupath.ext.instanseg.core;
 
-import ai.djl.Device;
-import ai.djl.inference.Predictor;
-import ai.djl.ndarray.BaseNDManager;
-import ai.djl.repository.zoo.Criteria;
-import ai.djl.training.util.ProgressBar;
-import com.google.gson.internal.LinkedTreeMap;
-import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
 
-import qupath.lib.experimental.pixels.OpenCVProcessor;
-import qupath.lib.images.ImageData;
-import qupath.lib.images.servers.ColorTransforms;
-import qupath.lib.objects.PathObject;
-import qupath.lib.objects.utils.ObjectMerger;
-import qupath.lib.objects.utils.Tiler;
-import qupath.lib.plugins.TaskRunner;
-import qupath.opencv.ops.ImageOps;
-
-import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import qupath.lib.common.GeneralTools;
+import qupath.lib.gui.UserDirectoryManager;
+import qupath.lib.images.servers.PixelCalibration;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -34,26 +21,26 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.Objects;
 
 public class InstanSegModel {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
-    private Path localModelPath;
     private URL modelURL = null;
+
+    /**
+     * Constant to indicate that any number of channels are supported.
+     */
+    public static final int ANY_CHANNELS = -1;
 
     private Path path = null;
     private BioimageIoSpec.BioimageIoModel model = null;
     private final String name;
-    private int nFailed = 0;
 
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
@@ -61,10 +48,9 @@ public class InstanSegModel {
         this.name = model.getName();
     }
 
-    private InstanSegModel(String name, URL modelURL, Path localModelPath) {
+    private InstanSegModel(String name, URL modelURL) {
         this.modelURL = modelURL;
         this.name = name;
-        this.localModelPath = localModelPath;
     }
 
     /**
@@ -74,28 +60,48 @@ public class InstanSegModel {
      * @throws IOException If the directory can't be found or isn't a valid model directory.
      */
     public static InstanSegModel fromPath(Path path) throws IOException {
-        return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
+        return new InstanSegModel(BioimageIoSpec.parseModel(path));
     }
 
     /**
      * Create an InstanSeg model from a remote URL.
      * @param name The model name
      * @param browserDownloadUrl The download URL from eg GitHub
-     * @param localModelPath The path that models should be downloaded to
      * @return A handle on the created model
      */
-    public static InstanSegModel fromURL(String name, URL browserDownloadUrl, Path localModelPath) {
-        return new InstanSegModel(name, browserDownloadUrl, localModelPath);
+    public static InstanSegModel fromURL(String name, URL browserDownloadUrl) {
+        return new InstanSegModel(name, browserDownloadUrl);
     }
-
 
     /**
      * Check if the model has been downloaded already.
      * @return True if a flag has been set.
      */
-    public boolean isDownloaded() {
+    public boolean isDownloaded(Path localModelPath) {
         // todo: this should also check if the contents are what we expect
+        // todo: this should also try to instantiate...?
+        if (Files.exists(localModelPath.resolve(name))) {
+            try {
+                download(localModelPath);
+            } catch (IOException e) {
+                logger.error("Model dir exists but is not valid", e);
+            }
+        }
         return path != null && model != null;
+    }
+
+    /**
+     * Trigger a download for a model
+     * @throws IOException If an error occurs when downloading, unzipping, etc.
+     */
+    public void download(Path localModelPath) throws IOException {
+        if (path != null && model != null) return;
+        var zipFile = downloadZipIfNeeded(
+                this.modelURL,
+                localModelPath,
+                name);
+        this.path = unzipIfNeeded(zipFile);
+        this.model = BioimageIoSpec.parseModel(path.toFile());
     }
 
     /**
@@ -112,16 +118,83 @@ public class InstanSegModel {
      *
      * @return the pixel size in the X dimension.
      */
-    public Optional<Double> getPixelSizeX() {
-        return getPixelSize().flatMap(p -> Optional.ofNullable(p.get("x")));
+    public Optional<Number> getPixelSizeX() {
+        return getPixelSize().flatMap(p -> Optional.ofNullable(p.getOrDefault("x", null)));
     }
 
     /**
      * Get the pixel size in the Y dimension.
      * @return the pixel size in the Y dimension.
      */
-    public Optional<Double> getPixelSizeY() {
-        return getPixelSize().flatMap(p -> Optional.ofNullable(p.get("y")));
+    public Optional<Number> getPixelSizeY() {
+        return getPixelSize().flatMap(p -> Optional.ofNullable(p.getOrDefault("y", null)));
+    }
+
+    /**
+     * Get the preferred pixel size for running the model, in the absence of any other information.
+     * This is the average of the X and Y pixel sizes if both are available.
+     * Otherwise, it is the value of whichever value is available - or null if neither is found.
+     * @return the pixel size
+     */
+    public Optional<Number> getPreferredPixelSize() {
+        var x = getPixelSizeX();
+        var y = getPixelSizeY();
+        if (x.isEmpty()) {
+            return y;
+        } else if (y.isEmpty()) {
+            return x;
+        } else {
+            return Optional.of((x.get().doubleValue() + y.get().doubleValue()) / 2.0);
+        }
+    }
+
+    /**
+     * Get the preferred downsample for running the model, incorporating information from the pixel calibration of the
+     * image.
+     * This is based on {@link #getPreferredPixelSize()} but is permitted to adjust values based on the pixel calibration
+     * to avoid unnecessary rounding.
+     * <p>
+     * For example, if the computed value would request a downsample of 2.04, this method is permitted to return 2.0.
+     * That is usually desirable to avoid introducing interpolation artifacts and unnecessary floating point vertices
+     * in the output.
+     * <p>
+     * In general, it is recommended to use this method rather than #getPreferredPixelSize() to calculate a downsample
+     * when the pixel calibration is available.
+     *
+     * @param cal The pixel calibration of the image
+     * @return the preferred downsample to use
+     */
+    public double getPreferredDownsample(PixelCalibration cal) {
+        Objects.requireNonNull(cal, "Pixel calibration must not be null");
+        Optional<Number> preferred = getPreferredPixelSize();
+        double current = cal.getAveragedPixelSize().doubleValue();
+        if (preferred.isEmpty()) {
+            return current;
+        }
+        double requested = preferred.get().doubleValue();
+        if (requested > 0 && current > 0) {
+            return getPreferredDownsample(current, requested);
+        } else {
+            logger.warn("Invalid pixel size of {} for pixel calibration {}", requested, cal);
+            return 1.0;
+        }
+    }
+
+    /**
+     * Get the preferred pixel size for running the model, incorporating information from the pixel calibration of the
+     * image. This tries to encourage downsampling by an integer amount.
+     * @param currentPixelSize The current pixel size (probably in microns)
+     * @param requestedPixelSize The pixel size that the model expects (probably in microns)
+     * @return The exact downsample, unless it's close to an integer, in which case the integer.
+     */
+    static double getPreferredDownsample(double currentPixelSize, double requestedPixelSize) {
+        double downsample = requestedPixelSize / currentPixelSize;
+        double downsampleRounded = Math.round(downsample);
+        if (GeneralTools.almostTheSame(downsample, Math.round(downsample), 0.01)) {
+            return downsampleRounded;
+        } else {
+            return downsample;
+        }
     }
 
     /**
@@ -153,14 +226,6 @@ public class InstanSegModel {
     }
 
     /**
-     * The number of tiles that failed during processing.
-     * @return The count of the number of failed tiles.
-     */
-    public int nFailed() {
-        return nFailed;
-    }
-
-    /**
      * Get the model name
      * @return A string
      */
@@ -168,47 +233,36 @@ public class InstanSegModel {
         return name;
     }
 
-    /**
-     * Trigger a download for a model
-     * @throws IOException If an error occurs when downloading, unzipping, etc.
-     */
-    public void download() throws IOException {
-        if (path != null && model != null) return;
-        var zipFile = downloadZip(
-                this.modelURL,
-                localModelPath,
-                name);
-        this.path = unzip(zipFile);
-        this.model = BioimageIoSpec.parseModel(path.toFile());
-    }
 
     /**
      * Try to check the number of channels in the model.
      * @return The integer if the model is downloaded, otherwise empty
      */
     public Optional<Integer> getNumChannels() {
-        var model = getModel();
-        if (model.isEmpty()) {
-            return Optional.empty();
-        }
-        assert model.get().getInputs().getFirst().getAxes().equals("bcyx");
-        int numChannels = model.get().getInputs().getFirst().getShape().getShapeMin()[1];
-        if (model.get().getInputs().getFirst().getShape().getShapeStep()[1] == 1) {
-            numChannels = Integer.MAX_VALUE;
-        }
-        return Optional.of(numChannels);
+        return getModel().flatMap(model -> Optional.of(extractChannelNum(model)));
     }
+
+    private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {
+        int ind = model.getInputs().getFirst().getAxes().toLowerCase().indexOf("c");
+        var shape = model.getInputs().getFirst().getShape();
+        if (shape.getShapeStep()[ind] == 1) {
+            return ANY_CHANNELS;
+        } else {
+            return shape.getShapeMin()[ind];
+        }
+    }
+
 
     /**
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
-    Optional<BioimageIoSpec.BioimageIoModel> getModel() {
+    private Optional<BioimageIoSpec.BioimageIoModel> getModel() {
         return Optional.ofNullable(model);
     }
 
 
-    private static Path downloadZip(URL url, Path localDirectory, String filename) {
+    private static Path downloadZipIfNeeded(URL url, Path localDirectory, String filename) {
         var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
         if (!isDownloadedAlready(zipFile)) {
             try (InputStream stream = url.openStream()) {
@@ -229,7 +283,7 @@ public class InstanSegModel {
         return Files.exists(zipFile);
     }
 
-    private static Path unzip(Path zipFile) {
+    private static Path unzipIfNeeded(Path zipFile) {
         var outdir = zipFile.resolveSibling(zipFile.getFileName().toString().replace(".zip", ""));
         if (!isUnpackedAlready(outdir)) {
             try {
@@ -276,112 +330,6 @@ public class InstanSegModel {
     }
 
 
-    private Optional<Map<String, Double>> getPixelSize() {
-        var model = getModel();
-        if (model.isEmpty()) return Optional.empty();
-        var map = new HashMap<String, Double>();
-        var config = (LinkedTreeMap<?, ?>)model.get().getConfig().get("qupath");
-        var axes = (ArrayList<?>)config.get("axes");
-        map.put("x", (Double) ((LinkedTreeMap<?, ?>)(axes.get(0))).get("step"));
-        map.put("y", (Double) ((LinkedTreeMap<?, ?>)(axes.get(1))).get("step"));
-        return Optional.of(map);
-    }
-
-
-
-    void runInstanSeg(
-            ImageData<BufferedImage> imageData,
-            Collection<? extends PathObject> pathObjects,
-            Collection<ColorTransforms.ColorTransform> channels,
-            int tileDims,
-            double downsample,
-            int padding,
-            int boundary,
-            Device device,
-            int nOutputChannels,
-            Class<? extends PathObject> preferredObjectClass,
-            TaskRunner taskRunner) {
-
-        nFailed = 0;
-        Optional<Path> modelPath = getPath();
-        if (modelPath.isEmpty()) {
-            logger.error("Unable to run model - path is missing!");
-        }
-        Path ptPath = modelPath.get().resolve("instanseg.pt");
-        int nPredictors = 1; // todo: change me?
-
-
-        // Optionally pad images to the required size
-        boolean padToInputSize = true;
-        String layout = "CHW";
-
-        String layoutOutput = "CHW";
-
-        try (var model = Criteria.builder()
-                .setTypes(Mat.class, Mat.class)
-                .optModelUrls(String.valueOf(ptPath.toUri()))
-                .optProgress(new ProgressBar())
-                .optDevice(device) // Remove this line if devices are problematic!
-                .optTranslator(new MatTranslator(layout, layoutOutput, nOutputChannels))
-                .build()
-                .loadModel()) {
-
-
-            BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
-            printResourceCount("Resource count before prediction",
-                    (BaseNDManager)baseManager.getParentManager());
-            baseManager.debugDump(2);
-            BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
-
-            try {
-                for (int i = 0; i < nPredictors; i++) {
-                    predictors.put(model.newPredictor());
-                }
-
-                printResourceCount("Resource count after creating predictors",
-                        (BaseNDManager)baseManager.getParentManager());
-
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding));
-                var predictionProcessor = new TilePredictionProcessor(predictors, baseManager,
-                        layout, layoutOutput, channels, tileDims, tileDims, padToInputSize);
-                var processor = OpenCVProcessor.builder(predictionProcessor)
-                        .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
-                        .tiler(Tiler.builder(sizeWithoutPadding)
-                                .alignCenter()
-                                .cropTiles(false)
-                                .build()
-                        )
-                        .outputHandler(new PruneObjectOutputHandler<>(new InstansegOutputToObjectConverter(preferredObjectClass), boundary))
-                        .padding(padding)
-                        .merger(ObjectMerger.createIoUMerger(0.2))
-                        .downsample(downsample)
-                        .build();
-                processor.processObjects(taskRunner, imageData, pathObjects);
-                nFailed = predictionProcessor.nFailed();
-            } finally {
-                for (var predictor: predictors) {
-                    predictor.close();
-                }
-            }
-            printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
-        } catch (Exception e) {
-            logger.error("Error running InstanSeg", e);
-        }
-    }
-
-    /**
-     * Print resource count for debugging purposes.
-     * If we are not logging at debug level, do nothing.
-     * @param title The title to put above the log messages
-     * @param manager The NDManager to dump the logs from
-     */
-    private static void printResourceCount(String title, BaseNDManager manager) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(title);
-            manager.debugDump(2);
-        }
-    }
-
 
     private String getREADMEString(Path path) {
         var file = path.resolve(name + "_README.md");
@@ -392,4 +340,37 @@ public class InstanSegModel {
             return null;
         }
     }
+
+    private Optional<Map<String, Double>> getPixelSize() {
+        return getModel().flatMap(model -> {
+            var config = model.getConfig().getOrDefault("qupath", null);
+            if (config instanceof Map configMap) {
+                var axes = (List)configMap.get("axes");
+                return Optional.of(Map.of(
+                        "x", (Double) ((Map) (axes.get(0))).get("step"),
+                        "y", (Double) ((Map) (axes.get(1))).get("step")
+                ));
+            }
+            return Optional.of(Map.of("x", 1.0, "y", 1.0));
+        });
+    }
+
+    private void fetchModel() {
+        if (modelURL == null) {
+            throw new NullPointerException("Model URL should not be null for a local model!");
+        }
+        downloadAndUnzip(modelURL, getUserDir().resolve("instanseg"));
+    }
+
+    private static void downloadAndUnzip(URL url, Path localDirectory) {
+        // todo: implement
+        throw new UnsupportedOperationException("Downloading and unzipping models is not yet implemented!");
+    }
+
+    private static Path getUserDir() {
+        Path userPath = UserDirectoryManager.getInstance().getUserPath();
+        Path cachePath = Paths.get(System.getProperty("user.dir"), ".cache", "QuPath");
+        return userPath == null || userPath.toString().isEmpty() ?  cachePath : userPath;
+    }
+
 }
