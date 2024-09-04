@@ -126,7 +126,7 @@ public class InstanSeg {
     public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
         double downsample = model.getPreferredDownsample(imageData.getServer().getPixelCalibration());
         DetectionMeasurer.builder()
-                .pixelSize(downsample)
+                .downsample(downsample)
                 .build()
                 .makeMeasurements(imageData, detections);
     }
