@@ -9,10 +9,12 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.gui.UserDirectoryManager;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
+import qupath.lib.images.servers.PixelCalibration;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.Tiler;
@@ -28,6 +30,7 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -64,7 +67,7 @@ public class InstanSegModel {
      * @throws IOException If the directory can't be found or isn't a valid model directory.
      */
     public static InstanSegModel fromPath(Path path) throws IOException {
-        return new InstanSegModel(BioimageIoSpec.parseModel(path.toFile()));
+        return new InstanSegModel(BioimageIoSpec.parseModel(path));
     }
 
     /**
@@ -81,16 +84,82 @@ public class InstanSegModel {
      * Get the pixel size in the X dimension.
      * @return the pixel size in the X dimension.
      */
-    public Double getPixelSizeX() {
-        return getPixelSize().get("x");
+    private Number getPixelSizeX() {
+        return getPixelSize().getOrDefault("x", null);
     }
 
     /**
      * Get the pixel size in the Y dimension.
      * @return the pixel size in the Y dimension.
      */
-    public Double getPixelSizeY() {
-        return getPixelSize().get("y");
+    private Number getPixelSizeY() {
+        return getPixelSize().getOrDefault("y", null);
+    }
+
+    /**
+     * Get the preferred pixel size for running the model, in the absence of any other information.
+     * This is the average of the X and Y pixel sizes if both are available.
+     * Otherwise, it is the value of whichever value is available - or null if neither is found.
+     * @return the pixel size
+     */
+    public Number getPreferredPixelSize() {
+        var x = getPixelSizeX();
+        var y = getPixelSizeY();
+        if (x == null) {
+            return y;
+        } else if (y == null) {
+            return x;
+        } else {
+            return (x.doubleValue() + y.doubleValue()) / 2.0;
+        }
+    }
+
+    /**
+     * Get the preferred pixel size for running the model, incorporating information from the pixel calibration of the
+     * image.
+     * This is based on {@link #getPreferredPixelSize()} but is permitted to adjust values based on the pixel calibration
+     * to avoid unnecessary rounding.
+     * <p>
+     * For example, if the computed value would request a downsample of 1.01, this method is permitted to adjust the
+     * value to 1.0.
+     * <p>
+     * In general, it is recommended to use this method rather than #getPreferredPixelSize() when the pixel calibration
+     * is available, because it is guaranteed to return a value that is compatible with the image - and cannot return
+     * null.
+     * @param cal The pixel calibration of the image
+     * @return the pixel size
+     */
+    public double getPreferredPixelSize(PixelCalibration cal) {
+        Objects.requireNonNull(cal, "Pixel calibration must not be null");
+        Number preferred = getPreferredPixelSize();
+        double current = cal.getAveragedPixelSize().doubleValue();
+        if (preferred == null) {
+            return current;
+        }
+        double requested = preferred.doubleValue();
+        if (requested > 0 && current > 0) {
+            return getPreferredPixelSize(current, requested);
+        } else {
+            logger.warn("Invalid pixel size of {} for pixel calibration {}", requested, cal);
+            return cal.getAveragedPixelSize().doubleValue();
+        }
+    }
+
+    /**
+     * Get the preferred pixel size for running the model, incorporating information from the pixel calibration of the
+     * image. This tries to encourage downsampling by an integer amount.
+     * @param currentPixelSize
+     * @param requestedPixelSize
+     * @return
+     */
+    static double getPreferredPixelSize(double currentPixelSize, double requestedPixelSize) {
+        double downsample = requestedPixelSize / currentPixelSize;
+        double downsampleRounded = Math.round(downsample);
+        if (GeneralTools.almostTheSame(downsample, Math.round(downsample), 0.01)) {
+            return currentPixelSize * downsampleRounded;
+        } else {
+            return requestedPixelSize;
+        }
     }
 
     /**
@@ -208,21 +277,22 @@ public class InstanSegModel {
             Device device,
             int nOutputChannels,
             Class<? extends PathObject> preferredObjectClass,
-            TaskRunner taskRunner) {
+            TaskRunner taskRunner,
+            boolean randomColors) {
 
         nFailed = 0;
         Path modelPath;
         modelPath = getPath().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
-
-        // Optionally pad images to the required size
-        boolean padToInputSize = true;
+        // Optionally pad images so that every tile has the required size.
+        // This is useful if the model requires a specific input size - but InstanSeg should be able to handle this
+        // and inference can be much faster if we permit tiles to be cropped.
+        boolean padToInputSize = false;
         String layout = "CHW";
 
         // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
         String layoutOutput = "CHW";
-
 
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
@@ -248,16 +318,19 @@ public class InstanSegModel {
                 printResourceCount("Resource count after creating predictors",
                         (BaseNDManager)baseManager.getParentManager());
 
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding));
+                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
                 var predictionProcessor = new TilePredictionProcessor(predictors, channels, tileDims, tileDims, padToInputSize);
                 var processor = OpenCVProcessor.builder(predictionProcessor)
-                        .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels).apply(parameters.getImageData(), parameters.getRegionRequest()))
+                        .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels)
+                                .apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(Tiler.builder(sizeWithoutPadding)
                                 .alignCenter()
                                 .cropTiles(false)
                                 .build()
                         )
-                        .outputHandler(new PruneObjectOutputHandler<>(new InstanSegOutputToObjectConverter(preferredObjectClass), boundary))
+                        .outputHandler(
+                                new PruneObjectOutputHandler<>(
+                                        new InstanSegOutputToObjectConverter(preferredObjectClass, randomColors), boundary))
                         .padding(padding)
 //                        .merger(ObjectMerger.createIoUMerger(0.5))
                         .merger(ObjectMerger.createIoMinMerger(0.5))

@@ -98,6 +98,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         Predictor<Mat, Mat> predictor = null;
         try {
             predictor = predictors.take();
+            logger.debug("Predicting tile {}", mat);
             var matOutput = predictor.predict(mat);
 
             matOutput.convertTo(matOutput, opencv_core.CV_32S);

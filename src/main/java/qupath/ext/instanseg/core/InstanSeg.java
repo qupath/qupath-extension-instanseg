@@ -29,6 +29,7 @@ public class InstanSeg {
     private final int padding;
     private final int boundary;
     private final int numOutputChannels;
+    private final boolean randomColors;
     private final ImageData<BufferedImage> imageData;
     private final Collection<ColorTransforms.ColorTransform> channels;
     private final InstanSegModel model;
@@ -36,13 +37,21 @@ public class InstanSeg {
     private final TaskRunner taskRunner;
     private final Class<? extends PathObject> preferredOutputClass;
 
-
-    /**
-     * Create a builder object for InstanSeg.
-     * @return A builder, which may not be valid.
-     */
-    public static Builder builder() {
-        return new Builder();
+    private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
+                      Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner,
+                      Class<? extends PathObject> preferredOutputClass, boolean randomColors) {
+        this.tileDims = tileDims;
+        this.downsample = downsample;
+        this.padding = padding;
+        this.boundary = boundary;
+        this.numOutputChannels = numOutputChannels;
+        this.imageData = imageData;
+        this.channels = channels;
+        this.model = model;
+        this.device = device;
+        this.taskRunner = taskRunner;
+        this.preferredOutputClass = preferredOutputClass;
+        this.randomColors = randomColors;
     }
 
     /**
@@ -92,9 +101,33 @@ public class InstanSeg {
                 device,
                 numOutputChannels,
                 preferredOutputClass,
-                taskRunner
+                taskRunner,
+                randomColors
         );
     }
+
+    /**
+     * Create a builder object for InstanSeg.
+     * @return A builder, which may not be valid.
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+
+    /**
+     * Utility function to make measurements for the objects created by InstanSeg.
+     * @param imageData The ImageData for making measurements.
+     * @param detections The objects to measure.
+     */
+    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
+        double pixelSize = model.getPreferredPixelSize(imageData.getServer().getPixelCalibration());
+        DetectionMeasurer.builder()
+                .pixelSize(pixelSize)
+                .build()
+                .makeMeasurements(imageData, detections);
+    }
+
 
 
     /**
@@ -112,6 +145,7 @@ public class InstanSeg {
         private int padding = 80; // Previous default of 40 could miss large objects
         private int boundary = 20; // TODO: Check relationship between padding & boundary
         private int numOutputChannels = 2;
+        private boolean randomColors = true;
         private Device device = Device.fromName("cpu");
         private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
         private ImageData<BufferedImage> imageData;
@@ -293,6 +327,24 @@ public class InstanSeg {
         }
 
         /**
+         * Request that random colors be used for the output objects.
+         * @return
+         */
+        public Builder randomColors() {
+            return randomColors(true);
+        }
+
+        /**
+         * Optionally request that random colors be used for the output objects.
+         * @param doRandomColors
+         * @return
+         */
+        public Builder randomColors(boolean doRandomColors) {
+            this.randomColors = doRandomColors;
+            return this;
+        }
+
+        /**
          * Set the number of threads used
          * @param nThreads The number of threads to be used
          * @return A modified builder
@@ -419,37 +471,10 @@ public class InstanSeg {
                     this.model,
                     this.device,
                     this.taskRunner,
-                    this.preferredOutputClass);
+                    this.preferredOutputClass,
+                    this.randomColors);
         }
 
     }
 
-    /**
-     * Utility function to make measurements for the objects created by InstanSeg.
-     * @param imageData The ImageData for making measurements.
-     * @param detections The objects to measure.
-     */
-    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
-        DetectionMeasurer.builder()
-                .pixelSize((model.getPixelSizeX() + model.getPixelSizeY()) / 2.0)
-                .build()
-                .makeMeasurements(imageData, detections);
-    }
-
-
-    private InstanSeg(int tileDims, double downsample, int padding, int boundary, int numOutputChannels, ImageData<BufferedImage> imageData,
-                      Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner,
-                      Class<? extends PathObject> preferredOutputClass) {
-        this.tileDims = tileDims;
-        this.downsample = downsample;
-        this.padding = padding;
-        this.boundary = boundary;
-        this.numOutputChannels = numOutputChannels;
-        this.imageData = imageData;
-        this.channels = channels;
-        this.model = model;
-        this.device = device;
-        this.taskRunner = taskRunner;
-        this.preferredOutputClass = preferredOutputClass;
-    }
 }

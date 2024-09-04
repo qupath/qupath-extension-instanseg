@@ -324,12 +324,11 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureTileSizes() {
-        // Because of the use of 32-bit signed ints for coordinates of the intermediate sparse matrix,
-        // we can't have very large tile sizes.
-        // We can estimate the total number of instances supported as 2^31 / (tileSize^2) -
-        // if we have large tiles, we likely have many instances and we can have errors.
-        tileSizeChoiceBox.getItems().addAll(128, 256, 512, 1024);
-        tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(256));
+        // The use of 32-bit signed ints for coordinates of the intermediate sparse matrix *might* be
+        // an issue for very large tile sizes - but I haven't seen any evidence of this.
+        // We definitely can't have very small tiles, because they must be greater than 2 x the padding.
+        tileSizeChoiceBox.getItems().addAll(256, 512, 1024, 2048);
+        tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(512));
         tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
         tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
     }
@@ -472,6 +471,9 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
+            double downsample = model.getPreferredPixelSize(server.getPixelCalibration()) /
+                    server.getPixelCalibration().getAveragedPixelSize().doubleValue();
+            logger.warn("Downsample: {}", downsample);
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
@@ -479,7 +481,7 @@ public class InstanSegController extends BorderPane {
                     .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                    .downsample(model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize())
+                    .downsample(downsample)
 //                    .outputAnnotations()
                     .taskRunner(taskRunner)
                     .build();
@@ -502,7 +504,7 @@ public class InstanSegController extends BorderPane {
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
-                            model.getPixelSizeX() / (double) server.getPixelCalibration().getAveragedPixelSize(),
+                            downsample,
                             InstanSegPreferences.numThreadsProperty().getValue(),
                             makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
                     );

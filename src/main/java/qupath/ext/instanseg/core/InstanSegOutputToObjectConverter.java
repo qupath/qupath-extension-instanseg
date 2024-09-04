@@ -38,10 +38,11 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
      * Assign random colors to the objects.
      * This may be turned off or made optional in the future.
      */
-    private boolean assignRandomColors = true;
+    private final boolean randomColors;
 
-    InstanSegOutputToObjectConverter(Class<? extends PathObject> preferredObjectClass) {
+    InstanSegOutputToObjectConverter(Class<? extends PathObject> preferredObjectClass, boolean randomColors) {
         this.preferredObjectClass = preferredObjectClass;
+        this.randomColors = randomColors;
     }
 
     @Override
@@ -106,7 +107,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             }
         }
 
-        if (assignRandomColors) {
+        if (randomColors) {
             var rng = new Random(params.getRegionRequest().hashCode());
             pathObjects.forEach(p -> assignRandomColor(p, rng));
         }
