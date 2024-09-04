@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
+import qupath.ext.instanseg.core.InstanSegResults;
 import qupath.ext.instanseg.core.PytorchManager;
 import qupath.fx.dialogs.Dialogs;
 import qupath.fx.dialogs.FileChoosers;
@@ -471,9 +472,6 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
-            double downsample = model.getPreferredPixelSize(server.getPixelCalibration()) /
-                    server.getPixelCalibration().getAveragedPixelSize().doubleValue();
-            logger.warn("Downsample: {}", downsample);
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
@@ -481,7 +479,6 @@ public class InstanSegController extends BorderPane {
                     .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                    .downsample(downsample)
 //                    .outputAnnotations()
                     .taskRunner(taskRunner)
                     .build();
@@ -494,7 +491,6 @@ public class InstanSegController extends BorderPane {
                                 .numOutputChannels(%d)
                                 .channels(%s)
                                 .tileDims(%d)
-                                .downsample(%f)
                                 .nThreads(%d)
                                 .build()
                                 .%s
@@ -504,22 +500,24 @@ public class InstanSegController extends BorderPane {
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
-                            downsample,
                             InstanSegPreferences.numThreadsProperty().getValue(),
                             makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
                     );
+            InstanSegResults results;
             if (makeMeasurements) {
-                instanSeg.detectObjectsAndMeasure(selectedObjects);
+                results = instanSeg.detectObjectsAndMeasure(selectedObjects);
             } else {
-                instanSeg.detectObjects(selectedObjects);
+                results = instanSeg.detectObjects(selectedObjects);
             }
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
             imageData.getHistoryWorkflow()
                     .addStep(
                             new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
                     );
-            if (model.nFailed() > 0) {
-                var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
+            logger.info("Results: {}", results);
+            int nFailed = results.nTilesFailed();
+            if (nFailed > 0) {
+                var errorMessage = String.format(resources.getString("error.tiles-failed"), nFailed);
                 logger.error(errorMessage);
                 Dialogs.showErrorMessage(resources.getString("title"), errorMessage);
             }

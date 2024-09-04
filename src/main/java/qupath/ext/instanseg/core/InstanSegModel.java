@@ -1,38 +1,20 @@
 package qupath.ext.instanseg.core;
 
-import ai.djl.Device;
-import ai.djl.inference.Predictor;
-import ai.djl.ndarray.BaseNDManager;
-import ai.djl.repository.zoo.Criteria;
-import ai.djl.training.util.ProgressBar;
-import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
 import qupath.lib.common.GeneralTools;
-import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.gui.UserDirectoryManager;
-import qupath.lib.images.ImageData;
-import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelCalibration;
-import qupath.lib.objects.PathObject;
-import qupath.lib.objects.utils.ObjectMerger;
-import qupath.lib.objects.utils.Tiler;
-import qupath.lib.plugins.TaskRunner;
-import qupath.opencv.ops.ImageOps;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 public class InstanSegModel {
 
@@ -47,7 +29,6 @@ public class InstanSegModel {
     private URL modelURL = null;
     private BioimageIoSpec.BioimageIoModel model = null;
     private final String name;
-    private int nFailed = 0;
 
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
@@ -115,21 +96,22 @@ public class InstanSegModel {
     }
 
     /**
-     * Get the preferred pixel size for running the model, incorporating information from the pixel calibration of the
+     * Get the preferred downsample for running the model, incorporating information from the pixel calibration of the
      * image.
      * This is based on {@link #getPreferredPixelSize()} but is permitted to adjust values based on the pixel calibration
      * to avoid unnecessary rounding.
      * <p>
-     * For example, if the computed value would request a downsample of 1.01, this method is permitted to adjust the
-     * value to 1.0.
+     * For example, if the computed value would request a downsample of 2.04, this method is permitted to return 2.0.
+     * That is usually desirable to avoid introducing interpolation artifacts and unnecessary floating point vertices
+     * in the output.
      * <p>
-     * In general, it is recommended to use this method rather than #getPreferredPixelSize() when the pixel calibration
-     * is available, because it is guaranteed to return a value that is compatible with the image - and cannot return
-     * null.
+     * In general, it is recommended to use this method rather than #getPreferredPixelSize() to calculate a downsample
+     * when the pixel calibration is available.
+     *
      * @param cal The pixel calibration of the image
-     * @return the pixel size
+     * @return the preferred downsample to use
      */
-    public double getPreferredPixelSize(PixelCalibration cal) {
+    public double getPreferredDownsample(PixelCalibration cal) {
         Objects.requireNonNull(cal, "Pixel calibration must not be null");
         Number preferred = getPreferredPixelSize();
         double current = cal.getAveragedPixelSize().doubleValue();
@@ -138,10 +120,10 @@ public class InstanSegModel {
         }
         double requested = preferred.doubleValue();
         if (requested > 0 && current > 0) {
-            return getPreferredPixelSize(current, requested);
+            return getPreferredDownsample(current, requested);
         } else {
             logger.warn("Invalid pixel size of {} for pixel calibration {}", requested, cal);
-            return cal.getAveragedPixelSize().doubleValue();
+            return 1.0;
         }
     }
 
@@ -152,13 +134,13 @@ public class InstanSegModel {
      * @param requestedPixelSize
      * @return
      */
-    static double getPreferredPixelSize(double currentPixelSize, double requestedPixelSize) {
+    static double getPreferredDownsample(double currentPixelSize, double requestedPixelSize) {
         double downsample = requestedPixelSize / currentPixelSize;
         double downsampleRounded = Math.round(downsample);
         if (GeneralTools.almostTheSame(downsample, Math.round(downsample), 0.01)) {
-            return currentPixelSize * downsampleRounded;
+            return downsampleRounded;
         } else {
-            return requestedPixelSize;
+            return downsample;
         }
     }
 
@@ -194,14 +176,6 @@ public class InstanSegModel {
     }
 
     /**
-     * The number of tiles that failed during processing.
-     * @return The count of the number of failed tiles.
-     */
-    public int nFailed() {
-        return nFailed;
-    }
-
-    /**
      * Get the model name
      * @return A string
      */
@@ -213,7 +187,7 @@ public class InstanSegModel {
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
-    BioimageIoSpec.BioimageIoModel getModel() {
+    private BioimageIoSpec.BioimageIoModel getModel() {
         if (model == null) {
             fetchModel();
         }
@@ -264,102 +238,6 @@ public class InstanSegModel {
         Path userPath = UserDirectoryManager.getInstance().getUserPath();
         Path cachePath = Paths.get(System.getProperty("user.dir"), ".cache", "QuPath");
         return userPath == null || userPath.toString().isEmpty() ?  cachePath : userPath;
-    }
-
-    void runInstanSeg(
-            ImageData<BufferedImage> imageData,
-            Collection<? extends PathObject> pathObjects,
-            Collection<ColorTransforms.ColorTransform> channels,
-            int tileDims,
-            double downsample,
-            int padding,
-            int boundary,
-            Device device,
-            int nOutputChannels,
-            Class<? extends PathObject> preferredObjectClass,
-            TaskRunner taskRunner,
-            boolean randomColors) {
-
-        nFailed = 0;
-        Path modelPath;
-        modelPath = getPath().resolve("instanseg.pt");
-        int nPredictors = 1; // todo: change me?
-
-        // Optionally pad images so that every tile has the required size.
-        // This is useful if the model requires a specific input size - but InstanSeg should be able to handle this
-        // and inference can be much faster if we permit tiles to be cropped.
-        boolean padToInputSize = false;
-        String layout = "CHW";
-
-        // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
-        String layoutOutput = "CHW";
-
-        try (var model = Criteria.builder()
-                .setTypes(Mat.class, Mat.class)
-                .optModelUrls(String.valueOf(modelPath.toUri()))
-                .optProgress(new ProgressBar())
-                .optDevice(device) // Remove this line if devices are problematic!
-                .optTranslator(new MatTranslator(layout, layoutOutput, nOutputChannels))
-                .build()
-                .loadModel()) {
-
-
-            BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
-            printResourceCount("Resource count before prediction",
-                    (BaseNDManager)baseManager.getParentManager());
-            baseManager.debugDump(2);
-            BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
-
-            try {
-                for (int i = 0; i < nPredictors; i++) {
-                    predictors.put(model.newPredictor());
-                }
-
-                printResourceCount("Resource count after creating predictors",
-                        (BaseNDManager)baseManager.getParentManager());
-
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
-                var predictionProcessor = new TilePredictionProcessor(predictors, channels, tileDims, tileDims, padToInputSize);
-                var processor = OpenCVProcessor.builder(predictionProcessor)
-                        .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels)
-                                .apply(parameters.getImageData(), parameters.getRegionRequest()))
-                        .tiler(Tiler.builder(sizeWithoutPadding)
-                                .alignCenter()
-                                .cropTiles(false)
-                                .build()
-                        )
-                        .outputHandler(
-                                new PruneObjectOutputHandler<>(
-                                        new InstanSegOutputToObjectConverter(preferredObjectClass, randomColors), boundary))
-                        .padding(padding)
-//                        .merger(ObjectMerger.createIoUMerger(0.5))
-                        .merger(ObjectMerger.createIoMinMerger(0.5))
-                        .downsample(downsample)
-                        .build();
-                processor.processObjects(taskRunner, imageData, pathObjects);
-                nFailed = predictionProcessor.nFailed();
-            } finally {
-                for (var predictor: predictors) {
-                    predictor.close();
-                }
-            }
-            printResourceCount("Resource count after prediction", (BaseNDManager)baseManager.getParentManager());
-        } catch (Exception e) {
-            logger.error("Error running InstanSeg", e);
-        }
-    }
-
-    /**
-     * Print resource count for debugging purposes.
-     * If we are not logging at debug level, do nothing.
-     * @param title
-     * @param manager
-     */
-    private static void printResourceCount(String title, BaseNDManager manager) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(title);
-            manager.debugDump(2);
-        }
     }
 
 }
