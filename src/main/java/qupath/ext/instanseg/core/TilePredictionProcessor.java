@@ -1,7 +1,6 @@
 package qupath.ext.instanseg.core;
 
 import ai.djl.inference.Predictor;
-import ai.djl.ndarray.NDManager;
 import ai.djl.translate.TranslateException;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
@@ -14,7 +13,6 @@ import qupath.lib.experimental.pixels.Processor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.images.servers.PixelType;
-import qupath.lib.objects.PathObject;
 import qupath.lib.regions.Padding;
 import qupath.lib.regions.RegionRequest;
 import qupath.lib.roi.interfaces.ROI;
@@ -30,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
 
@@ -41,7 +41,13 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     private final int inputHeight;
     private final boolean doPadding;
     private final Collection<ColorTransforms.ColorTransform> channels;
-    private int nFailed = 0;
+
+    private final double lowPercentile = 0.1;
+    private final double highPercentile = 99.9;
+
+    private final AtomicLong nPixelsProcessed = new AtomicLong(0);
+    private final AtomicInteger nTilesProcessed = new AtomicInteger(0);
+    private final AtomicInteger nTilesFailed = new AtomicInteger(0);
 
     /**
      * Cache normalization op so it doesn't need to be recalculated for every tile.
@@ -62,11 +68,31 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     }
 
     /**
-     * The number of tiles that failed during processing.
-     * @return The count of the number of failed tiles.
+     * get the total number of tiles that were processed, including any that failed.
+     * @return the number of tiles that were processed
      */
-    public int nFailed() {
-        return nFailed;
+    public int getTilesProcessedCount() {
+        return nTilesProcessed.get();
+    }
+
+    /**
+     * Get the number of tiles that threw an exception during processing.
+     * @return the number of tiles that failed
+     */
+    public int getTilesFailedCount() {
+        return nTilesFailed.get();
+    }
+
+    /**
+     * Get the number of pixels that were processed.
+     * This is calculated by summing the width x height of each tile that was processed.
+     * The number of channels does not influence the result.
+     * <p>
+     * One use of this is to help assess the impact of padding on the processing time.
+     * @return the pixels that were processed
+     */
+    public long getPixelsProcessedCount() {
+        return nPixelsProcessed.get();
     }
 
     @Override
@@ -78,7 +104,10 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
 
         // Normalize using percentiles (from a sufficiently low-resolution image)
         ImageOp norm = normalization.computeIfAbsent(params.getParent().getROI(),
-                roi -> getNormalization(imageData, roi, channels, 0.1, 99.9));
+                roi -> getNormalization(imageData, roi, channels, lowPercentile, highPercentile));
+
+        // Number of pixels in the Mat *excluding channels*
+        long nPixels = mat.total();
 
         var preprocessing = ImageOps.Core.sequential(
                 ImageOps.Core.ensureType(PixelType.FLOAT32),
@@ -98,6 +127,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         Predictor<Mat, Mat> predictor = null;
         try {
             predictor = predictors.take();
+            logger.debug("Predicting tile {}", mat);
             var matOutput = predictor.predict(mat);
 
             matOutput.convertTo(matOutput, opencv_core.CV_32S);
@@ -105,10 +135,11 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
                 matOutput = OpenCVTools.crop(matOutput, padding);
             return matOutput;
         } catch (TranslateException e) {
-            nFailed++;
+            nTilesFailed.incrementAndGet();
             logger.error("Error in prediction", e);
         } catch (InterruptedException | IllegalStateException e) {
             // illegal state exception comes when ndmanager is closed from another thread (I think)
+            nTilesFailed.incrementAndGet();
             logger.debug("Prediction interrupted", e);
         } finally {
             if (predictor != null) {
@@ -118,6 +149,8 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
                     logger.warn("Tiling interrupted");
                 }
             }
+            nTilesProcessed.incrementAndGet();
+            nPixelsProcessed.addAndGet(nPixels);
         }
         return null;
     }

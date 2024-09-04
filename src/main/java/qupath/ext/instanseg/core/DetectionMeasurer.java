@@ -15,19 +15,20 @@ import java.util.Collection;
 import java.util.List;
 
 public class DetectionMeasurer {
+
     private static final Logger logger = LoggerFactory.getLogger(DetectionMeasurer.class);
 
     private final Collection<ObjectMeasurements.Compartments> compartments;
     private final Collection<ObjectMeasurements.Measurements> measurements;
     private final Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures;
-    private final double pixelSize;
+    private final double downsample;
 
     private DetectionMeasurer(Collection<ObjectMeasurements.Compartments> compartments,
                               Collection<ObjectMeasurements.Measurements> measurements,
                               Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures,
-                              double pixelSize) {
+                              double downsample) {
         this.shapeFeatures = shapeFeatures;
-        this.pixelSize = pixelSize;
+        this.downsample = downsample;
         this.compartments = compartments;
         this.measurements = measurements;
     }
@@ -48,13 +49,8 @@ public class DetectionMeasurer {
      */
     public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> objects) {
         var server = imageData.getServer();
-        var resolution = server.getPixelCalibration();
         var pixelCal = server.getPixelCalibration();
 
-        if (Double.isFinite(pixelSize) && pixelSize > 0) {
-            double downsample = pixelSize / resolution.getAveragedPixelSize().doubleValue();
-            resolution = resolution.createScaledInstance(downsample, downsample);
-        }
         ObjectMeasurements.ShapeFeatures[] featuresArray = shapeFeatures.toArray(new ObjectMeasurements.ShapeFeatures[0]);
         objects.parallelStream().forEach(c -> ObjectMeasurements.addShapeMeasurements(c, pixelCal, featuresArray));
 
@@ -72,9 +68,6 @@ public class DetectionMeasurer {
             }
 
             try (var server2 = builder.build()) {
-
-                double downsample = resolution.getAveragedPixelSize().doubleValue() / pixelCal.getAveragedPixelSize().doubleValue();
-
                 objects.parallelStream().forEach(cell -> {
                     try {
                         ObjectMeasurements.addIntensityMeasurements(server2, cell, downsample, measurements, compartments);
@@ -94,6 +87,7 @@ public class DetectionMeasurer {
      * A builder class for DetectionMeasurer.
      */
     public static class Builder {
+
         private Collection<ObjectMeasurements.Compartments> compartments = Arrays.asList(ObjectMeasurements.Compartments.values());
         private Collection<ObjectMeasurements.Measurements> measurements = Arrays.stream(ObjectMeasurements.Measurements.values())
                 .filter(m -> m != ObjectMeasurements.Measurements.VARIANCE) // Skip variance - we have standard deviation
