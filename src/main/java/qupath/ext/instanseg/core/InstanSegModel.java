@@ -222,6 +222,20 @@ public class InstanSegModel {
         }
     }
 
+    /**
+     * Get the number of output channels provided by the model (typically 1 or 2)
+     * @return a positive integer
+     */
+    public int getOutputChannels() {
+        var output = getModel().getOutputs().getFirst();
+        String axes = output.getAxes().toLowerCase();
+        int ind = axes.indexOf("c");
+        var shape = output.getShape().getShape();
+        if (shape != null && shape.length > ind)
+            return shape[ind];
+        return (int)Math.round(output.getShape().getOffset()[ind] * 2);
+    }
+
     private void fetchModel() {
         if (modelURL == null) {
             throw new NullPointerException("Model URL should not be null for a local model!");

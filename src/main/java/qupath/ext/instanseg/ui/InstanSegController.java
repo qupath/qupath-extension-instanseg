@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -472,11 +474,13 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
+            var outputChannels = nucleiOnlyCheckBox.isSelected() ? new int[]{0} : new int[]{};
+
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .imageData(imageData)
                     .device(deviceChoices.getSelectionModel().getSelectedItem())
-                    .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
+                    .outputChannels(outputChannels)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
 //                    .outputAnnotations()
@@ -488,7 +492,7 @@ public class InstanSegController extends BorderPane {
                             qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
-                                .numOutputChannels(%d)
+                                .outputChannels(%s)
                                 .channels(%s)
                                 .tileDims(%d)
                                 .nThreads(%d)
@@ -497,7 +501,9 @@ public class InstanSegController extends BorderPane {
                             """,
                             model.getPath(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
-                            nucleiOnlyCheckBox.isSelected() ? 1 : 2,
+                            outputChannels.length == 0 ? "" : Arrays.stream(outputChannels)
+                                    .mapToObj(Integer::toString)
+                                    .collect(Collectors.joining(", ")),
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
