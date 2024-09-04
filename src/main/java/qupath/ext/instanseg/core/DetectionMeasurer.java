@@ -28,9 +28,9 @@ public class DetectionMeasurer {
                               Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures,
                               double downsample) {
         this.shapeFeatures = shapeFeatures;
-        this.downsample = downsample;
         this.compartments = compartments;
         this.measurements = measurements;
+        this.downsample = downsample;
     }
 
     /**
@@ -93,15 +93,15 @@ public class DetectionMeasurer {
                 .filter(m -> m != ObjectMeasurements.Measurements.VARIANCE) // Skip variance - we have standard deviation
                 .toList();
         private Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures = Arrays.asList(ObjectMeasurements.ShapeFeatures.values());
-        private double pixelSize;
+        private double downsample;
 
         /**
-         * Set the pixel size that measurements should be made at.
-         * @param pixelSize The pixel size that detections/annotations/etc were made at.
-         * @return A modified builder.
+         * Set the desired downsample.
+         * @param downsample
+         * @return
          */
-        public Builder pixelSize(double pixelSize) {
-            this.pixelSize = pixelSize;
+        public Builder downsample(double downsample) {
+            this.downsample = downsample;
             return this;
         }
 
@@ -140,7 +140,7 @@ public class DetectionMeasurer {
          * @return An immutable detection measurer.
          */
         public DetectionMeasurer build() {
-            return new DetectionMeasurer(compartments, measurements, shapeFeatures, pixelSize);
+            return new DetectionMeasurer(compartments, measurements, shapeFeatures, downsample);
         }
     }
 }
