@@ -16,6 +16,8 @@ import qupath.lib.objects.PathCellObject;
 import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.utils.ObjectMerger;
+import qupath.lib.objects.utils.ObjectProcessor;
+import qupath.lib.objects.utils.OverlapFixer;
 import qupath.lib.objects.utils.Tiler;
 import qupath.lib.plugins.TaskRunner;
 import qupath.lib.plugins.TaskRunnerUtils;
@@ -193,7 +195,7 @@ public class InstanSeg {
                                 new PruneObjectOutputHandler<>(
                                         new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundary))
                         .padding(padding)
-                        .merger(ObjectMerger.createIoMinMerger(0.5))
+                        .postProcess(createPostProcessor())
                         .downsample(downsample)
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);
@@ -216,6 +218,16 @@ public class InstanSeg {
             return new InstanSegResults(0, 0, 0, 0,
                     System.currentTimeMillis() - startTime);
         }
+    }
+
+    private static ObjectProcessor createPostProcessor() {
+        var merger = ObjectMerger.createIoMinMerger(0.5);
+        var fixer = OverlapFixer.builder()
+                .clipOverlaps()
+                .keepFragments(false)
+                .sortBySolidity()
+                .build();
+        return merger.andThen(fixer);
     }
 
     /**
