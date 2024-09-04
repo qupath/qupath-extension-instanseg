@@ -425,7 +425,7 @@ public class InstanSegController extends BorderPane {
     private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {
         var releases = getReleases();
         if (releases.isEmpty()) {
-            logger.info("No releases found");
+            logger.info("No releases found.");
             return;
         }
         var release = releases.getFirst();
@@ -775,7 +775,7 @@ public class InstanSegController extends BorderPane {
                 .build();
         HttpResponse<String> response;
         String json;
-        // check github api for releases
+        // check GitHub api for releases
         try (HttpClient client = HttpClient.newHttpClient()) {
             response = client.send(request, HttpResponse.BodyHandlers.ofString());
             // if response is okay, then cache it
@@ -783,23 +783,28 @@ public class InstanSegController extends BorderPane {
                 json = response.body();
                 Files.writeString(cachedReleases, json);
             } else {
-                // if not, try to fall back on a cached version
-                if (Files.exists(cachedReleases)) {
-                    json = Files.readString(cachedReleases);
-                    // no cache, give up!
-                } else {
-                    logger.warn("Unable to fetch release information from GitHub and no cached version available.");
-                    return List.of();
-                }
+                // otherwise problems
+                throw new IOException("Unable to fetch GitHub release information, status " + response.statusCode());
             }
         } catch (IOException | InterruptedException e) {
-            logger.error("Unable to fetch GitHub release information", e);
-            return List.of();
+            // if not, try to fall back on a cached version
+            if (Files.exists(cachedReleases)) {
+                try {
+                    json = Files.readString(cachedReleases);
+                } catch (IOException ex) {
+                    logger.warn("Unable to read cached release information");
+                    return List.of();
+                }
+            } else {
+                logger.info("Unable to fetch release information from GitHub and no cached version available.");
+                return List.of();
+            }
         }
 
         Gson gson = new Gson();
         var releases = gson.fromJson(json, GitHubRelease[].class);
         if (!(releases.length > 0)) {
+            logger.info("No releases found in JSON string");
             return List.of();
         }
         return List.of(releases);

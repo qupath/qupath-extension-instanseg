@@ -79,12 +79,11 @@ public class InstanSegModel {
      */
     public boolean isDownloaded(Path localModelPath) {
         // todo: this should also check if the contents are what we expect
-        // todo: this should also try to instantiate...?
         if (Files.exists(localModelPath.resolve(name))) {
             try {
                 download(localModelPath);
             } catch (IOException e) {
-                logger.error("Model dir exists but is not valid", e);
+                logger.error("Model directory exists but is not valid", e);
             }
         }
         return path != null && model != null;
@@ -261,7 +260,7 @@ public class InstanSegModel {
     }
 
 
-    private static Path downloadZipIfNeeded(URL url, Path localDirectory, String filename) {
+    private static Path downloadZipIfNeeded(URL url, Path localDirectory, String filename) throws IOException {
         var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
         if (!isDownloadedAlready(zipFile)) {
             try (InputStream stream = url.openStream()) {
@@ -270,8 +269,6 @@ public class InstanSegModel {
                         fos.getChannel().transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
                     }
                 }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
             }
         }
         return zipFile;
