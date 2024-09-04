@@ -540,10 +540,11 @@ public class InstanSegController extends BorderPane {
 
         int imageChannels = selectedChannels.size();
         var modelChannels = model.getNumChannels();
-        if (!modelChannels.isPresent()) {
+        if (modelChannels.isEmpty()) {
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.fetching"));
             return;
         }
+
         int nModelChannels = modelChannels.get();
         if (!(nModelChannels == Integer.MAX_VALUE || nModelChannels != imageChannels)) {
             Dialogs.showErrorNotification(resources.getString("title"), String.format(
@@ -561,6 +562,7 @@ public class InstanSegController extends BorderPane {
                     pendingTask.set(null);
             }
         });
+
     }
 
     private class InstanSegTask extends Task<Void> {
@@ -592,6 +594,7 @@ public class InstanSegController extends BorderPane {
             Optional<Path> path = model.getPath();
             if (pixelSize.isEmpty() || path.isEmpty()) {
                 Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.querying-local"));
+                return null;
             }
 
             var instanSeg = InstanSeg.builder()
@@ -618,24 +621,27 @@ public class InstanSegController extends BorderPane {
                                 .build()
                                 .%s
                             """,
-                            path,
+                            path.get(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
                             pixelSize.get() / (double) server.getPixelCalibration().getAveragedPixelSize(),
-                            InstanSegPreferences.numThreadsProperty().getValue()
+                            InstanSegPreferences.numThreadsProperty().getValue(),
+                            makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
                     );
             if (makeMeasurements) {
                 instanSeg.detectObjectsAndMeasure(selectedObjects);
             } else {
                 instanSeg.detectObjects(selectedObjects);
             }
+
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
             imageData.getHistoryWorkflow()
                     .addStep(
                             new DefaultScriptableWorkflowStep(resources.getString("workflow.title"), cmd)
                     );
+
             if (model.nFailed() > 0) {
                 var errorMessage = String.format(resources.getString("error.tiles-failed"), model.nFailed());
                 logger.error(errorMessage);
