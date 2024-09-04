@@ -87,6 +87,7 @@ import java.util.stream.IntStream;
 public class InstanSegController extends BorderPane {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegController.class);
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
+    private final Watcher watcher;
 
     @FXML
     private CheckComboBox<ChannelSelectItem> comboChannels;
@@ -119,12 +120,10 @@ public class InstanSegController extends BorderPane {
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
-    private ObjectProperty<FutureTask<?>> pendingTask = new SimpleObjectProperty<>();
+    private final ObjectProperty<FutureTask<?>> pendingTask = new SimpleObjectProperty<>();
     private MessageTextHelper messageTextHelper;
 
     private final BooleanProperty needsUpdating = new SimpleBooleanProperty();
-    private final Watcher watcher = new Watcher(modelChoiceBox);
-    private ExecutorService executor;
 
     /**
      * Create an instance of the InstanSeg GUI pane.
@@ -143,6 +142,7 @@ public class InstanSegController extends BorderPane {
         loader.setRoot(this);
         loader.setController(this);
         loader.load();
+        watcher = new Watcher(modelChoiceBox);
 
         configureMessageLabel();
         configureTileSizes();
@@ -537,8 +537,7 @@ public class InstanSegController extends BorderPane {
     }
 
     void restart() {
-        executor = Executors.newSingleThreadExecutor();
-        executor.submit(watcher::processEvents);
+        Thread.ofVirtual().start(watcher::processEvents);
     }
 
     @FXML

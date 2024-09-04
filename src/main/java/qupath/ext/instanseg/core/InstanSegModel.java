@@ -216,7 +216,6 @@ public class InstanSegModel {
      * the yaml contents and the checksum of the pt file.
      */
     public static boolean isValidModel(Path path) {
-        // return path.toString().endsWith(".pt"); // if just looking at pt files
         if (Files.isDirectory(path)) {
             return Files.exists(path.resolve("instanseg.pt")) && Files.exists(path.resolve("rdf.yaml"));
         }
