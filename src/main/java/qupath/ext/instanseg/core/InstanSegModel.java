@@ -115,18 +115,17 @@ public class InstanSegModel {
 
     /**
      * Get the pixel size in the X dimension.
-     *
-     * @return the pixel size in the X dimension.
+     * @return the pixel size in the X dimension, or empty if the model isn't downloaded yet.
      */
-    public Optional<Number> getPixelSizeX() {
+    private Optional<Number> getPixelSizeX() {
         return getPixelSize().flatMap(p -> Optional.ofNullable(p.getOrDefault("x", null)));
     }
 
     /**
      * Get the pixel size in the Y dimension.
-     * @return the pixel size in the Y dimension.
+     * @return the pixel size in the Y dimension, or empty if the model isn't downloaded yet.
      */
-    public Optional<Number> getPixelSizeY() {
+    private Optional<Number> getPixelSizeY() {
         return getPixelSize().flatMap(p -> Optional.ofNullable(p.getOrDefault("y", null)));
     }
 
@@ -134,7 +133,7 @@ public class InstanSegModel {
      * Get the preferred pixel size for running the model, in the absence of any other information.
      * This is the average of the X and Y pixel sizes if both are available.
      * Otherwise, it is the value of whichever value is available - or null if neither is found.
-     * @return the pixel size
+     * @return the pixel size, or empty if the model isn't downloaded yet.
      */
     public Optional<Number> getPreferredPixelSize() {
         var x = getPixelSizeX();

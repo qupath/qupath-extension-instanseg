@@ -158,7 +158,9 @@ public class InstanSegController extends BorderPane {
                 modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating);
 
         infoButton.disableProperty().bind(currentModelIsDownloaded.not());
-        downloadButton.disableProperty().bind(currentModelIsDownloaded);
+        downloadButton.disableProperty().bind(
+                currentModelIsDownloaded.or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
+        );
         configureChannelPicker();
     }
 
@@ -467,6 +469,9 @@ public class InstanSegController extends BorderPane {
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
                 var localPath = path.resolve("local");
+                if (!Files.exists(localPath)) {
+                    Files.createDirectory(localPath);
+                }
                 watcher.register(localPath); // todo: unregister
                 addModelsFromPath(localPath, modelChoiceBox);
             } catch (IOException e) {
@@ -611,9 +616,8 @@ public class InstanSegController extends BorderPane {
 
             var imageData = qupath.getImageData();
             var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
-            Optional<Number> pixelSize = model.getPixelSizeX();
             Optional<Path> path = model.getPath();
-            if (pixelSize.isEmpty() || path.isEmpty()) {
+            if (path.isEmpty()) {
                 Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.querying-local"));
                 return null;
             }
@@ -625,7 +629,6 @@ public class InstanSegController extends BorderPane {
                     .numOutputChannels(nucleiOnlyCheckBox.isSelected() ? 1 : 2)
                     .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
-                    .downsample(pixelSize.get().doubleValue() / (double) server.getPixelCalibration().getAveragedPixelSize())
                     .taskRunner(taskRunner)
                     .build();
 
@@ -646,7 +649,6 @@ public class InstanSegController extends BorderPane {
                             nucleiOnlyCheckBox.isSelected() ? 1 : 2,
                             ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
-                            pixelSize.get().doubleValue() / (double) server.getPixelCalibration().getAveragedPixelSize(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
                             makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
                     );
@@ -759,21 +761,44 @@ public class InstanSegController extends BorderPane {
         }
     }
 
+    /**
+     * Get the list of models from the latest GitHub release, downloading if
+     * necessary.
+     * @return A list of GitHub releases, possibly empty.
+     */
     private static List<GitHubRelease> getReleases() {
+        Path cachedReleases = Path.of(InstanSegPreferences.modelDirectoryProperty().get(), "releases.json");
         String uString = "https://api.github.com/repos/instanseg/InstanSeg/releases";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(uString))
                 .GET()
                 .build();
-        String response;
+        HttpResponse<String> response;
+        String json;
+        // check github api for releases
         try (HttpClient client = HttpClient.newHttpClient()) {
-            response = client.send(request, HttpResponse.BodyHandlers.ofString()).body();
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            // if response is okay, then cache it
+            if (response.statusCode() == 200) {
+                json = response.body();
+                Files.writeString(cachedReleases, json);
+            } else {
+                // if not, try to fall back on a cached version
+                if (Files.exists(cachedReleases)) {
+                    json = Files.readString(cachedReleases);
+                    // no cache, give up!
+                } else {
+                    logger.warn("Unable to fetch release information from GitHub and no cached version available.");
+                    return List.of();
+                }
+            }
         } catch (IOException | InterruptedException e) {
             logger.error("Unable to fetch GitHub release information", e);
             return List.of();
         }
+
         Gson gson = new Gson();
-        var releases = gson.fromJson(response, GitHubRelease[].class);
+        var releases = gson.fromJson(json, GitHubRelease[].class);
         if (!(releases.length > 0)) {
             return List.of();
         }
