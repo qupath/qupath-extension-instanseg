@@ -96,9 +96,13 @@ public class DetectionMeasurer {
         private double downsample;
 
         /**
-         * Set the desired downsample.
-         * @param downsample
-         * @return
+         * Set the downsample that the measurer should use.
+         * The measurer is assumed to be short-lived and used for a single image, and so doesn't need to maintain a
+         * value related to pixel size. Therefore, it takes an explicit downsample to avoid any risk that the
+         * pixel-size-to-downsample calculation here wouldn't match that done during detection.
+         *
+         * @param downsample The downsample that detections/annotations/etc should be made at.
+         * @return A modified builder.
          */
         public Builder downsample(double downsample) {
             this.downsample = downsample;
