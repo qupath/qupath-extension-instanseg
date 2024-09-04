@@ -93,15 +93,19 @@ public class DetectionMeasurer {
                 .filter(m -> m != ObjectMeasurements.Measurements.VARIANCE) // Skip variance - we have standard deviation
                 .toList();
         private Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures = Arrays.asList(ObjectMeasurements.ShapeFeatures.values());
-        private double pixelSize;
+        private double downsample;
 
         /**
-         * Set the pixel size that measurements should be made at.
-         * @param pixelSize The pixel size that detections/annotations/etc were made at.
+         * Set the downsample that the measurer should use.
+         * The measurer is assumed to be short-lived and used for a single image, and so doesn't need to maintain a
+         * value related to pixel size. Therefore, it takes an explicit downsample to avoid any risk that the
+         * pixel-size-to-downsample calculation here wouldn't match that done during detection.
+         *
+         * @param downsample The downsample that detections/annotations/etc should be made at.
          * @return A modified builder.
          */
-        public Builder pixelSize(double pixelSize) {
-            this.pixelSize = pixelSize;
+        public Builder downsample(double downsample) {
+            this.downsample = downsample;
             return this;
         }
 
@@ -140,7 +144,7 @@ public class DetectionMeasurer {
          * @return An immutable detection measurer.
          */
         public DetectionMeasurer build() {
-            return new DetectionMeasurer(compartments, measurements, shapeFeatures, pixelSize);
+            return new DetectionMeasurer(compartments, measurements, shapeFeatures, downsample);
         }
     }
 }
