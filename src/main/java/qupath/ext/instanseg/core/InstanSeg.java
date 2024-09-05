@@ -383,7 +383,7 @@ public class InstanSeg {
          * @param channels A collection of channels to be used in inference
          * @return this builder
          */
-        public Builder channels(Collection<? extends ColorTransforms.ColorTransform> channels) {
+        public Builder inputChannels(Collection<? extends ColorTransforms.ColorTransform> channels) {
             this.channels = channels;
             return this;
         }
@@ -393,7 +393,7 @@ public class InstanSeg {
          * @param channels Channels to be used in inference
          * @return this builder
          */
-        public Builder channels(ColorTransforms.ColorTransform channel, ColorTransforms.ColorTransform... channels) {
+        public Builder inputChannels(ColorTransforms.ColorTransform channel, ColorTransforms.ColorTransform... channels) {
             var l = new ArrayList<ColorTransforms.ColorTransform>();
             l.add(channel);
             l.addAll(Arrays.asList(channels));
@@ -405,7 +405,7 @@ public class InstanSeg {
          * Request that all input channels be used in inference
          * @return this builder
          */
-        public Builder allChannels() {
+        public Builder allInputChannels() {
             this.channels = Collections.emptyList();
             return this;
         }
@@ -415,7 +415,7 @@ public class InstanSeg {
          * @param channels Integers used to specify the channels used
          * @return this builder
          */
-        public Builder channelIndices(Collection<Integer> channels) {
+        public Builder inputChannelIndices(Collection<Integer> channels) {
             this.channels = channels.stream()
                     .map(ColorTransforms::createChannelExtractor)
                     .toList();
@@ -427,7 +427,7 @@ public class InstanSeg {
          * @param channels Integers used to specify the channels used
          * @return this builder
          */
-        public Builder channelIndices(int channel, int... channels) {
+        public Builder inputChannels(int channel, int... channels) {
             List<ColorTransforms.ColorTransform> l = new ArrayList<>();
             l.add(ColorTransforms.createChannelExtractor(channel));
             for (int i: channels) {
@@ -442,7 +442,7 @@ public class InstanSeg {
          * @param channels A set of channel names
          * @return this builder
          */
-        public Builder channelNames(Collection<String> channels) {
+        public Builder inputChannelNames(Collection<String> channels) {
             this.channels = channels.stream()
                     .map(ColorTransforms::createChannelExtractor)
                     .toList();
@@ -454,7 +454,7 @@ public class InstanSeg {
          * @param channels A set of channel names
          * @return this builder
          */
-        public Builder channelNames(String channel, String... channels) {
+        public Builder inputChannelNames(String channel, String... channels) {
             List<ColorTransforms.ColorTransform> l = new ArrayList<>();
             l.add(ColorTransforms.createChannelExtractor(channel));
             for (String s: channels) {

@@ -52,8 +52,8 @@ class ChannelSelectItem {
 
     static String toConstructorString(Collection<ChannelSelectItem> items) {
         if (items == null || items.isEmpty())
-            return "allChannels()";
+            return "allInputChannels()";
         else
-            return "channels([" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + "])";
+            return "inputChannels([" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + "])";
     }
 }

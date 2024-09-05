@@ -740,7 +740,7 @@ public class InstanSegController extends BorderPane {
             var instanSeg = InstanSeg.builder()
                     .model(model)
                     .device(deviceChoices.getSelectionModel().getSelectedItem())
-                    .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
+                    .inputChannels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .outputChannels(outputChannels)
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
                     .taskRunner(taskRunner)
