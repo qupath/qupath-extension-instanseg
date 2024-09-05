@@ -23,7 +23,7 @@
 <?import org.controlsfx.control.SearchableComboBox?>
 <?import org.controlsfx.control.SegmentedButton?>
 
-<fx:root maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" type="BorderPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+<fx:root maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" type="BorderPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/22" xmlns:fx="http://javafx.com/fxml/1">
     <center>
         <VBox fx:id="vBox">
             <TitledPane fx:id="pane1" animated="false" collapsible="false" prefHeight="262.0" prefWidth="330.0" styleClass="uncollapsible-titled-pane" text="%ui.processing.pane" VBox.vgrow="NEVER">
@@ -135,20 +135,6 @@
                                 </Spinner>
                             </children>
                         </HBox>
-                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
-                            <padding>
-                                <Insets left="10" right="10" />
-                            </padding>
-                            <children>
-                                <Label styleClass="regular" text="%ui.options.nuclei-only" />
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
-                                <CheckBox fx:id="nucleiOnlyCheckBox">
-                                    <tooltip>
-                                        <Tooltip text="%ui.options.nuclei-only.tooltip" />
-                                    </tooltip>
-                                </CheckBox>
-                            </children>
-                        </HBox>
         <!--            Tile Size Selection-->
                         <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
                             <padding>
@@ -170,13 +156,26 @@
                                 <Insets left="10" right="10" />
                             </padding>
                             <children>
-                                <Label styleClass="regular" text="%ui.options.channel" />
+                                <Label styleClass="regular" text="%ui.options.input-channels" />
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <CheckComboBox fx:id="comboChannels">
                                     <tooltip>
-                                        <Tooltip text="%ui.options.channel.tooltip" />
+                                        <Tooltip text="%ui.options.input-channels.tooltip" />
                                     </tooltip>
                                 </CheckComboBox>
+                            </children>
+                        </HBox>
+                        <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                            <padding>
+                                <Insets left="10" right="10" />
+                            </padding>
+                            <children>
+                                <Label styleClass="regular" text="%ui.options.output-channels" />
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
+                        <CheckComboBox id="checkComboOutputs" fx:id="checkComboOutputs">
+                           <tooltip>
+                              <Tooltip text="%ui.options.output-channels.tooltip" />
+                           </tooltip></CheckComboBox>
                             </children>
                         </HBox>
                         <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
