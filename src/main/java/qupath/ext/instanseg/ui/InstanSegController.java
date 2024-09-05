@@ -116,9 +116,11 @@ public class InstanSegController extends BorderPane {
     @FXML
     private ToggleButton selectAllTMACoresButton;
     @FXML
-    private CheckBox nucleiOnlyCheckBox;
+    private CheckComboBox<InstanSegOutput> checkComboOutputs;
     @FXML
     private CheckBox makeMeasurementsCheckBox;
+    @FXML
+    private CheckBox randomColorsCheckBox;
     @FXML
     private Button infoButton;
     @FXML
@@ -178,6 +180,29 @@ public class InstanSegController extends BorderPane {
                         modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
         );
         configureChannelPicker();
+        configureOutputChannelCombo();
+        configureDefaultValues();
+    }
+
+    private void configureOutputChannelCombo() {
+        // Quick way to match widths...
+        checkComboOutputs.prefWidthProperty().bind(comboChannels.widthProperty());
+        // Show a better title than the text of all selections
+        checkComboOutputs.getCheckModel().getCheckedItems().addListener((ListChangeListener<InstanSegOutput>) c -> {
+            var list = c.getList();
+            if (list.isEmpty() || list.size() == checkComboOutputs.getItems().size())
+                checkComboOutputs.setTitle("All available");
+            else if (list.size() == 1) {
+                checkComboOutputs.setTitle(list.getFirst().toString());
+            } else {
+                checkComboOutputs.setTitle(list.size() + " selected");
+            }
+        });
+    }
+
+    private void configureDefaultValues() {
+        makeMeasurementsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.makeMeasurementsProperty());
+        randomColorsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.randomColorsProperty());
     }
 
     private BooleanBinding createModelDownloadedBinding() {
@@ -356,7 +381,7 @@ public class InstanSegController extends BorderPane {
     private void configureThreadSpinner() {
         SpinnerValueFactory.IntegerSpinnerValueFactory factory = (SpinnerValueFactory.IntegerSpinnerValueFactory) threadSpinner.getValueFactory();
         factory.setMax(Runtime.getRuntime().availableProcessors());
-        threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty());
+        threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty().asObject());
     }
 
     private void configureRunning() {
@@ -425,6 +450,10 @@ public class InstanSegController extends BorderPane {
                 comboChannels.getCheckModel().clearChecks();
                 comboChannels.getCheckModel().checkIndices(0, 1, 2);
             }
+            // Handle output channels
+            var nOutputs = n.getOutputChannels().orElse(1);
+            checkComboOutputs.getItems().setAll(InstanSegOutput.getOutputsForChannelCount(nOutputs));
+            checkComboOutputs.getCheckModel().checkAll();
         });
         downloadButton.setOnAction(e -> downloadModel());
         WebView webView = WebViews.create(true);
@@ -735,7 +764,19 @@ public class InstanSegController extends BorderPane {
                 Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.querying-local"));
                 return null;
             }
-            var outputChannels = nucleiOnlyCheckBox.isSelected() ? new int[]{0} : new int[]{};
+            // TODO: HANDLE OUTPUT CHANNELS!
+            int nOutputs = model.getOutputChannels().orElse(1);
+            int[] outputChannels = new int[0];
+            if (nOutputs <= 0) {
+                logger.warn("Unknown output channels for {}", model);
+                nOutputs = 1;
+            }
+            int nChecked = checkComboOutputs.getCheckModel().getCheckedIndices().size();
+            if (nChecked > 0 && nChecked < nOutputs) {
+                outputChannels = checkComboOutputs.getCheckModel().getCheckedIndices().stream().mapToInt(Integer::intValue).toArray();
+            }
+            boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
+            boolean randomColors = randomColorsCheckBox.isSelected();
 
             var instanSeg = InstanSeg.builder()
                     .model(model)
@@ -744,10 +785,10 @@ public class InstanSegController extends BorderPane {
                     .outputChannels(outputChannels)
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
                     .taskRunner(taskRunner)
-                    .makeMeasurements(makeMeasurementsCheckBox.isSelected())
+                    .makeMeasurements(makeMeasurements)
+                    .randomColors(randomColors)
                     .build();
 
-            boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
             String cmd = String.format("""
                             qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
@@ -757,6 +798,7 @@ public class InstanSegController extends BorderPane {
                                 .tileDims(%d)
                                 .nThreads(%d)
                                 .makeMeasurements(%s)
+                                .randomColors(%s)
                                 .build()
                                 .detectObjects()
                             """,
@@ -768,7 +810,8 @@ public class InstanSegController extends BorderPane {
                                     .collect(Collectors.joining(", ")),
                             InstanSegPreferences.tileSizeProperty().get(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
-                            makeMeasurements
+                            makeMeasurements,
+                            randomColors
                     ).strip();
             InstanSegResults results = instanSeg.detectObjects(imageData, selectedObjects);
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
@@ -940,4 +983,55 @@ public class InstanSegController extends BorderPane {
         }
         return assets;
     }
+
+    /**
+     * Helper class to manage the display of an output channel.
+     */
+    private static class InstanSegOutput {
+
+        private final int index;
+        private final String name;
+
+        private static final List<InstanSegOutput> SINGLE_CHANNEL = List.of(
+                new InstanSegOutput(0, "Only channel")
+        );
+
+        // We have no way to query channel names currently - b
+        // but the first InstanSeg models with two channels are always in this order
+        private static final List<InstanSegOutput> TWO_CHANNEL = List.of(
+                new InstanSegOutput(0, "Channel 1 (Nuclei)"),
+                new InstanSegOutput(0, "Channel 2 (Cells)")
+        );
+
+        InstanSegOutput(int index, String name) {
+            this.index = index;
+            this.name = name;
+        }
+
+        private static List<InstanSegOutput> getOutputsForChannelCount(int nChannels) {
+            return switch (nChannels) {
+                case 0 -> List.of();
+                case 1 -> SINGLE_CHANNEL;
+                case 2 -> TWO_CHANNEL;
+                default ->
+                        IntStream.range(0, nChannels).mapToObj(i -> new InstanSegOutput(i, "Channel " + (i + 1))).toList();
+            };
+        }
+
+        /**
+         * Get the index of the output channel.
+         * @return
+         */
+        public int getIndex() {
+            return index;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+
+    }
+
+
 }
