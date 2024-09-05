@@ -3,6 +3,7 @@ package qupath.ext.instanseg.ui;
 import javafx.beans.property.BooleanProperty;
 import javafx.scene.Scene;
 import javafx.scene.control.MenuItem;
+import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,7 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 			try {
 				stage = new Stage();
 				var pane = InstanSegController.createInstance(qupath);
-				Scene scene = new Scene(pane);
+				Scene scene = new Scene(new BorderPane(pane));
 				pane.heightProperty().addListener((v, o, n) -> handleStageHeightChange());
 				stage.setScene(scene);
 				stage.initOwner(QuPathGUI.getInstance().getStage());
