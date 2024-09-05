@@ -821,7 +821,7 @@ public class InstanSegController extends BorderPane {
                     );
             logger.info("Results: {}", results);
             int nFailed = results.nTilesFailed();
-            if (nFailed > 0) {
+            if (nFailed > 0 && !results.wasInterrupted()) {
                 var errorMessage = String.format(resources.getString("error.tiles-failed"), nFailed);
                 logger.error(errorMessage);
                 Dialogs.showErrorMessage(resources.getString("title"), errorMessage);

@@ -22,13 +22,13 @@ import qupath.opencv.tools.OpenCVTools;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -49,6 +49,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     private final AtomicLong nPixelsProcessed = new AtomicLong(0);
     private final AtomicInteger nTilesProcessed = new AtomicInteger(0);
     private final AtomicInteger nTilesFailed = new AtomicInteger(0);
+    private final AtomicBoolean wasInterrupted = new AtomicBoolean(false);
 
     /**
      * Cache normalization op so it doesn't need to be recalculated for every tile.
@@ -96,6 +97,16 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         return nPixelsProcessed.get();
     }
 
+    /**
+     * Check if the processing was interrupted.
+     * This can be used to determine if the processing was stopped prematurely,
+     * and failed tiles were not necessarily errors.
+     * @return
+     */
+    public boolean wasInterrupted() {
+        return wasInterrupted.get();
+    }
+
     @Override
     public Mat process(Parameters<Mat, Mat> params) throws IOException {
 
@@ -131,6 +142,12 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
             logger.debug("Predicting tile {}", mat);
             var matOutput = predictor.predict(mat);
 
+            // These are useful for spotting issues with the model
+            if (System.getProperty("instanseg.showTiles", "false").equalsIgnoreCase("true")) {
+                OpenCVTools.matToImagePlus("Input " + params.getRegionRequest(), mat).show();
+                OpenCVTools.matToImagePlus("Output " + params.getRegionRequest(), matOutput).show();
+            }
+
             matOutput.convertTo(matOutput, opencv_core.CV_32S);
             if (padding != null)
                 matOutput = OpenCVTools.crop(matOutput, padding);
@@ -141,6 +158,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
         } catch (InterruptedException | IllegalStateException e) {
             // illegal state exception comes when ndmanager is closed from another thread (I think)
             nTilesFailed.incrementAndGet();
+            wasInterrupted.set(true);
             logger.debug("Prediction interrupted", e);
         } finally {
             if (predictor != null) {
