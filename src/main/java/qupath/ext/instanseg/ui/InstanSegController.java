@@ -739,12 +739,12 @@ public class InstanSegController extends BorderPane {
 
             var instanSeg = InstanSeg.builder()
                     .model(model)
-                    .imageData(imageData)
                     .device(deviceChoices.getSelectionModel().getSelectedItem())
+                    .inputChannels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .outputChannels(outputChannels)
-                    .channels(channels.stream().map(ChannelSelectItem::getTransform).toList())
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
                     .taskRunner(taskRunner)
+                    .makeMeasurements(makeMeasurementsCheckBox.isSelected())
                     .build();
 
             boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
@@ -752,30 +752,25 @@ public class InstanSegController extends BorderPane {
                             qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
                                 .device("%s")
+                                .%s
                                 .outputChannels(%s)
-                                .channels(%s)
                                 .tileDims(%d)
                                 .nThreads(%d)
+                                .makeMeasurements(%s)
                                 .build()
-                                .%s
+                                .detectObjects()
                             """,
                             path.get(),
                             deviceChoices.getSelectionModel().getSelectedItem(),
+                            ChannelSelectItem.toConstructorString(channels),
                             outputChannels.length == 0 ? "" : Arrays.stream(outputChannels)
                                     .mapToObj(Integer::toString)
                                     .collect(Collectors.joining(", ")),
-                            ChannelSelectItem.toConstructorString(channels),
                             InstanSegPreferences.tileSizeProperty().get(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
-                            makeMeasurements ? "detectObjectsAndMeasure()" : "detectObjects()"
-                    );
-            InstanSegResults results;
-            if (makeMeasurements) {
-                results = instanSeg.detectObjectsAndMeasure(selectedObjects);
-            } else {
-                results = instanSeg.detectObjects(selectedObjects);
-            }
-
+                            makeMeasurements
+                    ).strip();
+            InstanSegResults results = instanSeg.detectObjects(imageData, selectedObjects);
             imageData.getHierarchy().fireHierarchyChangedEvent(this);
             imageData.getHistoryWorkflow()
                     .addStep(

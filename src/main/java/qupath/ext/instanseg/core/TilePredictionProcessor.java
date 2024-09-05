@@ -22,6 +22,7 @@ import qupath.opencv.tools.OpenCVTools;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -58,7 +59,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     private final Map<ROI, ImageOp> normalization = Collections.synchronizedMap(new WeakHashMap<>());
 
     TilePredictionProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
-                            Collection<ColorTransforms.ColorTransform> channels,
+                            Collection<? extends ColorTransforms.ColorTransform> channels,
                             int inputWidth, int inputHeight, boolean doPadding) {
         this.predictors = predictors;
         this.channels = List.copyOf(channels);

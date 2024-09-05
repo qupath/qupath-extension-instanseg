@@ -15,6 +15,7 @@ import qupath.lib.objects.PathAnnotationObject;
 import qupath.lib.objects.PathCellObject;
 import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
+import qupath.lib.objects.PathObjectTools;
 import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.ObjectProcessor;
 import qupath.lib.objects.utils.OverlapFixer;
@@ -30,11 +31,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.stream.IntStream;
 
 public class InstanSeg {
 
@@ -45,8 +47,8 @@ public class InstanSeg {
     private final int padding;
     private final int[] outputChannels;
     private final boolean randomColors;
-    private final ImageData<BufferedImage> imageData;
-    private final Collection<ColorTransforms.ColorTransform> channels;
+    private final boolean makeMeasurements;
+    private final List<ColorTransforms.ColorTransform> inputChannels;
     private final InstanSegModel model;
     private final Device device;
     private final TaskRunner taskRunner;
@@ -55,60 +57,72 @@ public class InstanSeg {
     // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently
     private final int boundaryThreshold = 1;
 
-    private InstanSeg(int tileDims, double downsample, int padding, int[] outputChannels, ImageData<BufferedImage> imageData,
-                      Collection<ColorTransforms.ColorTransform> channels, InstanSegModel model, Device device, TaskRunner taskRunner,
-                      Class<? extends PathObject> preferredOutputClass, boolean randomColors) {
-        this.tileDims = tileDims;
-        this.downsample = downsample; // Optional... and not advised (use the model spec instead); set <= 0 to ignore
-        this.padding = padding;
-        this.outputChannels = outputChannels == null ? null : outputChannels.clone();
-        this.imageData = imageData;
-        this.channels = channels;
-        this.model = model;
-        this.device = device;
-        this.taskRunner = taskRunner;
-        this.preferredOutputClass = preferredOutputClass;
-        this.randomColors = randomColors;
+    private InstanSeg(Builder builder) {
+        this.tileDims = builder.tileDims;
+        this.downsample = builder.downsample; // Optional... and not advised (use the model spec instead); set <= 0 to ignore
+        this.padding = builder.padding;
+        this.outputChannels = builder.outputChannels == null ? null : builder.outputChannels.clone();
+        this.inputChannels = builder.channels == null ? Collections.emptyList() : List.copyOf(builder.channels);
+        this.model = builder.model;
+        this.device = builder.device;
+        this.taskRunner = builder.taskRunner;
+        this.preferredOutputClass = builder.preferredOutputClass;
+        this.randomColors = builder.randomColors;
+        this.makeMeasurements = builder.makeMeasurements;
     }
 
     /**
-     * Run inference for the currently selected PathObjects.
+     * Run inference for the currently selected PathObjects in the current image.
      */
     public InstanSegResults detectObjects() {
-        return detectObjects(imageData.getHierarchy().getSelectionModel().getSelectedObjects());
+        return detectObjects(QP.getCurrentImageData());
     }
 
     /**
-     * Run inference for the currently selected PathObjects, then measure the new objects that were created.
+     * Run inference for the currently selected PathObjects in the specified image.
      */
-    public InstanSegResults detectObjectsAndMeasure() {
-        return detectObjectsAndMeasure(imageData.getHierarchy().getSelectionModel().getSelectedObjects());
+    public InstanSegResults detectObjects(ImageData<BufferedImage> imageData) {
+        Objects.requireNonNull(imageData, "No imageData available");
+        return detectObjects(imageData, imageData.getHierarchy().getSelectionModel().getSelectedObjects());
     }
 
     /**
-     * Run inference for the specified selected PathObjects, then measure the new objects that were created.
+     * Run inference for a collection of PathObjects from the current image.
      */
-    public InstanSegResults detectObjectsAndMeasure(Collection<? extends PathObject> pathObjects) {
-        var results = detectObjects(pathObjects);
-        for (var pathObject: pathObjects) {
-            makeMeasurements(imageData, pathObject.getChildObjects());
+    public InstanSegResults detectObjects(Collection<? extends PathObject> pathObjects) {
+        var imageData = QP.getCurrentImageData();
+        var results = runInstanSeg(imageData, pathObjects);
+        if (makeMeasurements) {
+            for (var pathObject : pathObjects) {
+                makeMeasurements(imageData, pathObject.getChildObjects());
+            }
         }
         return results;
     }
 
     /**
-     * Get the imageData from an InstanSeg object.
-     * @return The imageData used for the model.
+     * Run inference for a collection of PathObjects associated with the specified image.
+     * @throws IllegalArgumentException if the image or objects are null, or if the objects are not found within the image's hierarchy
      */
-    public ImageData<BufferedImage> getImageData() {
-        return imageData;
+    public InstanSegResults detectObjects(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects)
+            throws IllegalArgumentException {
+        validateImageAndObjectsOrThrow(imageData, pathObjects);
+        var results = runInstanSeg(imageData, pathObjects);
+        if (makeMeasurements) {
+            for (var pathObject : pathObjects) {
+                makeMeasurements(imageData, pathObject.getChildObjects());
+            }
+        }
+        return results;
     }
 
-    /**
-     * Run inference for a collection of PathObjects.
-     */
-    public InstanSegResults detectObjects(Collection<? extends PathObject> pathObjects) {
-        return runInstanSeg(pathObjects);
+    private void validateImageAndObjectsOrThrow(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects) {
+        Objects.requireNonNull(imageData, "No imageData available");
+        Objects.requireNonNull(pathObjects, "No objects available");
+        var hierarchy = imageData.getHierarchy();
+        if (pathObjects.stream().anyMatch(p -> !PathObjectTools.hierarchyContainsObject(hierarchy, p))) {
+            throw new IllegalArgumentException("Objects must be contained in the image hierarchy!");
+        }
     }
 
     /**
@@ -125,7 +139,7 @@ public class InstanSeg {
      * @param imageData The ImageData for making measurements.
      * @param detections The objects to measure.
      */
-    public void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
+    private void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
         double downsample = model.getPreferredDownsample(imageData.getServer().getPixelCalibration());
         DetectionMeasurer.builder()
                 .downsample(downsample)
@@ -133,7 +147,7 @@ public class InstanSeg {
                 .makeMeasurements(imageData, detections);
     }
 
-    private InstanSegResults runInstanSeg(Collection<? extends PathObject> pathObjects) {
+    private InstanSegResults runInstanSeg(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects) {
 
         long startTime = System.currentTimeMillis();
 
@@ -175,6 +189,9 @@ public class InstanSeg {
             }
         }
 
+        // If no input channels are specified, use all channels
+        var inputChannels = getInputChannels(imageData);
+
         try (var model = Criteria.builder()
                 .setTypes(Mat.class, Mat.class)
                 .optModelUrls(String.valueOf(modelPath.toUri()))
@@ -199,9 +216,9 @@ public class InstanSeg {
                         (BaseNDManager)baseManager.getParentManager());
 
                 int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
-                var predictionProcessor = new TilePredictionProcessor(predictors, channels, tileDims, tileDims, padToInputSize);
+                var predictionProcessor = new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
                 var processor = OpenCVProcessor.builder(predictionProcessor)
-                        .imageSupplier((parameters) -> ImageOps.buildImageDataOp(channels)
+                        .imageSupplier((parameters) -> ImageOps.buildImageDataOp(inputChannels)
                                 .apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(Tiler.builder(sizeWithoutPadding)
                                 .alignCenter()
@@ -237,6 +254,23 @@ public class InstanSeg {
         }
     }
 
+    /**
+     * Get the input channels to use; if we don't have any specified, use all of them
+     * @param imageData
+     * @return
+     */
+    private List<ColorTransforms.ColorTransform> getInputChannels(ImageData<BufferedImage> imageData) {
+        if (inputChannels == null || inputChannels.isEmpty()) {
+            List<ColorTransforms.ColorTransform> channels = new ArrayList<>();
+            for (int i = 0; i < imageData.getServer().nChannels(); i++) {
+                channels.add(ColorTransforms.createChannelExtractor(i));
+            }
+            return channels;
+        } else {
+            return inputChannels;
+        }
+    }
+
     private static ObjectProcessor createPostProcessor() {
         var merger = ObjectMerger.createIoMinMerger(0.5);
         var fixer = OverlapFixer.builder()
@@ -269,17 +303,17 @@ public class InstanSeg {
         private static final Logger logger = LoggerFactory.getLogger(Builder.class);
 
         private static final int MIN_TILE_DIMS = 256;
-        private static final int MAX_TILE_DIMS = 2048;
+        private static final int MAX_TILE_DIMS = 4096;
 
         private int tileDims = 512;
         private double downsample = -1; // Optional - we usually get this from the model
         private int padding = 80; // Previous default of 40 could miss large objects
         private int[] outputChannels = null;
         private boolean randomColors = true;
+        private boolean makeMeasurements = false;
         private Device device = Device.fromName("cpu");
         private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
-        private ImageData<BufferedImage> imageData;
-        private Collection<ColorTransforms.ColorTransform> channels;
+        private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
         private Class<? extends PathObject> preferredOutputClass;
 
@@ -288,7 +322,7 @@ public class InstanSeg {
         /**
          * Set the width and height of tiles
          * @param tileDims The tile width and height
-         * @return A modified builder
+         * @return this builder
          */
         public Builder tileDims(int tileDims) {
             if (tileDims < MIN_TILE_DIMS) {
@@ -306,7 +340,7 @@ public class InstanSeg {
         /**
          * Set the downsample to be used in region requests
          * @param downsample The downsample to be used
-         * @return A modified builder
+         * @return this builder
          */
         public Builder downsample(double downsample) {
             this.downsample = downsample;
@@ -316,7 +350,7 @@ public class InstanSeg {
         /**
          * Set the padding (overlap) between tiles
          * @param padding The extra size added to tiles to allow overlap
-         * @return A modified builder
+         * @return this builder
          */
         public Builder interTilePadding(int padding) {
             if (padding < 0) {
@@ -337,7 +371,7 @@ public class InstanSeg {
          * so it can be much cheaper to eliminate channels now, rather than discard unwanted detections later.
          *
          * @param outputChannels 0-based indices of the output channels, or leave empty to use all channels
-         * @return A modified builder
+         * @return this builder
          */
         public Builder outputChannels(int... outputChannels) {
             this.outputChannels = outputChannels.clone();
@@ -345,30 +379,11 @@ public class InstanSeg {
         }
 
         /**
-         * Set the imageData to be used
-         * @param imageData An imageData instance
-         * @return A modified builder
-         */
-        public Builder imageData(ImageData<BufferedImage> imageData) {
-            this.imageData = imageData;
-            return this;
-        }
-
-        /**
-         * Set the imageData to be used as the current image data.
-         * @return A modified builder
-         */
-        public Builder currentImageData() {
-            this.imageData = QP.getCurrentImageData();
-            return this;
-        }
-
-        /**
          * Set the channels to be used in inference
          * @param channels A collection of channels to be used in inference
-         * @return A modified builder
+         * @return this builder
          */
-        public Builder channels(Collection<ColorTransforms.ColorTransform> channels) {
+        public Builder inputChannels(Collection<? extends ColorTransforms.ColorTransform> channels) {
             this.channels = channels;
             return this;
         }
@@ -376,34 +391,31 @@ public class InstanSeg {
         /**
          * Set the channels to be used in inference
          * @param channels Channels to be used in inference
-         * @return A modified builder
+         * @return this builder
          */
-        public Builder channels(ColorTransforms.ColorTransform channel, ColorTransforms.ColorTransform... channels) {
-            var l = Arrays.asList(channels);
+        public Builder inputChannels(ColorTransforms.ColorTransform channel, ColorTransforms.ColorTransform... channels) {
+            var l = new ArrayList<ColorTransforms.ColorTransform>();
             l.add(channel);
+            l.addAll(Arrays.asList(channels));
             this.channels = l;
             return this;
         }
 
         /**
-         * Set the model to use all channels for inference
-         * @return A modified builder
+         * Request that all input channels be used in inference
+         * @return this builder
          */
-        public Builder allChannels() {
-            // assignment is just to suppress IDE suggestion for void return val
-            var tmp = channelIndices(
-                    IntStream.range(0, imageData.getServer().nChannels())
-                            .boxed()
-                            .toList());
+        public Builder allInputChannels() {
+            this.channels = Collections.emptyList();
             return this;
         }
 
         /**
          * Set the channels using indices
          * @param channels Integers used to specify the channels used
-         * @return A modified builder
+         * @return this builder
          */
-        public Builder channelIndices(Collection<Integer> channels) {
+        public Builder inputChannelIndices(Collection<Integer> channels) {
             this.channels = channels.stream()
                     .map(ColorTransforms::createChannelExtractor)
                     .toList();
@@ -413,9 +425,9 @@ public class InstanSeg {
         /**
          * Set the channels using indices
          * @param channels Integers used to specify the channels used
-         * @return A modified builder
+         * @return this builder
          */
-        public Builder channelIndices(int channel, int... channels) {
+        public Builder inputChannels(int channel, int... channels) {
             List<ColorTransforms.ColorTransform> l = new ArrayList<>();
             l.add(ColorTransforms.createChannelExtractor(channel));
             for (int i: channels) {
@@ -428,9 +440,9 @@ public class InstanSeg {
         /**
          * Set the channel names to be used
          * @param channels A set of channel names
-         * @return A modified builder
+         * @return this builder
          */
-        public Builder channelNames(Collection<String> channels) {
+        public Builder inputChannelNames(Collection<String> channels) {
             this.channels = channels.stream()
                     .map(ColorTransforms::createChannelExtractor)
                     .toList();
@@ -440,9 +452,9 @@ public class InstanSeg {
         /**
          * Set the channel names to be used
          * @param channels A set of channel names
-         * @return A modified builder
+         * @return this builder
          */
-        public Builder channelNames(String channel, String... channels) {
+        public Builder inputChannelNames(String channel, String... channels) {
             List<ColorTransforms.ColorTransform> l = new ArrayList<>();
             l.add(ColorTransforms.createChannelExtractor(channel));
             for (String s: channels) {
@@ -454,7 +466,7 @@ public class InstanSeg {
 
         /**
          * Request that random colors be used for the output objects.
-         * @return
+         * @return this builder
          */
         public Builder randomColors() {
             return randomColors(true);
@@ -463,7 +475,7 @@ public class InstanSeg {
         /**
          * Optionally request that random colors be used for the output objects.
          * @param doRandomColors
-         * @return
+         * @return this builder
          */
         public Builder randomColors(boolean doRandomColors) {
             this.randomColors = doRandomColors;
@@ -473,7 +485,7 @@ public class InstanSeg {
         /**
          * Set the number of threads used
          * @param nThreads The number of threads to be used
-         * @return A modified builder
+         * @return this builder
          */
         public Builder nThreads(int nThreads) {
             this.taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner(nThreads);
@@ -483,7 +495,7 @@ public class InstanSeg {
         /**
          * Set the TaskRunner
          * @param taskRunner An object that will run tasks and show progress
-         * @return A modified builder
+         * @return this builder
          */
         public Builder taskRunner(TaskRunner taskRunner) {
             this.taskRunner = taskRunner;
@@ -493,7 +505,7 @@ public class InstanSeg {
         /**
          * Set the specific model to be used
          * @param model An already instantiated InstanSeg model.
-         * @return A modified builder
+         * @return this builder
          */
         public Builder model(InstanSegModel model) {
             this.model = model;
@@ -503,7 +515,7 @@ public class InstanSeg {
         /**
          * Set the specific model by path
          * @param path A path on disk to create an InstanSeg model from.
-         * @return A modified builder
+         * @return this builder
          */
         public Builder modelPath(Path path) throws IOException {
             return model(InstanSegModel.fromPath(path));
@@ -512,7 +524,7 @@ public class InstanSeg {
         /**
          * Set the specific model by path
          * @param path A path on disk to create an InstanSeg model from.
-         * @return A modified builder
+         * @return this builder
          */
         public Builder modelPath(String path) throws IOException {
             return modelPath(Path.of(path));
@@ -521,7 +533,7 @@ public class InstanSeg {
         /**
          * Set the device to be used
          * @param deviceName The name of the device to be used (eg, "gpu", "mps").
-         * @return A modified builder
+         * @return this builder
          */
         public Builder device(String deviceName) {
             this.device = Device.fromName(deviceName);
@@ -531,7 +543,7 @@ public class InstanSeg {
         /**
          * Set the device to be used
          * @param device The {@link Device} to be used
-         * @return A modified builder
+         * @return this builder
          */
         public Builder device(Device device) {
             this.device = device;
@@ -540,7 +552,7 @@ public class InstanSeg {
 
         /**
          * Specify cells as the output class, possibly without nuclei
-         * @return A modified builder
+         * @return this builder
          */
         public Builder outputCells() {
             this.preferredOutputClass = PathCellObject.class;
@@ -549,7 +561,7 @@ public class InstanSeg {
 
         /**
          * Specify (possibly nested) detections as the output class
-         * @return A modified builder
+         * @return this builder
          */
         public Builder outputDetections() {
             this.preferredOutputClass = PathDetectionObject.class;
@@ -558,10 +570,19 @@ public class InstanSeg {
 
         /**
          * Specify (possibly nested) annotations as the output class
-         * @return A modified builder
+         * @return this builder
          */
         public Builder outputAnnotations() {
             this.preferredOutputClass = PathAnnotationObject.class;
+            return this;
+        }
+
+        /**
+         * Request to make measurements from the objects created by InstanSeg.
+         * @return this builder
+         */
+        public Builder makeMeasurements(boolean doMeasure) {
+            this.makeMeasurements = doMeasure;
             return this;
         }
 
@@ -570,25 +591,7 @@ public class InstanSeg {
          * @return An InstanSeg instance ready for object detection.
          */
         public InstanSeg build() {
-            if (imageData == null) {
-                // assignment is just to suppress IDE suggestion for void return
-                var tmp = currentImageData();
-            }
-            if (channels == null) {
-                var tmp = allChannels();
-            }
-            return new InstanSeg(
-                    this.tileDims,
-                    this.downsample,
-                    this.padding,
-                    this.outputChannels,
-                    this.imageData,
-                    this.channels,
-                    this.model,
-                    this.device,
-                    this.taskRunner,
-                    this.preferredOutputClass,
-                    this.randomColors);
+            return new InstanSeg(this);
         }
 
     }
