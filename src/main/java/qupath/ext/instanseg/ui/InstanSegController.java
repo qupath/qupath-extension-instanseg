@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
+import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -119,6 +120,8 @@ public class InstanSegController extends BorderPane {
     private CheckBox makeMeasurementsCheckBox;
     @FXML
     private Button infoButton;
+    @FXML
+    private Label modelDirLabel;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
@@ -126,6 +129,19 @@ public class InstanSegController extends BorderPane {
     private MessageTextHelper messageTextHelper;
 
     private final BooleanProperty needsUpdating = new SimpleBooleanProperty();
+
+    private static final ObjectBinding<Path> modelDirectoryProperty = Bindings.createObjectBinding(
+            () -> tryToGetPath(InstanSegPreferences.modelDirectoryProperty().get()),
+            InstanSegPreferences.modelDirectoryProperty()
+    );
+
+    private final BooleanBinding isModelDirectoryValid = Bindings.createBooleanBinding(
+            () -> {
+                var path = modelDirectoryProperty.get();
+                return path != null && Files.isDirectory(path);
+            },
+            modelDirectoryProperty
+    );
 
     /**
      * Create an instance of the InstanSeg GUI pane.
@@ -147,13 +163,24 @@ public class InstanSegController extends BorderPane {
         watcher = new Watcher(modelChoiceBox);
 
         configureMessageLabel();
+        configureDirectoryLabel();
         configureTileSizes();
         configureDeviceChoices();
         configureModelChoices();
         configureSelectButtons();
         configureRunning();
         configureThreadSpinner();
-        BooleanBinding currentModelIsDownloaded = Bindings.createBooleanBinding(
+        BooleanBinding currentModelIsDownloaded = createModelDownloadedBinding();
+        infoButton.disableProperty().bind(currentModelIsDownloaded.not());
+        downloadButton.disableProperty().bind(
+                currentModelIsDownloaded.or(
+                        modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
+        );
+        configureChannelPicker();
+    }
+
+    private BooleanBinding createModelDownloadedBinding() {
+        return Bindings.createBooleanBinding(
                 () -> {
                     var model = modelChoiceBox.getSelectionModel().getSelectedItem();
                     if (model == null) {
@@ -164,12 +191,6 @@ public class InstanSegController extends BorderPane {
                 },
                 modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating,
                 InstanSegPreferences.modelDirectoryProperty());
-
-        infoButton.disableProperty().bind(currentModelIsDownloaded.not());
-        downloadButton.disableProperty().bind(
-                currentModelIsDownloaded.or(modelChoiceBox.getSelectionModel().selectedItemProperty().isNull())
-        );
-        configureChannelPicker();
     }
 
 
@@ -374,8 +395,7 @@ public class InstanSegController extends BorderPane {
     }
 
     static Optional<Path> getModelDirectory() {
-        var path = InstanSegPreferences.modelDirectoryProperty().get();
-        return Optional.ofNullable(tryToGetPath(path));
+        return Optional.ofNullable(modelDirectoryProperty.get());
     }
 
     private void configureModelChoices() {
@@ -419,8 +439,8 @@ public class InstanSegController extends BorderPane {
                 try {
                     var modelDir = getModelDirectory().orElse(null);
                     if (modelDir == null || !Files.exists(modelDir)) {
-                        logger.warn("Can't download model {}, model directory not found",
-                                modelChoiceBox.getSelectionModel().getSelectedItem());
+                        Dialogs.showErrorMessage(resources.getString("title"),
+                                resources.getString("ui.model-directory.choose-prompt"));
                         return;
                     }
                     var model = modelChoiceBox.getSelectionModel().getSelectedItem();
@@ -550,6 +570,21 @@ public class InstanSegController extends BorderPane {
             else
                 labelMessage.getStyleClass().setAll("standard-message");
         });
+    }
+
+    private void configureDirectoryLabel() {
+        isModelDirectoryValid.addListener((v, o, n) -> updateModelDirectoryLabel());
+        updateModelDirectoryLabel();
+    }
+
+    private void updateModelDirectoryLabel() {
+        if (isModelDirectoryValid.get()) {
+            modelDirLabel.getStyleClass().setAll("standard-message");
+            modelDirLabel.setText(resources.getString("ui.options.directory"));
+        } else {
+            modelDirLabel.getStyleClass().setAll("warning-message");
+            modelDirLabel.setText(resources.getString("ui.options.directory-not-set"));
+        }
     }
 
     static void addModelsFromPath(Path path, ComboBox<InstanSegModel> box) {

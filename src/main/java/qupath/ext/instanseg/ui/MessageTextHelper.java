@@ -29,8 +29,10 @@ import java.util.ResourceBundle;
  * Helper class for determining which text to display in the message label.
  */
 class MessageTextHelper {
+
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
-    private static final QuPathGUI qupath = QuPathGUI.getInstance();
+
+    private final QuPathGUI qupath = QuPathGUI.getInstance();
     private final SelectedObjectCounter selectedObjectCounter;
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
     private final ChoiceBox<String> deviceChoiceBox;
