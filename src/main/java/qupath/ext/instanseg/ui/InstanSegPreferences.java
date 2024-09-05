@@ -3,6 +3,7 @@ package qupath.ext.instanseg.ui;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.Property;
 import javafx.beans.property.StringProperty;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.prefs.PathPrefs;
 
 class InstanSegPreferences {
@@ -17,7 +18,7 @@ class InstanSegPreferences {
 
     private static final StringProperty preferredDeviceProperty = PathPrefs.createPersistentPreference(
             "instanseg.pref.device",
-            "cpu");
+            getDefaultDevice());
 
     private static final Property<Integer> numThreadsProperty = PathPrefs.createPersistentPreference(
             "instanseg.num.threads",
@@ -25,7 +26,20 @@ class InstanSegPreferences {
 
     private static final IntegerProperty tileSizeProperty = PathPrefs.createPersistentPreference(
             "intanseg.tile.size",
-            256);
+            512);
+
+    /**
+     * MPS should work reliably (and much faster) on Apple Silicon, so set as default.
+     * Everywhere else, use CPU as we can't count on a GPU/CUDA being available.
+     * @return
+     */
+    private static String getDefaultDevice() {
+        if (GeneralTools.isMac() && "aarch64".equals(System.getProperty("os.arch"))) {
+            return "mps";
+        } else {
+            return "cpu";
+        }
+    }
 
     static StringProperty modelDirectoryProperty() {
         return modelDirectoryProperty;
