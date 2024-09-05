@@ -15,11 +15,13 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
@@ -401,14 +403,14 @@ public class InstanSegController extends BorderPane {
     private void configureModelChoices() {
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
         handleModelDirectory(tfModelDirectory.getText());
-        addRemoteModels(modelChoiceBox);
+        addRemoteModels(modelChoiceBox.getItems());
         tfModelDirectory.textProperty().addListener((v, o, n) -> {
             var oldModelDir = tryToGetPath(o);
             if (oldModelDir != null && Files.exists(oldModelDir)) {
                 watcher.unregister(oldModelDir);
             }
             handleModelDirectory(n);
-            addRemoteModels(modelChoiceBox);
+//            addRemoteModels(modelChoiceBox.getItems());
         });
         modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
             if (n == null) {
@@ -477,7 +479,45 @@ public class InstanSegController extends BorderPane {
         infoPopover.show(infoButton);
     }
 
-    private static void addRemoteModels(ComboBox<InstanSegModel> comboBox) {
+    private static boolean promptToAllowOnlineModelCheck() {
+        String always = resources.getString("ui.model-online-check.always");
+        String never = resources.getString("ui.model-online-check.never");
+        String prompt = resources.getString("ui.model-online-check.allow-once");
+        var permit = Dialogs.builder()
+                .title(resources.getString("title"))
+                .contentText(resources.getString("ui.model-online-check.prompt"))
+                .buttons(always, never, prompt)
+                .showAndWait()
+                .orElse(null);
+        if (permit == null)
+            return false;
+        String text = permit.getText();
+        if (always.equals(text)) {
+            InstanSegPreferences.permitOnlineProperty().set(InstanSegPreferences.OnlinePermission.YES);
+            return true;
+        } else if (never.equals(text)) {
+            InstanSegPreferences.permitOnlineProperty().set(InstanSegPreferences.OnlinePermission.NO);
+            return false;
+        } else if (prompt.equals(text)) {
+            InstanSegPreferences.permitOnlineProperty().set(InstanSegPreferences.OnlinePermission.PROMPT);
+            return true;
+        } else {
+            logger.warn("Unknown choice: {}", text);
+            return false;
+        }
+    }
+
+    private static void addRemoteModels(ObservableList<InstanSegModel> models) {
+        var permit = InstanSegPreferences.permitOnlineProperty().get();
+        if (permit == InstanSegPreferences.OnlinePermission.NO) {
+            logger.debug("Not allowed to check for models online.");
+            return;
+        } else if (permit == InstanSegPreferences.OnlinePermission.PROMPT) {
+            if (!promptToAllowOnlineModelCheck()) {
+                logger.debug("User declined online model check.");
+                return;
+            }
+        }
         var releases = getReleases();
         if (releases.isEmpty()) {
             logger.info("No releases found.");
@@ -486,7 +526,7 @@ public class InstanSegController extends BorderPane {
         var release = releases.getFirst();
         var assets = getAssets(release);
         assets.forEach(asset -> {
-            comboBox.getItems().add(
+            models.add(
                     InstanSegModel.fromURL(
                             asset.name.replace(".zip", ""),
                             asset.browser_download_url)
