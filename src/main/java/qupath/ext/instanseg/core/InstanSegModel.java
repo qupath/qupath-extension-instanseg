@@ -330,10 +330,15 @@ public class InstanSegModel {
 
     private String getREADMEString(Path path) {
         var file = path.resolve(name + "_README.md");
-        try {
-            return Files.readString(file, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            logger.error("Unable to find README", e);
+        if (Files.exists(file)) {
+            try {
+                return Files.readString(file, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                logger.error("Unable to find README", e);
+                return null;
+            }
+        } else {
+            logger.debug("No README found for model {}", name);
             return null;
         }
     }

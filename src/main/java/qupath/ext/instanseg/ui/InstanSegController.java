@@ -85,7 +85,9 @@ import java.util.stream.IntStream;
  * Controller for UI pane contained in instanseg_control.fxml
  */
 public class InstanSegController extends BorderPane {
+
     private static final Logger logger = LoggerFactory.getLogger(InstanSegController.class);
+
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
     private final Watcher watcher;
 
@@ -157,9 +159,11 @@ public class InstanSegController extends BorderPane {
                     if (model == null) {
                         return false;
                     }
-                    return model.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+                    var modelDir = getModelDirectory().orElse(null);
+                    return modelDir != null && model.isDownloaded(modelDir);
                 },
-                modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating);
+                modelChoiceBox.getSelectionModel().selectedItemProperty(), needsUpdating,
+                InstanSegPreferences.modelDirectoryProperty());
 
         infoButton.disableProperty().bind(currentModelIsDownloaded.not());
         downloadButton.disableProperty().bind(
@@ -182,15 +186,14 @@ public class InstanSegController extends BorderPane {
         if (event.getClickCount() != 2) {
             return;
         }
-        var path = InstanSegPreferences.modelDirectoryProperty().get();
-        if (path == null || path.isEmpty()) {
+        var modelDir = getModelDirectory().orElse(null);
+        if (modelDir == null) {
             return;
         }
-        var file = new File(path);
-        if (file.exists()) {
-            GuiTools.browseDirectory(file);
+        if (Files.exists(modelDir)) {
+            GuiTools.browseDirectory(modelDir.toFile());
         } else {
-            logger.debug("Can't browse directory for {}", file);
+            logger.debug("Can't browse directory for {}", modelDir);
         }
     }
 
@@ -345,7 +348,11 @@ public class InstanSegController extends BorderPane {
                             if (model == null) {
                                 return true;
                             }
-                            if (!model.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()))) {
+                            var modelDir = getModelDirectory().orElse(null);
+                            if (modelDir == null || !Files.exists(modelDir)) {
+                                return true; // Can't download without somewhere to put it
+                            }
+                            if (!model.isDownloaded(modelDir)) {
                                 return false; // to enable "download and run"
                             }
                             return false;
@@ -358,12 +365,28 @@ public class InstanSegController extends BorderPane {
         });
     }
 
+    private static Path tryToGetPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        } else {
+            return Path.of(path);
+        }
+    }
+
+    static Optional<Path> getModelDirectory() {
+        var path = InstanSegPreferences.modelDirectoryProperty().get();
+        return Optional.ofNullable(tryToGetPath(path));
+    }
+
     private void configureModelChoices() {
         tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
         handleModelDirectory(tfModelDirectory.getText());
         addRemoteModels(modelChoiceBox);
         tfModelDirectory.textProperty().addListener((v, o, n) -> {
-            watcher.unregister(Path.of(o));
+            var oldModelDir = tryToGetPath(o);
+            if (oldModelDir != null && Files.exists(oldModelDir)) {
+                watcher.unregister(oldModelDir);
+            }
             handleModelDirectory(n);
             addRemoteModels(modelChoiceBox);
         });
@@ -371,7 +394,8 @@ public class InstanSegController extends BorderPane {
             if (n == null) {
                 return;
             }
-            boolean isDownloaded = n.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+            var modelDir = getModelDirectory().orElse(null);
+            boolean isDownloaded = modelDir != null && n.isDownloaded(modelDir);
             if (!isDownloaded || qupath.getImageData() == null) {
                 return;
             }
@@ -393,10 +417,16 @@ public class InstanSegController extends BorderPane {
         try (var pool = ForkJoinPool.commonPool()) {
             pool.execute(() -> {
                 try {
+                    var modelDir = getModelDirectory().orElse(null);
+                    if (modelDir == null || !Files.exists(modelDir)) {
+                        logger.warn("Can't download model {}, model directory not found",
+                                modelChoiceBox.getSelectionModel().getSelectedItem());
+                        return;
+                    }
                     var model = modelChoiceBox.getSelectionModel().getSelectedItem();
                     Dialogs.showInfoNotification(resources.getString("title"),
                             String.format(resources.getString("ui.popup.fetching"), model.getName()));
-                    model.download(Path.of(InstanSegPreferences.modelDirectoryProperty().get()));
+                    model.download(modelDir);
                     Dialogs.showInfoNotification(resources.getString("title"),
                             String.format(resources.getString("ui.popup.available"), model.getName()));
                     needsUpdating.set(!needsUpdating.get());
@@ -469,8 +499,9 @@ public class InstanSegController extends BorderPane {
     }
 
     private void handleModelDirectory(String n) {
-        if (n == null) return;
-        var path = Path.of(n);
+        var path = tryToGetPath(n);
+        if (path == null)
+            return;
         if (Files.exists(path) && Files.isDirectory(path)) {
             try {
                 var localPath = path.resolve("local");
@@ -557,9 +588,14 @@ public class InstanSegController extends BorderPane {
 
 
         var model = modelChoiceBox.getSelectionModel().getSelectedItem();
-        var modelPath = Path.of(InstanSegPreferences.modelDirectoryProperty().get());
+        var modelPath = getModelDirectory().orElse(null);
+        if (modelPath == null) {
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("ui.model-directory.choose-prompt"));
+            return;
+        }
         if (!model.isDownloaded(modelPath)) {
-            if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup"))) return;
+            if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup")))
+                return;
             Dialogs.showInfoNotification(resources.getString("title"), String.format(resources.getString("ui.popup.fetching"), model.getName()));
             downloadModel();
             if (!model.isDownloaded(modelPath)) {
@@ -576,7 +612,7 @@ public class InstanSegController extends BorderPane {
         }
 
         int nModelChannels = modelChannels.get();
-        if (!(nModelChannels == InstanSegModel.ANY_CHANNELS || nModelChannels != imageChannels)) {
+        if (nModelChannels != InstanSegModel.ANY_CHANNELS && nModelChannels != imageChannels) {
             Dialogs.showErrorNotification(resources.getString("title"), String.format(
                     resources.getString("ui.error.num-channels-dont-match"),
                     nModelChannels, imageChannels));
@@ -774,7 +810,9 @@ public class InstanSegController extends BorderPane {
      * @return A list of GitHub releases, possibly empty.
      */
     private static List<GitHubRelease> getReleases() {
-        Path cachedReleases = Path.of(InstanSegPreferences.modelDirectoryProperty().get(), "releases.json");
+        Path modelDir = getModelDirectory().orElse(null);
+        Path cachedReleases = modelDir == null ? null : modelDir.resolve("releases.json");
+
         String uString = "https://api.github.com/repos/instanseg/InstanSeg/releases";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(uString))
@@ -789,15 +827,19 @@ public class InstanSegController extends BorderPane {
             // if response is okay, then cache it
             if (response.statusCode() == 200) {
                 json = response.body();
-                JsonElement jsonElement = JsonParser.parseString(json);
-                Files.writeString(cachedReleases, gson.toJson(jsonElement));
+                if (cachedReleases != null && Files.exists(cachedReleases.getParent())) {
+                    JsonElement jsonElement = JsonParser.parseString(json);
+                    Files.writeString(cachedReleases, gson.toJson(jsonElement));
+                } else {
+                    logger.debug("Unable to cache release information - no model directory specified");
+                }
             } else {
                 // otherwise problems
                 throw new IOException("Unable to fetch GitHub release information, status " + response.statusCode());
             }
         } catch (IOException | InterruptedException e) {
             // if not, try to fall back on a cached version
-            if (Files.exists(cachedReleases)) {
+            if (cachedReleases != null && Files.exists(cachedReleases)) {
                 try {
                     json = Files.readString(cachedReleases);
                 } catch (IOException ex) {
