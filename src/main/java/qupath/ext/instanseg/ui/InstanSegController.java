@@ -120,6 +120,8 @@ public class InstanSegController extends BorderPane {
     @FXML
     private CheckBox makeMeasurementsCheckBox;
     @FXML
+    private CheckBox randomColorsCheckBox;
+    @FXML
     private Button infoButton;
     @FXML
     private Label modelDirLabel;
@@ -179,6 +181,7 @@ public class InstanSegController extends BorderPane {
         );
         configureChannelPicker();
         configureOutputChannelCombo();
+        configureDefaultValues();
     }
 
     private void configureOutputChannelCombo() {
@@ -195,6 +198,11 @@ public class InstanSegController extends BorderPane {
                 checkComboOutputs.setTitle(list.size() + " selected");
             }
         });
+    }
+
+    private void configureDefaultValues() {
+        makeMeasurementsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.makeMeasurementsProperty());
+        randomColorsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.randomColorsProperty());
     }
 
     private BooleanBinding createModelDownloadedBinding() {
@@ -373,7 +381,7 @@ public class InstanSegController extends BorderPane {
     private void configureThreadSpinner() {
         SpinnerValueFactory.IntegerSpinnerValueFactory factory = (SpinnerValueFactory.IntegerSpinnerValueFactory) threadSpinner.getValueFactory();
         factory.setMax(Runtime.getRuntime().availableProcessors());
-        threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty());
+        threadSpinner.getValueFactory().valueProperty().bindBidirectional(InstanSegPreferences.numThreadsProperty().asObject());
     }
 
     private void configureRunning() {
@@ -767,6 +775,8 @@ public class InstanSegController extends BorderPane {
             if (nChecked > 0 && nChecked < nOutputs) {
                 outputChannels = checkComboOutputs.getCheckModel().getCheckedIndices().stream().mapToInt(Integer::intValue).toArray();
             }
+            boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
+            boolean randomColors = randomColorsCheckBox.isSelected();
 
             var instanSeg = InstanSeg.builder()
                     .model(model)
@@ -775,10 +785,10 @@ public class InstanSegController extends BorderPane {
                     .outputChannels(outputChannels)
                     .tileDims(InstanSegPreferences.tileSizeProperty().get())
                     .taskRunner(taskRunner)
-                    .makeMeasurements(makeMeasurementsCheckBox.isSelected())
+                    .makeMeasurements(makeMeasurements)
+                    .randomColors(randomColors)
                     .build();
 
-            boolean makeMeasurements = makeMeasurementsCheckBox.isSelected();
             String cmd = String.format("""
                             qupath.ext.instanseg.core.InstanSeg.builder()
                                 .modelPath("%s")
@@ -788,6 +798,7 @@ public class InstanSegController extends BorderPane {
                                 .tileDims(%d)
                                 .nThreads(%d)
                                 .makeMeasurements(%s)
+                                .randomColors(%s)
                                 .build()
                                 .detectObjects()
                             """,
@@ -799,7 +810,8 @@ public class InstanSegController extends BorderPane {
                                     .collect(Collectors.joining(", ")),
                             InstanSegPreferences.tileSizeProperty().get(),
                             InstanSegPreferences.numThreadsProperty().getValue(),
-                            makeMeasurements
+                            makeMeasurements,
+                            randomColors
                     ).strip();
             InstanSegResults results = instanSeg.detectObjects(imageData, selectedObjects);
             imageData.getHierarchy().fireHierarchyChangedEvent(this);

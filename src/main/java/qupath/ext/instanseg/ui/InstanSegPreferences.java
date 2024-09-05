@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.ui;
 
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.Property;
@@ -32,13 +33,21 @@ class InstanSegPreferences {
             "instanseg.pref.device",
             getDefaultDevice());
 
-    private static final Property<Integer> numThreadsProperty = PathPrefs.createPersistentPreference(
+    private static final IntegerProperty numThreadsProperty = PathPrefs.createPersistentPreference(
             "instanseg.num.threads",
-            Math.min(4, Runtime.getRuntime().availableProcessors())).asObject();
+            Math.min(4, Runtime.getRuntime().availableProcessors()));
 
     private static final IntegerProperty tileSizeProperty = PathPrefs.createPersistentPreference(
             "intanseg.tile.size",
             512);
+
+    private static final BooleanProperty makeMeasurementsProperty = PathPrefs.createPersistentPreference(
+            "intanseg.measurements",
+            true);
+
+    private static final BooleanProperty randomColorsProperty = PathPrefs.createPersistentPreference(
+            "intanseg.random.colors",
+            true);
 
     /**
      * MPS should work reliably (and much faster) on Apple Silicon, so set as default.
@@ -65,11 +74,20 @@ class InstanSegPreferences {
         return preferredDeviceProperty;
     }
 
-    static Property<Integer> numThreadsProperty() {
+    static IntegerProperty numThreadsProperty() {
         return numThreadsProperty;
     }
 
     static IntegerProperty tileSizeProperty() {
         return tileSizeProperty;
     }
+
+    static BooleanProperty makeMeasurementsProperty() {
+        return makeMeasurementsProperty;
+    }
+
+    static BooleanProperty randomColorsProperty() {
+        return randomColorsProperty;
+    }
+
 }
