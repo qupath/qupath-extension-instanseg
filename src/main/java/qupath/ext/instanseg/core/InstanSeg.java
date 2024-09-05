@@ -152,8 +152,8 @@ public class InstanSeg {
         long startTime = System.currentTimeMillis();
 
         Optional<Path> oModelPath = model.getPath();
-        if (!oModelPath.isPresent()) {
-            return new InstanSegResults(0, 0, 0, 0, 0);
+        if (oModelPath.isEmpty()) {
+            return InstanSegResults.emptyInstance();
         }
         Path modelPath = oModelPath.get().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
@@ -161,7 +161,10 @@ public class InstanSeg {
         // Optionally pad images so that every tile has the required size.
         // This is useful if the model requires a specific input size - but InstanSeg should be able to handle this
         // and inference can be much faster if we permit tiles to be cropped.
-        boolean padToInputSize = false;
+        boolean padToInputSize = System.getProperty("instanseg.padToInputSize", "false").strip().equalsIgnoreCase("true");
+        if (padToInputSize) {
+            logger.warn("Padding to input size is turned on - this is likely to be slower (but could help fix any issues)");
+        }
         String layout = "CHW";
 
         // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
@@ -239,7 +242,8 @@ public class InstanSeg {
                         predictionProcessor.getTilesProcessedCount(),
                         predictionProcessor.getTilesFailedCount(),
                         nObjects,
-                        System.currentTimeMillis() - startTime
+                        System.currentTimeMillis() - startTime,
+                        predictionProcessor.wasInterrupted()
                 );
             } finally {
                 for (var predictor: predictors) {
@@ -250,7 +254,7 @@ public class InstanSeg {
         } catch (Exception e) {
             logger.error("Error running InstanSeg", e);
             return new InstanSegResults(0, 0, 0, 0,
-                    System.currentTimeMillis() - startTime);
+                    System.currentTimeMillis() - startTime, e instanceof InterruptedException);
         }
     }
 
