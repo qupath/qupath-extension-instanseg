@@ -49,6 +49,7 @@ dependencies {
     shadow libs.qupath.fxtras
     shadow libs.bioimageio.spec
     shadow libs.deepJavaLibrary
+    shadow libs.commonmark
 
     implementation 'io.github.qupath:qupath-extension-djl:0.3.0'
 

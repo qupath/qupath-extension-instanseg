@@ -3,22 +3,35 @@ package qupath.ext.instanseg.core;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.BioimageIoSpec;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.UserDirectoryManager;
 import qupath.lib.images.servers.PixelCalibration;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.Objects;
 
 public class InstanSegModel {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
+    private URL modelURL = null;
 
     /**
      * Constant to indicate that any number of channels are supported.
@@ -26,17 +39,16 @@ public class InstanSegModel {
     public static final int ANY_CHANNELS = -1;
 
     private Path path = null;
-    private URL modelURL = null;
     private BioimageIoSpec.BioimageIoModel model = null;
     private final String name;
 
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
-        this.name = model.getName();
+        this.name = model.getName() + " (local)";
     }
 
-    private InstanSegModel(URL modelURL, String name) {
+    private InstanSegModel(String name, URL modelURL) {
         this.modelURL = modelURL;
         this.name = name;
     }
@@ -52,46 +64,85 @@ public class InstanSegModel {
     }
 
     /**
-     * Request an InstanSeg model from the set of available models
+     * Create an InstanSeg model from a remote URL.
      * @param name The model name
-     * @return The specified model.
+     * @param browserDownloadUrl The download URL from eg GitHub
+     * @return A handle on the created model
      */
-    public static InstanSegModel fromName(String name) {
-        // todo: instantiate built-in models somehow
-        throw new UnsupportedOperationException("Fetching models by name is not yet implemented!");
+    public static InstanSegModel fromURL(String name, URL browserDownloadUrl) {
+        return new InstanSegModel(name, browserDownloadUrl);
+    }
+
+    /**
+     * Check if the model has been downloaded already.
+     * @return True if a flag has been set.
+     */
+    public boolean isDownloaded(Path localModelPath) {
+        // todo: this should also check if the contents are what we expect
+        if (Files.exists(localModelPath.resolve(name))) {
+            try {
+                download(localModelPath);
+            } catch (IOException e) {
+                logger.error("Model directory exists but is not valid", e);
+            }
+        }
+        return path != null && model != null;
+    }
+
+    /**
+     * Trigger a download for a model
+     * @throws IOException If an error occurs when downloading, unzipping, etc.
+     */
+    public void download(Path localModelPath) throws IOException {
+        if (path != null && model != null) return;
+        var zipFile = downloadZipIfNeeded(
+                this.modelURL,
+                localModelPath,
+                name);
+        this.path = unzipIfNeeded(zipFile);
+        this.model = BioimageIoSpec.parseModel(path.toFile());
+    }
+
+    /**
+     * Extract the README from a local file
+     * @return The README as a String, if possible. If not present, or an error
+     * occurs when reading, nothing.
+     */
+    public Optional<String> getREADME() {
+        return getPath().map(this::getREADMEString);
     }
 
     /**
      * Get the pixel size in the X dimension.
-     * @return the pixel size in the X dimension.
+     * @return the pixel size in the X dimension, or empty if the model isn't downloaded yet.
      */
-    private Number getPixelSizeX() {
-        return getPixelSize().getOrDefault("x", null);
+    private Optional<Number> getPixelSizeX() {
+        return getPixelSize().flatMap(p -> Optional.ofNullable(p.getOrDefault("x", null)));
     }
 
     /**
      * Get the pixel size in the Y dimension.
-     * @return the pixel size in the Y dimension.
+     * @return the pixel size in the Y dimension, or empty if the model isn't downloaded yet.
      */
-    private Number getPixelSizeY() {
-        return getPixelSize().getOrDefault("y", null);
+    private Optional<Number> getPixelSizeY() {
+        return getPixelSize().flatMap(p -> Optional.ofNullable(p.getOrDefault("y", null)));
     }
 
     /**
      * Get the preferred pixel size for running the model, in the absence of any other information.
      * This is the average of the X and Y pixel sizes if both are available.
      * Otherwise, it is the value of whichever value is available - or null if neither is found.
-     * @return the pixel size
+     * @return the pixel size, or empty if the model isn't downloaded yet.
      */
-    public Number getPreferredPixelSize() {
+    public Optional<Number> getPreferredPixelSize() {
         var x = getPixelSizeX();
         var y = getPixelSizeY();
-        if (x == null) {
+        if (x.isEmpty()) {
             return y;
-        } else if (y == null) {
+        } else if (y.isEmpty()) {
             return x;
         } else {
-            return (x.doubleValue() + y.doubleValue()) / 2.0;
+            return Optional.of((x.get().doubleValue() + y.get().doubleValue()) / 2.0);
         }
     }
 
@@ -113,12 +164,12 @@ public class InstanSegModel {
      */
     public double getPreferredDownsample(PixelCalibration cal) {
         Objects.requireNonNull(cal, "Pixel calibration must not be null");
-        Number preferred = getPreferredPixelSize();
+        Optional<Number> preferred = getPreferredPixelSize();
         double current = cal.getAveragedPixelSize().doubleValue();
-        if (preferred == null) {
+        if (preferred.isEmpty()) {
             return current;
         }
-        double requested = preferred.doubleValue();
+        double requested = preferred.get().doubleValue();
         if (requested > 0 && current > 0) {
             return getPreferredDownsample(current, requested);
         } else {
@@ -130,9 +181,9 @@ public class InstanSegModel {
     /**
      * Get the preferred pixel size for running the model, incorporating information from the pixel calibration of the
      * image. This tries to encourage downsampling by an integer amount.
-     * @param currentPixelSize
-     * @param requestedPixelSize
-     * @return
+     * @param currentPixelSize The current pixel size (probably in microns)
+     * @param requestedPixelSize The pixel size that the model expects (probably in microns)
+     * @return The exact downsample, unless it's close to an integer, in which case the integer.
      */
     static double getPreferredDownsample(double currentPixelSize, double requestedPixelSize) {
         double downsample = requestedPixelSize / currentPixelSize;
@@ -146,13 +197,10 @@ public class InstanSegModel {
 
     /**
      * Get the path where the model is stored on disk.
-     * @return A path on disk, or an exception if it can't be found.
+     * @return A path on disk.
      */
-    public Path getPath() {
-        if (path == null) {
-            fetchModel();
-        }
-        return path;
+    public Optional<Path> getPath() {
+        return Optional.ofNullable(path);
     }
 
     @Override
@@ -168,7 +216,6 @@ public class InstanSegModel {
      * the yaml contents and the checksum of the pt file.
      */
     public static boolean isValidModel(Path path) {
-        // return path.toString().endsWith(".pt"); // if just looking at pt files
         if (Files.isDirectory(path)) {
             return Files.exists(path.resolve("instanseg.pt")) && Files.exists(path.resolve("rdf.yaml"));
         }
@@ -179,42 +226,22 @@ public class InstanSegModel {
      * Get the model name
      * @return A string
      */
-    String getName() {
+    public String getName() {
         return name;
     }
 
-    /**
-     * Retrieve the BioImage model spec.
-     * @return The BioImageIO model spec for this InstanSeg model.
-     */
-    private BioimageIoSpec.BioimageIoModel getModel() {
-        if (model == null) {
-            fetchModel();
-        }
-        return model;
-    }
-
-    private Map<String, Double> getPixelSize() {
-        // todo: this code is horrendous
-        var config = getModel().getConfig().getOrDefault("qupath", null);
-        if (config instanceof Map configMap) {
-            var axes = (List)configMap.get("axes");
-            return Map.of(
-                    "x", (Double) ((Map) (axes.get(0))).get("step"),
-                    "y", (Double) ((Map) (axes.get(1))).get("step")
-            );
-        }
-        return Map.of("x", 1.0, "y", 1.0);
-    }
 
     /**
-     * Get the number of input channels supported by the model.
-     * @return a positive integer, or {@link #ANY_CHANNELS} if any number of channels is supported.
+     * Try to check the number of channels in the model.
+     * @return The integer if the model is downloaded, otherwise empty
      */
-    public int getInputChannels() {
-        String axes = getModel().getInputs().getFirst().getAxes().toLowerCase();
-        int ind = axes.indexOf("c");
-        var shape = getModel().getInputs().getFirst().getShape();
+    public Optional<Integer> getNumChannels() {
+        return getModel().flatMap(model -> Optional.of(extractChannelNum(model)));
+    }
+
+    private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {
+        int ind = model.getInputs().getFirst().getAxes().toLowerCase().indexOf("c");
+        var shape = model.getInputs().getFirst().getShape();
         if (shape.getShapeStep()[ind] == 1) {
             return ANY_CHANNELS;
         } else {
@@ -222,36 +249,129 @@ public class InstanSegModel {
         }
     }
 
+
+    /**
+     * Retrieve the BioImage model spec.
+     * @return The BioImageIO model spec for this InstanSeg model.
+     */
+    private Optional<BioimageIoSpec.BioimageIoModel> getModel() {
+        return Optional.ofNullable(model);
+    }
+
+
+    private static Path downloadZipIfNeeded(URL url, Path localDirectory, String filename) throws IOException {
+        var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
+        if (!isDownloadedAlready(zipFile)) {
+            try (InputStream stream = url.openStream()) {
+                try (ReadableByteChannel readableByteChannel = Channels.newChannel(stream)) {
+                    try (FileOutputStream fos = new FileOutputStream(zipFile.toFile())) {
+                        fos.getChannel().transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+                    }
+                }
+            }
+        }
+        return zipFile;
+    }
+
+    private static boolean isDownloadedAlready(Path zipFile) {
+        // todo: validate contents somehow
+        return Files.exists(zipFile);
+    }
+
+    private static Path unzipIfNeeded(Path zipFile) throws IOException {
+        var outdir = zipFile.resolveSibling(zipFile.getFileName().toString().replace(".zip", ""));
+        if (!isUnpackedAlready(outdir)) {
+            try {
+                unzip(zipFile, zipFile.getParent());
+                // Files.delete(zipFile);
+            } catch (IOException e) {
+                // clean up files just in case!
+                Files.deleteIfExists(zipFile);
+                Files.deleteIfExists(outdir);
+            }
+        }
+        return outdir;
+    }
+
+    private static boolean isUnpackedAlready(Path outdir) {
+        return Files.exists(outdir) && isValidModel(outdir);
+    }
+
+    private static void unzip(Path zipFile, Path destination) throws IOException {
+        if (!Files.exists(destination)) {
+            Files.createDirectory(destination);
+        }
+        ZipInputStream zipIn = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile.toFile())));
+        ZipEntry entry = zipIn.getNextEntry();
+        while (entry != null) {
+            Path filePath = destination.resolve(entry.getName());
+            if (entry.isDirectory()) {
+                Files.createDirectory(filePath);
+            } else {
+                extractFile(zipIn, filePath);
+            }
+            zipIn.closeEntry();
+            entry = zipIn.getNextEntry();
+        }
+        zipIn.close();
+    }
+
+    private static void extractFile(ZipInputStream zipIn, Path filePath) throws IOException {
+        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath.toFile()));
+        byte[] bytesIn = new byte[4096];
+        int read;
+        while ((read = zipIn.read(bytesIn)) != -1) {
+            bos.write(bytesIn, 0, read);
+        }
+        bos.close();
+    }
+
+
+
+    private String getREADMEString(Path path) {
+        var file = path.resolve(name + "_README.md");
+        if (Files.exists(file)) {
+            try {
+                return Files.readString(file, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                logger.error("Unable to find README", e);
+                return null;
+            }
+        } else {
+            logger.debug("No README found for model {}", name);
+            return null;
+        }
+    }
+
+    private Optional<Map<String, Double>> getPixelSize() {
+        return getModel().flatMap(model -> {
+            var config = model.getConfig().getOrDefault("qupath", null);
+            if (config instanceof Map configMap) {
+                var axes = (List) configMap.get("axes");
+                return Optional.of(Map.of(
+                        "x", (Double) ((Map) (axes.get(0))).get("step"),
+                        "y", (Double) ((Map) (axes.get(1))).get("step")
+                ));
+            }
+            return Optional.of(Map.of("x", 1.0, "y", 1.0));
+        });
+    }
+
     /**
      * Get the number of output channels provided by the model (typically 1 or 2)
      * @return a positive integer
      */
-    public int getOutputChannels() {
-        var output = getModel().getOutputs().getFirst();
-        String axes = output.getAxes().toLowerCase();
-        int ind = axes.indexOf("c");
-        var shape = output.getShape().getShape();
-        if (shape != null && shape.length > ind)
-            return shape[ind];
-        return (int)Math.round(output.getShape().getOffset()[ind] * 2);
+    public Optional<Integer> getOutputChannels() {
+        return getModel().map(model -> {
+            var output = model.getOutputs().getFirst();
+            String axes = output.getAxes().toLowerCase();
+            int ind = axes.indexOf("c");
+            var shape = output.getShape().getShape();
+            if (shape != null && shape.length > ind)
+                return shape[ind];
+            return (int)Math.round(output.getShape().getOffset()[ind] * 2);
+        });
     }
 
-    private void fetchModel() {
-        if (modelURL == null) {
-            throw new NullPointerException("Model URL should not be null for a local model!");
-        }
-        downloadAndUnzip(modelURL, getUserDir().resolve("instanseg"));
-    }
-
-    private static void downloadAndUnzip(URL url, Path localDirectory) {
-        // todo: implement
-        throw new UnsupportedOperationException("Downloading and unzipping models is not yet implemented!");
-    }
-
-    private static Path getUserDir() {
-        Path userPath = UserDirectoryManager.getInstance().getUserPath();
-        Path cachePath = Paths.get(System.getProperty("user.dir"), ".cache", "QuPath");
-        return userPath == null || userPath.toString().isEmpty() ?  cachePath : userPath;
-    }
 
 }

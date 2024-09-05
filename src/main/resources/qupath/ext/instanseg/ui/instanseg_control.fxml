@@ -1,16 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.*?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
-<?import org.controlsfx.control.*?>
-
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
-<fx:root type="BorderPane" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Text?>
+<?import org.controlsfx.control.CheckComboBox?>
+<?import org.controlsfx.control.SearchableComboBox?>
+<?import org.controlsfx.control.SegmentedButton?>
+
+<fx:root maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" type="BorderPane" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/20.0.1" xmlns:fx="http://javafx.com/fxml/1">
     <center>
         <VBox fx:id="vBox">
-            <TitledPane fx:id="pane1" styleClass="uncollapsible-titled-pane" animated="false" collapsible="false" prefHeight="262.0" prefWidth="330.0" text="%ui.processing.pane" VBox.vgrow="NEVER">
+            <TitledPane fx:id="pane1" animated="false" collapsible="false" prefHeight="262.0" prefWidth="330.0" styleClass="uncollapsible-titled-pane" text="%ui.processing.pane" VBox.vgrow="NEVER">
                 <VBox alignment="TOP_CENTER" styleClass="standard-spacing ">
                     <children>
                         <!-- **********************Models**********************-->
@@ -91,11 +107,11 @@
         <!--            Device Selection-->
                         <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
                             <padding>
-                                <Insets left="10" right="10" top="10"/>
+                                <Insets left="10" right="10" top="10" />
                             </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.device" />
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <ChoiceBox fx:id="deviceChoices">
                                     <tooltip><Tooltip text="%ui.options.device.tooltip" /></tooltip>
                                 </ChoiceBox>
@@ -108,7 +124,7 @@
                             </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.threads" />
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <Spinner fx:id="threadSpinner" prefWidth="75.0">
                                     <tooltip>
                                         <Tooltip text="%ui.options.threads.tooltip" />
@@ -125,7 +141,7 @@
                             </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.nuclei-only" />
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <CheckBox fx:id="nucleiOnlyCheckBox">
                                     <tooltip>
                                         <Tooltip text="%ui.options.nuclei-only.tooltip" />
@@ -140,8 +156,8 @@
                             </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.tilesize" />
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
-                                <ChoiceBox prefWidth="75.0" fx:id="tileSizeChoiceBox">
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
+                                <ChoiceBox fx:id="tileSizeChoiceBox" prefWidth="75.0">
                                     <tooltip>
                                         <Tooltip text="%ui.options.tilesize.tooltip" />
                                     </tooltip>
@@ -155,7 +171,7 @@
                             </padding>
                             <children>
                                 <Label styleClass="regular" text="%ui.options.channel" />
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <CheckComboBox fx:id="comboChannels">
                                     <tooltip>
                                         <Tooltip text="%ui.options.channel.tooltip" />
@@ -165,12 +181,12 @@
                         </HBox>
                         <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
                             <padding>
-                                <Insets left="10" right="10" bottom="10"/>
+                                <Insets bottom="10" left="10" right="10" />
                             </padding>
                             <children>
-                                <Label text="%ui.options.makeMeasurements"/>
-                                <Pane minWidth="5" HBox.hgrow="ALWAYS"/>
-                                <CheckBox styleClass="regular" fx:id="makeMeasurementsCheckBox">
+                                <Label text="%ui.options.makeMeasurements" />
+                                <Pane minWidth="5" HBox.hgrow="ALWAYS" />
+                                <CheckBox fx:id="makeMeasurementsCheckBox" styleClass="regular">
                                     <tooltip>
                                         <Tooltip text="%ui.options.makeMeasurements.tooltip" />
                                     </tooltip>
@@ -185,7 +201,7 @@
         <!--            Model Directory Selection-->
                         <VBox alignment="CENTER" styleClass="standard-vertical-spacing">
                             <children>
-                                <Label onMouseClicked="#handleModelDirectoryLabelClick" styleClass="regular" text="%ui.options.directory" />
+                                <Label fx:id="modelDirLabel" onMouseClicked="#handleModelDirectoryLabelClick" styleClass="regular" text="%ui.options.directory" />
                                 <HBox styleClass="standard-spacing">
                                     <children>
                                         <TextField fx:id="tfModelDirectory" HBox.hgrow="ALWAYS">

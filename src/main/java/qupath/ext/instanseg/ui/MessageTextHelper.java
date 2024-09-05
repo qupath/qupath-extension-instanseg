@@ -5,6 +5,7 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.ObjectBinding;
 import javafx.beans.binding.StringBinding;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -28,12 +29,15 @@ import java.util.ResourceBundle;
  * Helper class for determining which text to display in the message label.
  */
 class MessageTextHelper {
+
     private static final ResourceBundle resources = ResourceBundle.getBundle("qupath.ext.instanseg.ui.strings");
-    private static final QuPathGUI qupath = QuPathGUI.getInstance();
+
+    private final QuPathGUI qupath = QuPathGUI.getInstance();
     private final SelectedObjectCounter selectedObjectCounter;
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
     private final ChoiceBox<String> deviceChoiceBox;
     private final CheckComboBox<ChannelSelectItem> comboChannels;
+    private final BooleanProperty needsUpdating;
 
     /**
      * Text to display a warning (because inference can't be run)
@@ -55,10 +59,11 @@ class MessageTextHelper {
      */
     private BooleanBinding hasWarning;
 
-    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<ChannelSelectItem> comboChannels) {
+    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<ChannelSelectItem> comboChannels, BooleanProperty needsUpdating) {
         this.modelChoiceBox = modelChoiceBox;
         this.deviceChoiceBox = deviceChoiceBox;
         this.comboChannels = comboChannels;
+        this.needsUpdating = needsUpdating;
         this.selectedObjectCounter = new SelectedObjectCounter(qupath.imageDataProperty());
         configureMessageTextBindings();
     }
@@ -110,7 +115,8 @@ class MessageTextHelper {
                 comboChannels.getCheckModel().getCheckedItems(),
                 deviceChoiceBox.getSelectionModel().selectedItemProperty(),
                 selectedObjectCounter.numSelectedAnnotations,
-                selectedObjectCounter.numSelectedTMACores);
+                selectedObjectCounter.numSelectedTMACores,
+                needsUpdating);
     }
 
     private String getWarningText() {
@@ -123,14 +129,21 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
-        int modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getInputChannels();
-        int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
-        if (modelChannels != InstanSegModel.ANY_CHANNELS) {
-            if (modelChannels != selectedChannels) {
-                return String.format(
-                        resources.getString("ui.error.num-channels-dont-match"),
-                        modelChannels,
-                        selectedChannels);
+        var modelDir = InstanSegController.getModelDirectory().orElse(null);
+        if (modelDir != null && modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded(modelDir)) {
+            // shouldn't happen if downloaded anyway!
+            var modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
+            if (modelChannels.isPresent()) {
+                int nModelChannels = modelChannels.get();
+                int selectedChannels = comboChannels.getCheckModel().getCheckedItems().size();
+                if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
+                    if (nModelChannels != selectedChannels) {
+                        return String.format(
+                                resources.getString("ui.error.num-channels-dont-match"),
+                                nModelChannels,
+                                selectedChannels);
+                    }
+                }
             }
         }
         return null;

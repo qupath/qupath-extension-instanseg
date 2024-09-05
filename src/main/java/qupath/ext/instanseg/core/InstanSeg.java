@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.IntStream;
@@ -136,8 +137,11 @@ public class InstanSeg {
 
         long startTime = System.currentTimeMillis();
 
-        Path modelPath;
-        modelPath = model.getPath().resolve("instanseg.pt");
+        Optional<Path> oModelPath = model.getPath();
+        if (!oModelPath.isPresent()) {
+            return new InstanSegResults(0, 0, 0, 0, 0);
+        }
+        Path modelPath = oModelPath.get().resolve("instanseg.pt");
         int nPredictors = 1; // todo: change me?
 
         // Optionally pad images so that every tile has the required size.
@@ -162,7 +166,7 @@ public class InstanSeg {
         // Create an int[] representing a boolean array of channels to use
         boolean[] outputChannelArray = null;
         if (outputChannels != null && outputChannels.length > 0) {
-            outputChannelArray = new boolean[model.getOutputChannels()];;
+            outputChannelArray = new boolean[model.getOutputChannels().get()]; // safe to call get because of previous checks
             for (int c : outputChannels) {
                 if (c < 0 || c >= outputChannelArray.length) {
                     throw new IllegalArgumentException("Invalid channel index: " + c);
@@ -512,15 +516,6 @@ public class InstanSeg {
          */
         public Builder modelPath(String path) throws IOException {
             return modelPath(Path.of(path));
-        }
-
-        /**
-         * Set the specific model to be used
-         * @param name The name of a built-in model
-         * @return A modified builder
-         */
-        public Builder modelName(String name) {
-            return model(InstanSegModel.fromName(name));
         }
 
         /**

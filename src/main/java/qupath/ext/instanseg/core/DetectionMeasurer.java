@@ -28,9 +28,9 @@ public class DetectionMeasurer {
                               Collection<ObjectMeasurements.ShapeFeatures> shapeFeatures,
                               double downsample) {
         this.shapeFeatures = shapeFeatures;
-        this.downsample = downsample;
         this.compartments = compartments;
         this.measurements = measurements;
+        this.downsample = downsample;
     }
 
     /**

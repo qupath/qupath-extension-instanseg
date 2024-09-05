@@ -1,6 +1,7 @@
 package qupath.ext.instanseg.ui;
 
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import org.controlsfx.control.SearchableComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,7 @@ class Watcher {
         keys.put(key, dir);
     }
 
-    private void unregister(Path dir) {
+    void unregister(Path dir) {
         for (var es: keys.entrySet()) {
             if (es.getValue().equals(dir)) {
                 logger.debug("Unregister: {}", es.getValue());
@@ -79,27 +80,28 @@ class Watcher {
             for (WatchEvent<?> event : key.pollEvents()) {
                 WatchEvent.Kind<?> kind = event.kind();
                 WatchEvent<Path> ev = cast(event);
-                Path name = ev.context();
+                Path fileName = ev.context();
 
                 // Context for directory entry event is the file name of entry
-                Path child = dir.resolve(name);
+                Path filePath = dir.resolve(fileName);
 
                 // print out event
-                logger.debug("{}: {}", event.kind().name(), child);
+                logger.debug("{}: {}", event.kind().name(), filePath);
 
-                if (kind == ENTRY_CREATE && InstanSegModel.isValidModel(name)) {
-                    Platform.runLater(() -> {
-                        try {
-                            modelChoiceBox.getItems().add(InstanSegModel.fromPath(child));
-                        } catch (IOException e) {
-                            logger.error("Unable to add model from path", e);
-                        }
-                    });
+                if (kind == ENTRY_CREATE) {
+                    if (InstanSegModel.isValidModel(filePath)) {
+                        Platform.runLater(() -> {
+                            try {
+                                modelChoiceBox.getItems().add(InstanSegModel.fromPath(filePath));
+                            } catch (IOException e) {
+                                logger.error("Unable to add model from path", e);
+                            }
+                        });
+                    }
                 }
-                if (kind == ENTRY_DELETE && InstanSegModel.isValidModel(name)) {
-                    Platform.runLater(() -> {
-                        modelChoiceBox.getItems().removeIf(model -> model.getPath().equals(child));
-                    });
+                if (kind == ENTRY_DELETE) {
+                    // todo: controller should handle adding/removing logic
+                    removeModel(filePath);
                 }
 
             }
@@ -119,5 +121,13 @@ class Watcher {
 
     void interrupt() {
         interrupted = true;
+    }
+
+    private void removeModel(Path filePath) {
+        // https://github.com/controlsfx/controlsfx/issues/1320
+        var items = FXCollections.observableArrayList(modelChoiceBox.getItems());
+        var matchingItems = modelChoiceBox.getItems().stream().filter(model -> model.getPath().map(p -> p.equals(filePath)).orElse(false)).toList();
+        items.removeAll(matchingItems);
+        Platform.runLater(() -> modelChoiceBox.setItems(items));
     }
 }
