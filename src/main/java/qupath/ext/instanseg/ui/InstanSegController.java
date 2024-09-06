@@ -5,7 +5,6 @@ import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
@@ -112,11 +111,11 @@ public class InstanSegController extends BorderPane {
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
     private final ObjectProperty<FutureTask<?>> pendingTask = new SimpleObjectProperty<>();
-    private MessageTextHelper messageTextHelper;
+    private final MessageTextHelper messageTextHelper;
 
     private final BooleanProperty needsUpdating = new SimpleBooleanProperty();
 
-    private final ReadOnlyObjectProperty<InstanSegModel> selectedModel = modelChoiceBox.getSelectionModel().selectedItemProperty();
+    private final ObjectProperty<InstanSegModel> selectedModel = new SimpleObjectProperty<>();
     private final BooleanBinding selectedModelIsAvailable = InstanSegUtils.createModelDownloadedBinding(selectedModel, needsUpdating);
 
     private static final ObjectBinding<Path> modelDirectoryBinding = InstanSegUtils.getModelDirectoryBinding();
@@ -140,25 +139,67 @@ public class InstanSegController extends BorderPane {
         loader.setRoot(this);
         loader.setController(this);
         loader.load();
+        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels, needsUpdating);
         watcher = new Watcher(modelChoiceBox);
+
 // TODO: REMOVE THIS! JUST FOR TESTING!
 InstanSegPreferences.modelDirectoryProperty().set(null);
-        configureMessageLabel();
+        // These items are ordered in the same way they appear in the UI,
+        // starting at the top
+
+        // Selecting a model
+        configureModelChoices();
+        configureDownloadButton();
+        configureInfoButton();
+
+        // Setting the model directory
         configureDirectoryLabel();
+
+        // Select all buttons
+        configureSelectButtons();
+
+        // Run button
+        configureRunning();
+        configureRunMessageLabel();
+
+        // Options
+
         configureTileSizes();
         configureDeviceChoices();
-        configureModelChoices();
-        configureSelectButtons();
-        configureRunning();
         configureThreadSpinner();
+        configureChannelPicker();
+        configureOutputChannelCombo();
+        configureDefaultValues();
+    }
+
+    private void configureModelChoices() {
+        selectedModel.bind(modelChoiceBox.getSelectionModel().selectedItemProperty());
+        addRemoteModels(modelChoiceBox.getItems());
+        InstanSegPreferences.modelDirectoryProperty().addListener((v, o, n) -> {
+            var oldModelDir = InstanSegUtils.tryToGetPath(o);
+            if (oldModelDir != null && Files.exists(oldModelDir)) {
+                watcher.unregister(oldModelDir);
+            }
+            handleModelDirectory(n);
+        });
+        selectedModel.addListener((v, o, n) -> refreshModelChoice());
+    }
+
+    private void configureInfoButton() {
         infoButton.disableProperty().bind(selectedModelIsAvailable.not());
+        WebView webView = WebViews.create(true);
+        PopOver infoPopover = new PopOver(webView);
+        infoButton.setOnAction(e -> {
+            parseMarkdown(selectedModel.get(), webView, infoButton, infoPopover);
+        });
+    }
+
+    private void configureDownloadButton() {
         downloadButton.disableProperty().bind(
                 selectedModelIsAvailable.or(
                         selectedModel.isNull())
         );
-        configureChannelPicker();
-        configureOutputChannelCombo();
-        configureDefaultValues();
+        downloadButton.setOnAction(e -> downloadSelectedModelAsync());
     }
 
     private void configureOutputChannelCombo() {
@@ -178,7 +219,6 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
             checkComboOutputs.setTitle(list.size() + " selected");
         }
     }
-    
 
     private void configureDefaultValues() {
         makeMeasurementsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.makeMeasurementsProperty());
@@ -346,24 +386,6 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
     }
 
 
-    private void configureModelChoices() {
-        addRemoteModels(modelChoiceBox.getItems());
-        InstanSegPreferences.modelDirectoryProperty().addListener((v, o, n) -> {
-            var oldModelDir = InstanSegUtils.tryToGetPath(o);
-            if (oldModelDir != null && Files.exists(oldModelDir)) {
-                watcher.unregister(oldModelDir);
-            }
-            handleModelDirectory(n);
-        });
-        selectedModel.addListener((v, o, n) -> refreshModelChoice());
-        downloadButton.setOnAction(e -> downloadSelectedModelAsync());
-        WebView webView = WebViews.create(true);
-        PopOver infoPopover = new PopOver(webView);
-        infoButton.setOnAction(e -> {
-            parseMarkdown(selectedModel.get(), webView, infoButton, infoPopover);
-        });
-    }
-
     /**
      * Make UI changes based on the selected model.
      * This may be called when the selected model is changed, or an existing model is downloaded.
@@ -509,13 +531,13 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         }
         var release = releases.getFirst();
         var assets = GitHubUtils.getAssets(release);
-        assets.forEach(asset -> {
+        for (var asset : assets) {
             models.add(
                     InstanSegModel.fromURL(
                             asset.getName().replace(".zip", ""),
                             asset.getUrl())
             );
-        });
+        }
     }
 
 
@@ -583,8 +605,7 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         }
     }
 
-    private void configureMessageLabel() {
-        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels, needsUpdating);
+    private void configureRunMessageLabel() {
         labelMessage.textProperty().bind(messageTextHelper.messageLabelText());
         if (messageTextHelper.hasWarning().get()) {
             labelMessage.getStyleClass().setAll("warning-message");

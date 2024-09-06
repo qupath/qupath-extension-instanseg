@@ -21,6 +21,7 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 
 class Watcher {
+
     private static final Logger logger = LoggerFactory.getLogger(Watcher.class);
 
     private final WatchService watchService;
@@ -28,9 +29,13 @@ class Watcher {
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
     private boolean interrupted;
 
-    @SuppressWarnings("unchecked")
-    static <T> WatchEvent<T> cast(WatchEvent<?> event) {
-        return (WatchEvent<T>)event;
+    /**
+     * Creates a WatchService and registers the given directory
+     */
+    Watcher(SearchableComboBox<InstanSegModel> modelChoiceBox) throws IOException {
+        this.modelChoiceBox = modelChoiceBox;
+        this.watchService = FileSystems.getDefault().newWatchService();
+        this.keys = new ConcurrentHashMap<>();
     }
 
     void register(Path dir) throws IOException {
@@ -46,15 +51,6 @@ class Watcher {
                 keys.remove(es.getKey());
             }
         }
-    }
-
-    /**
-     * Creates a WatchService and registers the given directory
-     */
-    Watcher(SearchableComboBox<InstanSegModel> modelChoiceBox) throws IOException {
-        this.modelChoiceBox = modelChoiceBox;
-        this.watchService = FileSystems.getDefault().newWatchService();
-        this.keys = new ConcurrentHashMap<>();
     }
 
     /**
@@ -103,7 +99,6 @@ class Watcher {
                     // todo: controller should handle adding/removing logic
                     removeModel(filePath);
                 }
-
             }
 
             // reset key and remove from set if directory no longer accessible
@@ -118,6 +113,12 @@ class Watcher {
             }
         }
     }
+
+    @SuppressWarnings("unchecked")
+    private static <T> WatchEvent<T> cast(WatchEvent<?> event) {
+        return (WatchEvent<T>)event;
+    }
+
 
     void interrupt() {
         interrupted = true;
