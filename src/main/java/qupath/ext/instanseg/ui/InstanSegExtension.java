@@ -70,8 +70,8 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 				stage.initOwner(QuPathGUI.getInstance().getStage());
 				stage.setTitle(resources.getString("title"));
 				stage.setResizable(false);
-				stage.setOnShown(e -> pane.restart());
-				stage.setOnHidden(e -> pane.interrupt());
+				stage.setOnShown(e -> Watcher.getInstance().start());
+				stage.setOnHidden(e -> Watcher.getInstance().stop());
 			} catch (IOException e) {
 				Dialogs.showErrorMessage("InstanSeg", "GUI loading failed");
 				logger.error("Unable to load InstanSeg FXML", e);

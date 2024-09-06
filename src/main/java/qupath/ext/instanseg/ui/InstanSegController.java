@@ -10,7 +10,6 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -51,6 +50,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,6 +62,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.FutureTask;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -71,7 +73,6 @@ public class InstanSegController extends BorderPane {
     private static final Logger logger = LoggerFactory.getLogger(InstanSegController.class);
 
     private static final ResourceBundle resources = InstanSegResources.getResources();
-    private final Watcher watcher;
 
     @FXML
     private CheckComboBox<ChannelSelectItem> comboChannels;
@@ -108,6 +109,8 @@ public class InstanSegController extends BorderPane {
     @FXML
     private Tooltip tooltipModelDir;
 
+    private final Watcher watcher = Watcher.getInstance();
+
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
     private final ObjectProperty<FutureTask<?>> pendingTask = new SimpleObjectProperty<>();
@@ -121,6 +124,8 @@ public class InstanSegController extends BorderPane {
     private static final ObjectBinding<Path> modelDirectoryBinding = InstanSegUtils.getModelDirectoryBinding();
 
     private static final BooleanBinding isModelDirectoryValid = InstanSegUtils.isModelDirectoryValid(modelDirectoryBinding);
+
+    private List<InstanSegModel> remoteModels;
 
     /**
      * Create an instance of the InstanSeg GUI pane.
@@ -140,7 +145,6 @@ public class InstanSegController extends BorderPane {
         loader.setController(this);
         loader.load();
         messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels, needsUpdating);
-        watcher = new Watcher(modelChoiceBox);
 
 // TODO: REMOVE THIS! JUST FOR TESTING!
 InstanSegPreferences.modelDirectoryProperty().set(null);
@@ -172,17 +176,45 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         configureDefaultValues();
     }
 
+    private void refreshAvailableModels() {
+        if (remoteModels == null)
+            remoteModels = getRemoteModels();
+        var list = new ArrayList<InstanSegModel>();
+        var comparator = Comparator.comparing(InstanSegModel::toString);
+        var localModels = watcher.getModels()
+                .stream()
+                .sorted(comparator)
+                .toList();
+        var localModelNames = localModels.stream()
+                .collect(Collectors.toMap(InstanSegModel::getName, m -> m));
+        var remoteAndNotLocal = remoteModels.stream()
+                .filter(m -> !localModelNames.containsKey(m.getName()))
+                .sorted(comparator)
+                .toList();
+        list.addAll(localModels);
+        list.addAll(remoteAndNotLocal);
+        // Update items & try our best to retain the current selection (based on name)
+        var currentSelection = modelChoiceBox.getSelectionModel().getSelectedItem();
+        modelChoiceBox.getItems().setAll(list);
+        if (list.isEmpty()) {
+            modelChoiceBox.getSelectionModel().clearSelection();
+        } else if (currentSelection == null) {
+            modelChoiceBox.getSelectionModel().selectFirst();
+        } else {
+            modelChoiceBox.getSelectionModel().select(
+                    list.stream()
+                            .filter(m -> m.getName().equals(currentSelection.getName()))
+                            .findFirst()
+                            .orElse(list.getFirst())
+            );
+        }
+    }
+
     private void configureModelChoices() {
         selectedModel.bind(modelChoiceBox.getSelectionModel().selectedItemProperty());
-        addRemoteModels(modelChoiceBox.getItems());
-        InstanSegPreferences.modelDirectoryProperty().addListener((v, o, n) -> {
-            var oldModelDir = InstanSegUtils.tryToGetPath(o);
-            if (oldModelDir != null && Files.exists(oldModelDir)) {
-                watcher.unregister(oldModelDir);
-            }
-            handleModelDirectory(n);
-        });
         selectedModel.addListener((v, o, n) -> refreshModelChoice());
+        watcher.getModels().addListener((ListChangeListener<InstanSegModel>) c -> refreshAvailableModels());
+        refreshAvailableModels();
     }
 
     private void configureInfoButton() {
@@ -223,11 +255,6 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
     private void configureDefaultValues() {
         makeMeasurementsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.makeMeasurementsProperty());
         randomColorsCheckBox.selectedProperty().bindBidirectional(InstanSegPreferences.randomColorsProperty());
-    }
-
-
-    void interrupt() {
-        watcher.interrupt();
     }
 
     /**
@@ -281,7 +308,8 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         if (imageData.isBrightfield()) {
             comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
             var model = selectedModel.get();
-            if (model != null && model.isDownloaded(Path.of(InstanSegPreferences.modelDirectoryProperty().get()))) {
+            var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
+            if (model != null && modelDir != null && model.isDownloaded(modelDir)) {
                 var modelChannels = model.getNumChannels();
                 if (modelChannels.isPresent()) {
                     int nModelChannels = modelChannels.get();
@@ -513,24 +541,25 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         }
     }
 
-    private static void addRemoteModels(ObservableList<InstanSegModel> models) {
+    private static List<InstanSegModel> getRemoteModels() {
         var permit = InstanSegPreferences.permitOnlineProperty().get();
         if (permit == InstanSegPreferences.OnlinePermission.NO) {
             logger.debug("Not allowed to check for models online.");
-            return;
+            return List.of();
         } else if (permit == InstanSegPreferences.OnlinePermission.PROMPT) {
             if (!promptToAllowOnlineModelCheck()) {
                 logger.debug("User declined online model check.");
-                return;
+                return List.of();
             }
         }
         var releases = GitHubUtils.getReleases(InstanSegUtils.getModelDirectory().orElse(null));
         if (releases.isEmpty()) {
             logger.info("No releases found.");
-            return;
+            return List.of();
         }
         var release = releases.getFirst();
         var assets = GitHubUtils.getAssets(release);
+        List<InstanSegModel> models = new ArrayList<>();
         for (var asset : assets) {
             models.add(
                     InstanSegModel.fromURL(
@@ -538,6 +567,7 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
                             asset.getUrl())
             );
         }
+        return List.copyOf(models);
     }
 
 
@@ -562,27 +592,6 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
     // This allows us to use a segmented button with the appearance of regular, non-toggle buttons
     private static void overrideToggleSelected(ToggleButton button) {
         button.selectedProperty().addListener((value, oldValue, newValue) -> button.setSelected(false));
-    }
-
-    private void handleModelDirectory(String n) {
-        var path = InstanSegUtils.tryToGetPath(n);
-        if (path == null)
-            return;
-        if (Files.exists(path) && Files.isDirectory(path)) {
-            try {
-                addModelsFromPath(path, modelChoiceBox);
-                var localPath = InstanSegUtils.getLocalModelDirectory().orElse(null);
-                if (localPath != null) {
-                    if (!Files.exists(localPath)) {
-                        Files.createDirectory(localPath);
-                    }
-                    watcher.register(localPath); // todo: unregister
-                }
-                addModelsFromPath(localPath, modelChoiceBox);
-            } catch (IOException e) {
-                logger.error("Unable to watch directory", e);
-            }
-        }
     }
 
     private void configureDeviceChoices() {
@@ -656,10 +665,6 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         } catch (IOException e) {
             logger.error("Unable to list directory", e);
         }
-    }
-
-    void restart() {
-        Thread.ofVirtual().start(watcher::processEvents);
     }
 
     @FXML
