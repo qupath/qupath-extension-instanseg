@@ -20,6 +20,7 @@ import javafx.concurrent.Task;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
@@ -28,8 +29,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
-import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.web.WebView;
@@ -97,8 +98,6 @@ public class InstanSegController extends BorderPane {
     @FXML
     private CheckComboBox<ChannelSelectItem> comboChannels;
     @FXML
-    private TextField tfModelDirectory;
-    @FXML
     private SearchableComboBox<InstanSegModel> modelChoiceBox;
     @FXML
     private Button runButton;
@@ -126,6 +125,10 @@ public class InstanSegController extends BorderPane {
     private Button infoButton;
     @FXML
     private Label modelDirLabel;
+    @FXML
+    private Label labelModelsLocation;
+    @FXML
+    private Tooltip tooltipModelDir;
 
     private final ExecutorService pool = Executors.newSingleThreadExecutor(ThreadTools.createThreadFactory("instanseg", true));
     private final QuPathGUI qupath;
@@ -165,7 +168,7 @@ public class InstanSegController extends BorderPane {
         loader.setController(this);
         loader.load();
         watcher = new Watcher(modelChoiceBox);
-
+InstanSegPreferences.modelDirectoryProperty().set(null);
         configureMessageLabel();
         configureDirectoryLabel();
         configureTileSizes();
@@ -426,16 +429,13 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureModelChoices() {
-        tfModelDirectory.textProperty().bindBidirectional(InstanSegPreferences.modelDirectoryProperty());
-        handleModelDirectory(tfModelDirectory.getText());
         addRemoteModels(modelChoiceBox.getItems());
-        tfModelDirectory.textProperty().addListener((v, o, n) -> {
+        InstanSegPreferences.modelDirectoryProperty().addListener((v, o, n) -> {
             var oldModelDir = tryToGetPath(o);
             if (oldModelDir != null && Files.exists(oldModelDir)) {
                 watcher.unregister(oldModelDir);
             }
             handleModelDirectory(n);
-//            addRemoteModels(modelChoiceBox.getItems());
         });
         modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> refreshModelChoice());
         downloadButton.setOnAction(e -> downloadSelectedModelAsync());
@@ -685,10 +685,17 @@ public class InstanSegController extends BorderPane {
     private void updateModelDirectoryLabel() {
         if (isModelDirectoryValid.get()) {
             modelDirLabel.getStyleClass().setAll("standard-message");
-            modelDirLabel.setText(resources.getString("ui.options.directory"));
+            String modelPath = modelDirectoryProperty.get().toString();
+            modelDirLabel.setText(modelPath);
+            modelDirLabel.setCursor(Cursor.HAND);
+            tooltipModelDir.setText(resources.getString("ui.options.directory.tooltip"));
+            labelModelsLocation.setText(resources.getString("ui.options.directory-name"));
         } else {
             modelDirLabel.getStyleClass().setAll("warning-message");
+            modelDirLabel.setCursor(Cursor.DEFAULT);
             modelDirLabel.setText(resources.getString("ui.options.directory-not-set"));
+            tooltipModelDir.setText(resources.getString("ui.options.directory-not-set.tooltip"));
+            labelModelsLocation.setText("");
         }
     }
 
@@ -912,7 +919,7 @@ public class InstanSegController extends BorderPane {
                 dir = null;
         }
         var newDir = FileChoosers.promptForDirectory(
-                FXUtils.getWindow(tfModelDirectory), // Get window from any node here
+                FXUtils.getWindow(modelDirLabel), // Get window from any node here
                 resources.getString("ui.model-directory.choose-directory"),
                 dir);
         if (newDir == null)
