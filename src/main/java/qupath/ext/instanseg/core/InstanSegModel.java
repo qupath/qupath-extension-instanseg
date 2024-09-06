@@ -9,7 +9,6 @@ import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import qupath.lib.common.GeneralTools;
-import qupath.lib.gui.UserDirectoryManager;
 import qupath.lib.images.servers.PixelCalibration;
 
 import java.io.IOException;

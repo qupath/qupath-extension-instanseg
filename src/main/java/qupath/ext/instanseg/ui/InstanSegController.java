@@ -76,6 +76,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -436,26 +437,8 @@ public class InstanSegController extends BorderPane {
             handleModelDirectory(n);
 //            addRemoteModels(modelChoiceBox.getItems());
         });
-        modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
-            if (n == null) {
-                return;
-            }
-            var modelDir = getModelDirectory().orElse(null);
-            boolean isDownloaded = modelDir != null && n.isDownloaded(modelDir);
-            if (!isDownloaded || qupath.getImageData() == null) {
-                return;
-            }
-            var numChannels = n.getNumChannels();
-            if (qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != InstanSegModel.ANY_CHANNELS) {
-                comboChannels.getCheckModel().clearChecks();
-                comboChannels.getCheckModel().checkIndices(0, 1, 2);
-            }
-            // Handle output channels
-            var nOutputs = n.getOutputChannels().orElse(1);
-            checkComboOutputs.getItems().setAll(InstanSegOutput.getOutputsForChannelCount(nOutputs));
-            checkComboOutputs.getCheckModel().checkAll();
-        });
-        downloadButton.setOnAction(e -> downloadModel());
+        modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> refreshModelChoice());
+        downloadButton.setOnAction(e -> downloadSelectedModelAsync());
         WebView webView = WebViews.create(true);
         PopOver infoPopover = new PopOver(webView);
         infoButton.setOnAction(e -> {
@@ -463,28 +446,82 @@ public class InstanSegController extends BorderPane {
         });
     }
 
-    private void downloadModel() {
-        try (var pool = ForkJoinPool.commonPool()) {
-            pool.execute(() -> {
-                try {
-                    var modelDir = getModelDirectory().orElse(null);
-                    if (modelDir == null || !Files.exists(modelDir)) {
-                        Dialogs.showErrorMessage(resources.getString("title"),
-                                resources.getString("ui.model-directory.choose-prompt"));
-                        return;
-                    }
-                    var model = modelChoiceBox.getSelectionModel().getSelectedItem();
-                    Dialogs.showInfoNotification(resources.getString("title"),
-                            String.format(resources.getString("ui.popup.fetching"), model.getName()));
-                    model.download(modelDir);
-                    Dialogs.showInfoNotification(resources.getString("title"),
-                            String.format(resources.getString("ui.popup.available"), model.getName()));
-                    needsUpdating.set(!needsUpdating.get());
-                } catch (IOException ex) {
-                    Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
-                }
-            });
+    /**
+     * Make UI changes based on the selected model.
+     * This may be called when the selected model is changed, or an existing model is downloaded.
+     */
+    private void refreshModelChoice() {
+        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        if (model == null)
+            return;
+
+        var modelDir = getModelDirectory().orElse(null);
+        boolean isDownloaded = modelDir != null && model.isDownloaded(modelDir);
+        if (!isDownloaded || qupath.getImageData() == null) {
+            return;
         }
+        var numChannels = model.getNumChannels();
+        if (qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != InstanSegModel.ANY_CHANNELS) {
+            comboChannels.getCheckModel().clearChecks();
+            comboChannels.getCheckModel().checkIndices(0, 1, 2);
+        }
+        // Handle output channels
+        var nOutputs = model.getOutputChannels().orElse(1);
+        checkComboOutputs.getCheckModel().clearChecks();
+        checkComboOutputs.getItems().setAll(InstanSegOutput.getOutputsForChannelCount(nOutputs));
+        checkComboOutputs.getCheckModel().checkAll();
+    }
+
+    /**
+     * Try to download the currently-selected model in another thread.
+     * @return
+     */
+    private CompletableFuture<InstanSegModel> downloadSelectedModelAsync() {
+        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        if (model == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return downloadModelAsync(model);
+    }
+
+    /**
+     * Try to download the specified model in another thread.
+     * @param model
+     * @return
+     */
+    private CompletableFuture<InstanSegModel> downloadModelAsync(InstanSegModel model) {
+        var modelDir = getModelDirectory().orElse(null);
+        if (modelDir == null || !Files.exists(modelDir)) {
+            Dialogs.showErrorMessage(resources.getString("title"),
+                    resources.getString("ui.model-directory.choose-prompt"));
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.supplyAsync(() -> downloadModel(model, modelDir), ForkJoinPool.commonPool());
+    }
+
+    /**
+     * Try to download the specified model to the given directory in the current thread.
+     * @param model
+     * @param modelDir
+     * @return
+     */
+    private InstanSegModel downloadModel(InstanSegModel model, Path modelDir) {
+        Objects.requireNonNull(modelDir);
+        Objects.requireNonNull(model);
+        try {
+            Dialogs.showInfoNotification(resources.getString("title"),
+                    String.format(resources.getString("ui.popup.fetching"), model.getName()));
+            model.download(modelDir);
+            Dialogs.showInfoNotification(resources.getString("title"),
+                    String.format(resources.getString("ui.popup.available"), model.getName()));
+            FXUtils.runOnApplicationThread(() -> {
+                needsUpdating.set(!needsUpdating.get());
+                refreshModelChoice();
+            });
+        } catch (IOException ex) {
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+        }
+        return model;
     }
 
     private static void parseMarkdown(InstanSegModel model, WebView webView, Button infoButton, PopOver infoPopover) {
@@ -676,41 +713,57 @@ public class InstanSegController extends BorderPane {
 
     @FXML
     private void runInstanSeg() {
+        runInstanSeg(modelChoiceBox.getSelectionModel().getSelectedItem());
+    }
+
+    private void runInstanSeg(InstanSegModel model) {
+        if (model == null) {
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("ui.error.no-model"));
+            return;
+        }
+        var imageData = qupath.getImageData();
+        if (imageData == null) {
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.no-imagedata"));
+            return;
+        }
+
         if (!PytorchManager.hasPyTorchEngine()) {
             if (!Dialogs.showConfirmDialog(resources.getString("title"), resources.getString("ui.pytorch"))) {
                 Dialogs.showWarningNotification(resources.getString("title"), resources.getString("ui.pytorch-popup"));
                 return;
             }
         }
-        ImageServer<?> server = qupath.getImageData().getServer();
-        List<ChannelSelectItem> selectedChannels = comboChannels
-                .getCheckModel().getCheckedItems()
-                .stream()
-                .filter(Objects::nonNull)
-                .toList();
 
-
-        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
         var modelPath = getModelDirectory().orElse(null);
         if (modelPath == null) {
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("ui.model-directory.choose-prompt"));
             return;
         }
+
         if (!model.isDownloaded(modelPath)) {
             if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup")))
                 return;
-            Dialogs.showInfoNotification(resources.getString("title"), String.format(resources.getString("ui.popup.fetching"), model.getName()));
-            downloadModel();
-            if (!model.isDownloaded(modelPath)) {
-                Dialogs.showErrorNotification(resources.getString("title"), String.format(resources.getString("error.localModel")));
-                return;
-            }
+            downloadModelAsync(model)
+                    .thenAccept((InstanSegModel suppliedModel) -> {
+                        if (suppliedModel == null || !suppliedModel.isDownloaded(modelPath)) {
+                            Dialogs.showErrorNotification(resources.getString("title"), String.format(resources.getString("error.localModel")));
+                        } else {
+                            runInstanSeg(suppliedModel);
+                        }
+                    });
+            return;
         }
 
+        ImageServer<?> server = imageData.getServer();
+        List<ChannelSelectItem> selectedChannels = comboChannels
+                .getCheckModel().getCheckedItems()
+                .stream()
+                .filter(Objects::nonNull)
+                .toList();
         int imageChannels = selectedChannels.size();
         var modelChannels = model.getNumChannels();
         if (modelChannels.isEmpty()) {
-            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.fetching"));
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("ui.error.model-not-downloaded"));
             return;
         }
 
