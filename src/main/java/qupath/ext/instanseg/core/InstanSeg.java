@@ -54,7 +54,8 @@ public class InstanSeg {
     private final TaskRunner taskRunner;
     private final Class<? extends PathObject> preferredOutputClass;
 
-    // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently
+    // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently.
+    // However we might want to reinstate it, possibly as a proportion of the padding amount.
     private final int boundaryThreshold = 1;
 
     private InstanSeg(Builder builder) {
@@ -119,6 +120,7 @@ public class InstanSeg {
     private void validateImageAndObjectsOrThrow(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects) {
         Objects.requireNonNull(imageData, "No imageData available");
         Objects.requireNonNull(pathObjects, "No objects available");
+        // TODO: Consider if there are use cases where it is worthwhile to provide objects that are not in the hierarchy
         var hierarchy = imageData.getHierarchy();
         if (pathObjects.stream().anyMatch(p -> !PathObjectTools.hierarchyContainsObject(hierarchy, p))) {
             throw new IllegalArgumentException("Objects must be contained in the image hierarchy!");

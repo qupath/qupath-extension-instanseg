@@ -26,9 +26,9 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 
 	private static final String EXTENSION_NAME = "InstanSeg";
 
-	private static final String EXTENSION_DESCRIPTION = "Use the InstanSeg deep learning model in QuPath";
+	private static final String EXTENSION_DESCRIPTION = "Use InstanSeg deep learning models for inference in QuPath";
 
-	private static final Version EXTENSION_QUPATH_VERSION = Version.parse("v0.5.0");
+	private static final Version EXTENSION_QUPATH_VERSION = Version.parse("v0.6.0");
 
 	private static final GitHubRepo EXTENSION_REPOSITORY = GitHubRepo.create(
 			EXTENSION_NAME, "qupath", "qupath-extension-instanseg");
