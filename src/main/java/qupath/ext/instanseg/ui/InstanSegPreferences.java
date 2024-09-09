@@ -41,6 +41,10 @@ class InstanSegPreferences {
             "intanseg.tile.size",
             512);
 
+    private static final IntegerProperty tilePaddingProperty = PathPrefs.createPersistentPreference(
+            "intanseg.tile.padding",
+            32);
+
     private static final BooleanProperty makeMeasurementsProperty = PathPrefs.createPersistentPreference(
             "intanseg.measurements",
             true);
@@ -80,6 +84,10 @@ class InstanSegPreferences {
 
     static IntegerProperty tileSizeProperty() {
         return tileSizeProperty;
+    }
+
+    static IntegerProperty tilePaddingProperty() {
+        return tilePaddingProperty;
     }
 
     static BooleanProperty makeMeasurementsProperty() {

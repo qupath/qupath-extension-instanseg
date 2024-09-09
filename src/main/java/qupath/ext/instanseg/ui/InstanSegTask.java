@@ -48,9 +48,10 @@ class InstanSegTask extends Task<Void> {
 
     @Override
     protected Void call() {
+        int nThreads = InstanSegPreferences.numThreadsProperty().get();
         var taskRunner = new TaskRunnerFX(
                 QuPathGUI.getInstance(),
-                InstanSegPreferences.numThreadsProperty().getValue());
+                nThreads);
 
         var selectedObjects = imageData.getHierarchy().getSelectionModel().getSelectedObjects();
         Optional<Path> path = model.getPath();
@@ -69,13 +70,16 @@ class InstanSegTask extends Task<Void> {
         if (nChecked > 0 && nChecked < nOutputs) {
             outputChannels = this.outputChannels.stream().mapToInt(Integer::intValue).toArray();
         }
+        int tileSize = InstanSegPreferences.tileSizeProperty().get();
+        int tilePadding = InstanSegPreferences.tilePaddingProperty().get();
 
         var instanSeg = InstanSeg.builder()
                 .model(model)
                 .device(device)
                 .inputChannels(channels.stream().map(InputChannelItem::getTransform).toList())
                 .outputChannels(outputChannels)
-                .tileDims(InstanSegPreferences.tileSizeProperty().get())
+                .tileDims(tileSize)
+                .interTilePadding(tilePadding)
                 .taskRunner(taskRunner)
                 .makeMeasurements(makeMeasurements)
                 .randomColors(randomColors)
@@ -88,6 +92,7 @@ class InstanSegTask extends Task<Void> {
                                 .%s
                                 .outputChannels(%s)
                                 .tileDims(%d)
+                                .interTilePadding(%d)
                                 .nThreads(%d)
                                 .makeMeasurements(%s)
                                 .randomColors(%s)
@@ -100,8 +105,9 @@ class InstanSegTask extends Task<Void> {
                 outputChannels.length == 0 ? "" : Arrays.stream(outputChannels)
                         .mapToObj(Integer::toString)
                         .collect(Collectors.joining(", ")),
-                InstanSegPreferences.tileSizeProperty().get(),
-                InstanSegPreferences.numThreadsProperty().getValue(),
+                tileSize,
+                tilePadding,
+                nThreads,
                 makeMeasurements,
                 randomColors
         ).strip();

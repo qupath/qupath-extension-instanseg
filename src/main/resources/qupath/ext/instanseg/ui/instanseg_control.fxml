@@ -176,6 +176,20 @@
                                 </ChoiceBox>
                             </children>
                         </HBox>
+                  <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                     <padding>
+                        <Insets left="10" right="10" />
+                     </padding>
+                     <children>
+                        <Label styleClass="regular" text="%ui.options.tileboundary" />
+                        <Pane minWidth="5" HBox.hgrow="ALWAYS" />
+                        <ChoiceBox fx:id="tilePaddingChoiceBox" prefWidth="75.0">
+                           <tooltip>
+                              <Tooltip text="%ui.options.tileboundary.tooltip" />
+                           </tooltip>
+                        </ChoiceBox>
+                     </children>
+                  </HBox>
         <!--            Channel Selection-->
                         <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
                             <padding>

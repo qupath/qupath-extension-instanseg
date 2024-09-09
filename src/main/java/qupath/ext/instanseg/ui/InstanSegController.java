@@ -88,6 +88,8 @@ public class InstanSegController extends BorderPane {
     @FXML
     private ChoiceBox<Integer> tileSizeChoiceBox;
     @FXML
+    private ChoiceBox<Integer> tilePaddingChoiceBox;
+    @FXML
     private Spinner<Integer> threadSpinner;
     @FXML
     private ToggleButton selectAllAnnotationsButton;
@@ -173,6 +175,7 @@ public class InstanSegController extends BorderPane {
 
         // Options
         configureTileSizes();
+        configureTilePadding();
         configureDeviceChoices();
         configureThreadSpinner();
         configureInputChannelCombo();
@@ -590,13 +593,18 @@ public class InstanSegController extends BorderPane {
         return List.copyOf(models);
     }
 
+    private void configureTilePadding() {
+        tilePaddingChoiceBox.getItems().addAll(16, 32, 48, 64, 80, 96);
+        tilePaddingChoiceBox.setValue(InstanSegPreferences.tilePaddingProperty().getValue());
+        tilePaddingChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tilePaddingProperty().set(n));
+    }
+
 
     private void configureTileSizes() {
         // The use of 32-bit signed ints for coordinates of the intermediate sparse matrix *might* be
         // an issue for very large tile sizes - but I haven't seen any evidence of this.
         // We definitely can't have very small tiles, because they must be greater than 2 x the padding.
         tileSizeChoiceBox.getItems().addAll(256, 512, 1024, 2048);
-        tileSizeChoiceBox.getSelectionModel().select(Integer.valueOf(512));
         tileSizeChoiceBox.setValue(InstanSegPreferences.tileSizeProperty().getValue());
         tileSizeChoiceBox.valueProperty().addListener((v, o, n) -> InstanSegPreferences.tileSizeProperty().set(n));
     }
