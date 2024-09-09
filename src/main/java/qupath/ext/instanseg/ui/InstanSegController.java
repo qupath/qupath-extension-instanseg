@@ -64,7 +64,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.FutureTask;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -77,7 +76,7 @@ public class InstanSegController extends BorderPane {
     private static final ResourceBundle resources = InstanSegResources.getResources();
 
     @FXML
-    private CheckComboBox<ChannelSelectItem> comboChannels;
+    private CheckComboBox<InputChannelItem> comboInputChannels;
     @FXML
     private SearchableComboBox<InstanSegModel> modelChoiceBox;
     @FXML
@@ -97,7 +96,7 @@ public class InstanSegController extends BorderPane {
     @FXML
     private ToggleButton selectAllTMACoresButton;
     @FXML
-    private CheckComboBox<OutputChannelItem> checkComboOutputs;
+    private CheckComboBox<OutputChannelItem> comboOutputChannels;
     @FXML
     private CheckBox makeMeasurementsCheckBox;
     @FXML
@@ -123,6 +122,10 @@ public class InstanSegController extends BorderPane {
     private final ObjectProperty<InstanSegModel> selectedModel = new SimpleObjectProperty<>();
     private final BooleanBinding selectedModelIsAvailable = InstanSegUtils.createModelDownloadedBinding(selectedModel, needsUpdating);
 
+    // Cache the checkbox status for input and output channels, so this can be restored when the selected model changes
+    private final CheckModelCache<String, InputChannelItem> inputChannelCache;
+    private final CheckModelCache<String, OutputChannelItem> outputChannelCache;
+
     private static final ObjectBinding<Path> modelDirectoryBinding = InstanSegUtils.getModelDirectoryBinding();
 
     private static final BooleanBinding isModelDirectoryValid = InstanSegUtils.isModelDirectoryValid(modelDirectoryBinding);
@@ -146,10 +149,12 @@ public class InstanSegController extends BorderPane {
         loader.setRoot(this);
         loader.setController(this);
         loader.load();
-        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboChannels, needsUpdating);
 
-// TODO: REMOVE THIS! JUST FOR TESTING!
-InstanSegPreferences.modelDirectoryProperty().set(null);
+        // Create variables that depend upon the UI elements
+        messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboInputChannels, needsUpdating);
+        inputChannelCache = CheckModelCache.create(selectedModel.map(InstanSegModel::getName), comboInputChannels);
+        outputChannelCache = CheckModelCache.create(selectedModel.map(InstanSegModel::getName), comboOutputChannels);
+
         // These items are ordered in the same way they appear in the UI,
         // starting at the top
 
@@ -169,11 +174,10 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         configureRunMessageLabel();
 
         // Options
-
         configureTileSizes();
         configureDeviceChoices();
         configureThreadSpinner();
-        configureChannelPicker();
+        configureInputChannelCombo();
         configureOutputChannelCombo();
         configureDefaultValues();
     }
@@ -243,19 +247,20 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
 
     private void configureOutputChannelCombo() {
         // Quick way to match widths...
-        checkComboOutputs.prefWidthProperty().bind(comboChannels.widthProperty());
+        comboOutputChannels.prefWidthProperty().bind(comboInputChannels.widthProperty());
         // Show a better title than the text of all selections
-        checkComboOutputs.getCheckModel().getCheckedItems().addListener(this::handleOutputChannelChange);
+        comboOutputChannels.getCheckModel().getCheckedItems().addListener(this::handleOutputChannelChange);
+        FXUtils.installSelectAllOrNoneMenu(comboOutputChannels);
     }
 
     private void handleOutputChannelChange(ListChangeListener.Change<? extends OutputChannelItem> change) {
         var list = change.getList();
-        if (list.isEmpty() || list.size() == checkComboOutputs.getItems().size())
-            checkComboOutputs.setTitle("All available");
+        if (list.isEmpty() || list.size() == comboOutputChannels.getItems().size())
+            comboOutputChannels.setTitle("All available");
         else if (list.size() == 1) {
-            checkComboOutputs.setTitle(list.getFirst().toString());
+            comboOutputChannels.setTitle(list.getFirst().toString());
         } else {
-            checkComboOutputs.setTitle(list.size() + " selected");
+            comboOutputChannels.setTitle(list.size() + " selected");
         }
     }
 
@@ -290,49 +295,56 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
     }
 
 
-    private void configureChannelPicker() {
-        updateChannelPicker(qupath.getImageData());
-        qupath.imageDataProperty().addListener((v, o, n) -> updateChannelPicker(n));
-        comboChannels.setTitle(getCheckComboBoxText(comboChannels));
-        comboChannels.getItems().addListener((ListChangeListener<ChannelSelectItem>) c -> {
-            comboChannels.setTitle(getCheckComboBoxText(comboChannels));
+    private void configureInputChannelCombo() {
+        updateInputChannels(qupath.getImageData());
+        qupath.imageDataProperty().addListener((v, o, n) -> updateInputChannels(n));
+        comboInputChannels.setTitle(getCheckComboBoxText(comboInputChannels));
+        comboInputChannels.getItems().addListener((ListChangeListener<InputChannelItem>) c -> {
+            comboInputChannels.setTitle(getCheckComboBoxText(comboInputChannels));
         });
-        comboChannels.getCheckModel().getCheckedItems().addListener((ListChangeListener<ChannelSelectItem>) c -> {
-            comboChannels.setTitle(getCheckComboBoxText(comboChannels));
+        comboInputChannels.getCheckModel().getCheckedItems().addListener((ListChangeListener<InputChannelItem>) c -> {
+            comboInputChannels.setTitle(getCheckComboBoxText(comboInputChannels));
         });
-        FXUtils.installSelectAllOrNoneMenu(comboChannels);
-        addSetFromVisible(comboChannels);
+        FXUtils.installSelectAllOrNoneMenu(comboInputChannels);
+        addSetFromVisible(comboInputChannels);
     }
 
 
-    private void updateChannelPicker(ImageData<BufferedImage> imageData) {
+    private void updateInputChannels(ImageData<BufferedImage> imageData) {
         if (imageData == null) {
             return;
         }
-        comboChannels.getCheckModel().clearChecks();
-        comboChannels.getItems().clear();
-        comboChannels.getItems().setAll(ChannelSelectItem.getAvailableChannels(imageData));
-        if (imageData.isBrightfield()) {
-            comboChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
-            var model = selectedModel.get();
+        // Store the checks without changing the current value
+        inputChannelCache.snapshotChecks();
+        // Update the items
+        comboInputChannels.getCheckModel().clearChecks();
+        comboInputChannels.getItems().clear();
+        comboInputChannels.getItems().setAll(InputChannelItem.getAvailableChannels(imageData));
+        var model = selectedModel.get();
+        if (model != null && inputChannelCache.restoreChecks() && !comboInputChannels.getCheckModel().isEmpty()) {
+            // Return if we could store previously-saved checks - this will fail if the items have changed,
+            // of if there were no previous checks (e.g. because its'a new model)
+            return;
+        } else if (imageData.isBrightfield()) {
+            comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
             var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
             if (model != null && modelDir != null && model.isDownloaded(modelDir)) {
                 var modelChannels = model.getNumChannels();
                 if (modelChannels.isPresent()) {
                     int nModelChannels = modelChannels.get();
                     if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
-                        comboChannels.getCheckModel().clearChecks();
-                        comboChannels.getCheckModel().checkIndices(0, 1, 2);
+                        comboInputChannels.getCheckModel().clearChecks();
+                        comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
                     }
                 }
 
             }
         } else {
-            comboChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+            comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
         }
     }
 
-    private static String getCheckComboBoxText(CheckComboBox<ChannelSelectItem> comboBox) {
+    private static String getCheckComboBoxText(CheckComboBox<InputChannelItem> comboBox) {
         int n = comboBox.getCheckModel().getCheckedItems().stream()
                 .filter(Objects::nonNull)
                 .toList()
@@ -354,7 +366,7 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
      * right-clicking and choosing "Set from visible".
      * @param comboChannels The CheckComboBox for selecting channels.
      */
-    private void addSetFromVisible(CheckComboBox<ChannelSelectItem> comboChannels) {
+    private void addSetFromVisible(CheckComboBox<InputChannelItem> comboChannels) {
         var mi = new MenuItem();
         mi.setText("Set from visible");
         mi.setOnAction(e -> {
@@ -436,15 +448,17 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
             return;
         }
         var numChannels = model.getNumChannels();
-        if (qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != InstanSegModel.ANY_CHANNELS) {
-            comboChannels.getCheckModel().clearChecks();
-            comboChannels.getCheckModel().checkIndices(0, 1, 2);
+        if (!inputChannelCache.restoreChecks() && qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != InstanSegModel.ANY_CHANNELS) {
+            comboInputChannels.getCheckModel().clearChecks();
+            comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
         }
         // Handle output channels
         var nOutputs = model.getOutputChannels().orElse(1);
-        checkComboOutputs.getCheckModel().clearChecks();
-        checkComboOutputs.getItems().setAll(OutputChannelItem.getOutputsForChannelCount(nOutputs));
-        checkComboOutputs.getCheckModel().checkAll();
+        comboOutputChannels.getCheckModel().clearChecks();
+        comboOutputChannels.getItems().setAll(OutputChannelItem.getOutputsForChannelCount(nOutputs));
+        if (!outputChannelCache.restoreChecks()) {
+            comboOutputChannels.getCheckModel().checkAll();
+        }
     }
 
     /**
@@ -717,7 +731,7 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
             return;
         }
 
-        List<ChannelSelectItem> selectedChannels = comboChannels
+        List<InputChannelItem> selectedChannels = comboInputChannels
                 .getCheckModel().getCheckedItems()
                 .stream()
                 .filter(Objects::nonNull)
@@ -743,7 +757,7 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
         boolean randomColors = randomColorsCheckBox.isSelected();
 
         var task = new InstanSegTask(qupath.getImageData(), model, selectedChannels,
-                checkComboOutputs.getCheckModel().getCheckedIndices(), device,
+                comboOutputChannels.getCheckModel().getCheckedIndices(), device,
                 makeMeasurements, randomColors);
 
         // Ensure PyTorch engine is available before running anything

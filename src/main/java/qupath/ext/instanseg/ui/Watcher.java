@@ -58,8 +58,8 @@ class Watcher {
 
     private Watcher() {
         modelDirectoryBinding.addListener(this::handleModelDirectoryChange);
-        handleModelDirectoryChange(modelDirectoryBinding, null, modelDirectoryBinding.get());
         modelPaths.addListener(this::handleModelPathsChanged);
+        handleModelDirectoryChange(modelDirectoryBinding, null, modelDirectoryBinding.get());
     }
 
     /**

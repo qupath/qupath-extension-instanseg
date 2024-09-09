@@ -1,6 +1,7 @@
 package qupath.ext.instanseg.ui;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.IntStream;
 
 /**
@@ -50,4 +51,15 @@ public class OutputChannelItem {
         return name;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof OutputChannelItem that)) return false;
+        return index == that.index && Objects.equals(name, that.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(index, name);
+    }
 }

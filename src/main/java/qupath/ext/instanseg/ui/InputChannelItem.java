@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -17,27 +18,27 @@ import java.util.stream.Collectors;
  * Super simple class to deal with channel selection dropdown items that have different display and selection names.
  * e.g., the first channel in non-RGB images is shown as "Channel 1 (C1)" but the actual name is "Channel 1".
  */
-class ChannelSelectItem {
+class InputChannelItem {
 
-    private static final Logger logger = LoggerFactory.getLogger(ChannelSelectItem.class);
+    private static final Logger logger = LoggerFactory.getLogger(InputChannelItem.class);
 
     private final String name;
     private final ColorTransforms.ColorTransform transform;
     private final String constructor;
 
-    ChannelSelectItem(String name) {
+    InputChannelItem(String name) {
         this.name = name;
         this.transform = ColorTransforms.createChannelExtractor(name);
         this.constructor = String.format("ColorTransforms.createChannelExtractor(\"%s\")", name);
     }
 
-    ChannelSelectItem(String name, int i) {
+    InputChannelItem(String name, int i) {
         this.name = name;
         this.transform = ColorTransforms.createChannelExtractor(i);
         this.constructor = String.format("ColorTransforms.createChannelExtractor(%d)", i);
     }
 
-    ChannelSelectItem(ColorDeconvolutionStains stains, int i) {
+    InputChannelItem(ColorDeconvolutionStains stains, int i) {
         this.name = stains.getStain(i).getName();
         this.transform = ColorTransforms.createColorDeconvolvedChannel(stains, i);
         this.constructor = String.format("ColorTransforms.createColorDeconvolvedChannel(stains, %d)", i);
@@ -65,13 +66,13 @@ class ChannelSelectItem {
      * @param imageData
      * @return
      */
-    static List<ChannelSelectItem> getAvailableChannels(ImageData<?> imageData) {
-        List<ChannelSelectItem> list = new ArrayList<>();
+    static List<InputChannelItem> getAvailableChannels(ImageData<?> imageData) {
+        List<InputChannelItem> list = new ArrayList<>();
         Set<String> names = new HashSet<>();
         var server = imageData.getServer();
         int i = 1;
         boolean hasDuplicates = false;
-        ChannelSelectItem item;
+        InputChannelItem item;
         for (var channel : server.getMetadata().getChannels()) {
             var name = channel.getName();
             if (names.contains(name)) {
@@ -81,9 +82,9 @@ class ChannelSelectItem {
             }
             names.add(name);
             if (hasDuplicates) {
-                item = new ChannelSelectItem(name, i - 1);
+                item = new InputChannelItem(name, i - 1);
             } else {
-                item = new ChannelSelectItem(name);
+                item = new InputChannelItem(name);
             }
             list.add(item);
             i++;
@@ -91,16 +92,30 @@ class ChannelSelectItem {
         var stains = imageData.getColorDeconvolutionStains();
         if (stains != null) {
             for (i = 1; i < 4; i++) {
-                list.add(new ChannelSelectItem(stains, i));
+                list.add(new InputChannelItem(stains, i));
             }
         }
         return list;
     }
 
-    static String toConstructorString(Collection<ChannelSelectItem> items) {
+    static String toConstructorString(Collection<InputChannelItem> items) {
         if (items == null || items.isEmpty())
             return "allInputChannels()";
         else
-            return "inputChannels([" + items.stream().map(ChannelSelectItem::getConstructor).collect(Collectors.joining(", ")) + "])";
+            return "inputChannels([" + items.stream().map(InputChannelItem::getConstructor).collect(Collectors.joining(", ")) + "])";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof InputChannelItem that)) return false;
+        // Note that we don't compare the transform - the constructor is sufficient, because we don't
+        // encode color deconvolution stains here
+        return Objects.equals(name, that.name) && Objects.equals(constructor, that.constructor);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, constructor);
     }
 }

@@ -184,7 +184,7 @@
                             <children>
                                 <Label styleClass="regular" text="%ui.options.input-channels" />
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
-                                <CheckComboBox fx:id="comboChannels">
+                                <CheckComboBox fx:id="comboInputChannels">
                                     <tooltip>
                                         <Tooltip text="%ui.options.input-channels.tooltip" />
                                     </tooltip>
@@ -198,7 +198,7 @@
                             <children>
                                 <Label styleClass="regular" text="%ui.options.output-channels" />
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
-                        <CheckComboBox id="checkComboOutputs" fx:id="checkComboOutputs">
+                        <CheckComboBox id="checkComboOutputs" fx:id="comboOutputChannels">
                            <tooltip>
                               <Tooltip text="%ui.options.output-channels.tooltip" />
                            </tooltip></CheckComboBox>

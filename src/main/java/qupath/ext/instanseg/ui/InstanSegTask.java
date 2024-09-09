@@ -27,14 +27,14 @@ class InstanSegTask extends Task<Void> {
     private static final ResourceBundle resources = InstanSegResources.getResources();
 
     private final ImageData<BufferedImage> imageData;
-    private final List<ChannelSelectItem> channels;
+    private final List<InputChannelItem> channels;
     private final List<Integer> outputChannels;
     private final InstanSegModel model;
     private final String device;
     private final boolean makeMeasurements;
     private final boolean randomColors;
 
-    InstanSegTask(ImageData<BufferedImage> imageData, InstanSegModel model, List<ChannelSelectItem> channels,
+    InstanSegTask(ImageData<BufferedImage> imageData, InstanSegModel model, List<InputChannelItem> channels,
                   List<Integer> outputChannels, String device, boolean makeMeasurements, boolean randomColors) {
         this.imageData = imageData;
         this.model = model;
@@ -73,7 +73,7 @@ class InstanSegTask extends Task<Void> {
         var instanSeg = InstanSeg.builder()
                 .model(model)
                 .device(device)
-                .inputChannels(channels.stream().map(ChannelSelectItem::getTransform).toList())
+                .inputChannels(channels.stream().map(InputChannelItem::getTransform).toList())
                 .outputChannels(outputChannels)
                 .tileDims(InstanSegPreferences.tileSizeProperty().get())
                 .taskRunner(taskRunner)
@@ -96,7 +96,7 @@ class InstanSegTask extends Task<Void> {
                             """,
                 path.get(),
                 device,
-                ChannelSelectItem.toConstructorString(channels),
+                InputChannelItem.toConstructorString(channels),
                 outputChannels.length == 0 ? "" : Arrays.stream(outputChannels)
                         .mapToObj(Integer::toString)
                         .collect(Collectors.joining(", ")),
