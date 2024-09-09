@@ -136,7 +136,10 @@
                                 <Insets left="10" right="10" top="10" />
                             </padding>
                             <children>
-                                <Label styleClass="regular" text="%ui.options.device" />
+                                <Label styleClass="regular" text="%ui.options.device">
+                           <tooltip>
+                              <Tooltip text="%ui.options.device.tooltip" />
+                           </tooltip></Label>
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <ChoiceBox fx:id="deviceChoices" prefWidth="75.0">
                                     <tooltip><Tooltip text="%ui.options.device.tooltip" /></tooltip>
@@ -149,7 +152,10 @@
                                 <Insets left="10" right="10" />
                             </padding>
                             <children>
-                                <Label styleClass="regular" text="%ui.options.threads" />
+                                <Label styleClass="regular" text="%ui.options.threads">
+                           <tooltip>
+                              <Tooltip text="%ui.options.threads.tooltip" />
+                           </tooltip></Label>
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <Spinner fx:id="threadSpinner" prefWidth="75.0">
                                     <tooltip>
@@ -167,7 +173,10 @@
                                 <Insets left="10" right="10" />
                             </padding>
                             <children>
-                                <Label styleClass="regular" text="%ui.options.tilesize" />
+                                <Label styleClass="regular" text="%ui.options.tilesize">
+                           <tooltip>
+                              <Tooltip text="%ui.options.tilesize.tooltip" />
+                           </tooltip></Label>
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <ChoiceBox fx:id="tileSizeChoiceBox" prefWidth="75.0">
                                     <tooltip>
@@ -176,13 +185,33 @@
                                 </ChoiceBox>
                             </children>
                         </HBox>
+                  <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
+                     <padding>
+                        <Insets left="10" right="10" />
+                     </padding>
+                     <children>
+                        <Label styleClass="regular" text="%ui.options.tileboundary">
+                           <tooltip>
+                              <Tooltip text="%ui.options.tileboundary.tooltip" />
+                           </tooltip></Label>
+                        <Pane minWidth="5" HBox.hgrow="ALWAYS" />
+                        <ChoiceBox fx:id="tilePaddingChoiceBox" prefWidth="75.0">
+                           <tooltip>
+                              <Tooltip text="%ui.options.tileboundary.tooltip" />
+                           </tooltip>
+                        </ChoiceBox>
+                     </children>
+                  </HBox>
         <!--            Channel Selection-->
                         <HBox alignment="CENTER_RIGHT" styleClass="standard-spacing">
                             <padding>
                                 <Insets left="10" right="10" />
                             </padding>
                             <children>
-                                <Label styleClass="regular" text="%ui.options.input-channels" />
+                                <Label styleClass="regular" text="%ui.options.input-channels">
+                           <tooltip>
+                              <Tooltip text="%ui.options.input-channels.tooltip" />
+                           </tooltip></Label>
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <CheckComboBox fx:id="comboInputChannels">
                                     <tooltip>
@@ -196,7 +225,10 @@
                                 <Insets left="10" right="10" />
                             </padding>
                             <children>
-                                <Label styleClass="regular" text="%ui.options.output-channels" />
+                                <Label styleClass="regular" text="%ui.options.output-channels">
+                           <tooltip>
+                              <Tooltip text="%ui.options.output-channels.tooltip" />
+                           </tooltip></Label>
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                         <CheckComboBox id="checkComboOutputs" fx:id="comboOutputChannels">
                            <tooltip>
@@ -209,7 +241,10 @@
                                 <Insets left="10.0" right="10.0" />
                             </padding>
                             <children>
-                                <Label text="%ui.options.makeMeasurements" />
+                                <Label text="%ui.options.makeMeasurements">
+                           <tooltip>
+                              <Tooltip text="%ui.options.makeMeasurements.tooltip" />
+                           </tooltip></Label>
                                 <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                                 <CheckBox fx:id="makeMeasurementsCheckBox" styleClass="regular">
                                     <tooltip>
@@ -224,7 +259,9 @@
                      </padding>
                      <children>
                         <Label text="%ui.options.randomColors">
-                        </Label>
+                           <tooltip>
+                              <Tooltip text="%ui.options.randomColors.tooltip" />
+                           </tooltip></Label>
                         <Pane minWidth="5" HBox.hgrow="ALWAYS" />
                         <CheckBox fx:id="randomColorsCheckBox" styleClass="regular">
                            <tooltip>

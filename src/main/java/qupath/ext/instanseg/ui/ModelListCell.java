@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.ui;
 
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.Tooltip;
 import org.controlsfx.glyphfont.FontAwesome;
@@ -46,7 +47,7 @@ public class ModelListCell extends ListCell<InstanSegModel> {
 
     private Glyph createOnlineIcon() {
         GlyphFont fontAwesome = GlyphFontRegistry.font("FontAwesome");
-        return fontAwesome.create(FontAwesome.Glyph.DOWNLOAD);
+        return fontAwesome.create(FontAwesome.Glyph.CLOUD);
     }
 
 }
