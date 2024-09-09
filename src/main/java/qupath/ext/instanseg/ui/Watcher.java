@@ -1,8 +1,10 @@
 package qupath.ext.instanseg.ui;
 
+import javafx.application.Platform;
 import javafx.beans.binding.ObjectBinding;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,12 +24,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 
+/**
+ * Watcher to look for changes in the model directory.
+ * This can provide an observable list containing the available local models.
+ */
 class Watcher {
 
     private static final Logger logger = LoggerFactory.getLogger(Watcher.class);
@@ -35,11 +40,18 @@ class Watcher {
     private WatchService watchService;
     private volatile boolean isRunning;
 
-    // We use this rather than ConcurrentHashMap because it supports null values
+    // We use this rather than ConcurrentHashMap because it supports null values,
+    // which we use to indicate directories we will want to watch as soon as the watch service is activated
     private final Map<Path, WatchKey> watchKeys = Collections.synchronizedMap(new HashMap<>());
+
+    // Store an observable list of model paths
+    private final ObservableList<Path> modelPaths = FXCollections.observableArrayList();
+
+    // Store an observable list of models, which we update only when the paths change
     private final ObservableList<InstanSegModel> models = FXCollections.observableArrayList();
     private final ObservableList<InstanSegModel> modelsUnmodifiable = FXCollections.unmodifiableObservableList(models);
 
+    //Binding to the directory we want to watch for models.
     private final ObjectBinding<Path> modelDirectoryBinding = InstanSegUtils.getModelDirectoryBinding();
 
     private static Watcher instance = new Watcher();
@@ -47,6 +59,7 @@ class Watcher {
     private Watcher() {
         modelDirectoryBinding.addListener(this::handleModelDirectoryChange);
         handleModelDirectoryChange(modelDirectoryBinding, null, modelDirectoryBinding.get());
+        modelPaths.addListener(this::handleModelPathsChanged);
     }
 
     /**
@@ -70,7 +83,7 @@ class Watcher {
                 logger.error("Unable to register new model directory", e);
             }
         }
-        refreshAllModels();
+        refreshAllModelPaths();
     }
 
     private synchronized void register(Path dir) throws IOException {
@@ -84,6 +97,10 @@ class Watcher {
         } else {
             watchKeys.put(dir, null);
         }
+    }
+
+    private static WatchKey register(WatchService watchService, Path dir) throws IOException {
+        return dir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
     }
 
     private synchronized void unregister(Path dir) {
@@ -123,16 +140,22 @@ class Watcher {
                     // print out event
                     logger.debug("{}: {}", event.kind().name(), filePath);
 
+                    // At least on macOS, renaming a file results in a CREATE then a DELETE event.
+                    // This means that listeners can be notified of a 'new' model before they are informed
+                    // that the previous model has been deleted - and both models will have the same name,
+                    // because this is read from rdf.yaml.
+                    // To reduce the risk of this causing trouble, do a full directory refresh on any change.
                     if (kind == ENTRY_CREATE) {
                         logger.info("File created: {}", rawEvent);
-                        handleFileCreated(filePath);
+                        refreshAllModelPaths();
                     }
                     if (kind == ENTRY_DELETE) {
                         logger.info("File deleted: {}", rawEvent);
-                        handleFileDeleted(filePath);
+                        refreshAllModelPaths();
                     }
                     if (kind == ENTRY_MODIFY) {
                         logger.info("File modified: {}", rawEvent);
+                        refreshAllModelPaths();
                     }
                 }
             }
@@ -150,17 +173,6 @@ class Watcher {
         }
     }
 
-    private void handleFileCreated(Path path) {
-        if (InstanSegModel.isValidModel(path)) {
-            try {
-                var model = InstanSegModel.fromPath(path);
-                FXUtils.runOnApplicationThread(() -> ensureModelInList(model));
-            } catch (IOException e) {
-                logger.error("Unable to add model from path", e);
-            }
-        }
-    }
-
     /**
      * Add the model, after checking it won't be a duplicate.
      * @param model
@@ -173,15 +185,6 @@ class Watcher {
             }
         }
         models.add(model);
-    }
-
-    private void handleFileDeleted(Path path) {
-        var matches = models.stream()
-                .filter(model -> model.getPath().map(p -> p.equals(path)).orElse(false))
-                .collect(Collectors.toSet());
-        if (!matches.isEmpty()) {
-            FXUtils.runOnApplicationThread(() -> models.removeAll(matches));
-        }
     }
 
 
@@ -203,7 +206,7 @@ class Watcher {
                     }
                 }
                 // Ensure our list is updated
-                refreshAllModels();
+                refreshAllModelPaths();
             } catch (IOException e) {
                 logger.error("Unable to create watch service", e);
             }
@@ -215,20 +218,40 @@ class Watcher {
     /**
      * Refresh all models to match the directories we are watching
      */
-    private void refreshAllModels() {
-        Set<InstanSegModel> set = new LinkedHashSet<>();
+    private void refreshAllModelPaths() {
+        Set<Path> currentPaths = new LinkedHashSet<>();
         for (var dir : watchKeys.keySet()) {
-            for (var modelPath : getModelPathsInDir(dir)) {
-                try {
-                    set.add(InstanSegModel.fromPath(modelPath));
-                } catch (IOException e) {
-                    logger.error("Unable to load model from path", e);
-                }
-            }
+            currentPaths.addAll(getModelPathsInDir(dir));
         }
-        FXUtils.runOnApplicationThread(() -> models.setAll(set));
+        // We only want to update the list if it has changed, to avoid rebuilding models unnecessarily
+        if (modelPaths.size() == currentPaths.size() && currentPaths.containsAll(modelPaths))
+            return;
+        FXUtils.runOnApplicationThread(() -> modelPaths.setAll(currentPaths));
     }
 
+    /**
+     * Update all models in response to a change in the model paths.
+     * @param change
+     */
+    private void handleModelPathsChanged(ListChangeListener.Change<? extends Path> change) {
+        if (!Platform.isFxApplicationThread())
+            throw new IllegalStateException("Must be on FX thread");
+        Set<InstanSegModel> set = new LinkedHashSet<>();
+        for (var modelPath : modelPaths) {
+            try {
+                set.add(InstanSegModel.fromPath(modelPath));
+            } catch (IOException e) {
+                logger.error("Unable to load model from path", e);
+            }
+        }
+        models.setAll(set);
+    }
+
+    /**
+     * Get all the local models in a directory.
+     * @param dir
+     * @return
+     */
     private static List<Path> getModelPathsInDir(Path dir) {
         try {
             return Files.list(dir)
@@ -240,12 +263,14 @@ class Watcher {
         }
     }
 
-    private static WatchKey register(WatchService watchService, Path dir) throws IOException {
-        return dir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
-    }
-
     /**
      * Get an unmodifiable observable list of the models found in the directories being watched.
+     * <p>
+     * Note that this list is updated only when the paths change, but it is *not* guaranteed to return
+     * the same instance of InstanSeg model for each path.
+     * Any calling code needs to figure out of models are really the same or different, which requires some
+     * decision-making (e.g. is a model that has been downloaded the same as the local representation...?
+     * Or are two models the same if the directories are duplicated, so that one has a different path...?).
      * @return
      */
     ObservableList<InstanSegModel> getModels() {

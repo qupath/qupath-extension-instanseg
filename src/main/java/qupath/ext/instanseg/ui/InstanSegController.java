@@ -53,10 +53,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -185,8 +187,13 @@ InstanSegPreferences.modelDirectoryProperty().set(null);
                 .stream()
                 .sorted(comparator)
                 .toList();
-        var localModelNames = localModels.stream()
-                .collect(Collectors.toMap(InstanSegModel::getName, m -> m));
+        // Need to use a loop and not a stream to avoid exceptions if there are duplicate names
+        Map<String, InstanSegModel> localModelNames = new TreeMap<>();
+        for (var model : localModels) {
+            if (localModelNames.put(model.getName(), model) != null) {
+                logger.warn("Duplicate model names aren't allowed! Dropping {}", model.getName());
+            }
+        }
         var remoteAndNotLocal = remoteModels.stream()
                 .filter(m -> !localModelNames.containsKey(m.getName()))
                 .sorted(comparator)

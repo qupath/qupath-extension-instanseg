@@ -77,6 +77,10 @@ public class InstanSegModel {
      * @return True if a flag has been set.
      */
     public boolean isDownloaded(Path localModelPath) {
+        // Check path first - *sometimes* the model might be downloaded, but have a name
+        // that doesn't match with the filename (although we'd prefer this didn't happen...)
+        if (path != null && model != null && Files.exists(path))
+            return true;
         // todo: this should also check if the contents are what we expect
         if (Files.exists(localModelPath.resolve(name))) {
             try {
