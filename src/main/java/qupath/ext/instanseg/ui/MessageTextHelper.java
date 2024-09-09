@@ -36,7 +36,7 @@ class MessageTextHelper {
     private final SelectedObjectCounter selectedObjectCounter;
     private final SearchableComboBox<InstanSegModel> modelChoiceBox;
     private final ChoiceBox<String> deviceChoiceBox;
-    private final CheckComboBox<ChannelSelectItem> comboChannels;
+    private final CheckComboBox<InputChannelItem> comboChannels;
     private final BooleanProperty needsUpdating;
 
     /**
@@ -59,7 +59,7 @@ class MessageTextHelper {
      */
     private BooleanBinding hasWarning;
 
-    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<ChannelSelectItem> comboChannels, BooleanProperty needsUpdating) {
+    MessageTextHelper(SearchableComboBox<InstanSegModel> modelChoiceBox, ChoiceBox<String> deviceChoiceBox, CheckComboBox<InputChannelItem> comboChannels, BooleanProperty needsUpdating) {
         this.modelChoiceBox = modelChoiceBox;
         this.deviceChoiceBox = deviceChoiceBox;
         this.comboChannels = comboChannels;
@@ -129,7 +129,7 @@ class MessageTextHelper {
             return resources.getString("ui.error.no-selection");
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
-        var modelDir = InstanSegController.getModelDirectory().orElse(null);
+        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
         if (modelDir != null && modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded(modelDir)) {
             // shouldn't happen if downloaded anyway!
             var modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();

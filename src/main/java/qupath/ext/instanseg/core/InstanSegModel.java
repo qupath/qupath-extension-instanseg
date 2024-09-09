@@ -44,7 +44,7 @@ public class InstanSegModel {
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
-        this.name = model.getName() + " (local)";
+        this.name = model.getName();
     }
 
     private InstanSegModel(String name, URL modelURL) {
@@ -77,6 +77,10 @@ public class InstanSegModel {
      * @return True if a flag has been set.
      */
     public boolean isDownloaded(Path localModelPath) {
+        // Check path first - *sometimes* the model might be downloaded, but have a name
+        // that doesn't match with the filename (although we'd prefer this didn't happen...)
+        if (path != null && model != null && Files.exists(path))
+            return true;
         // todo: this should also check if the contents are what we expect
         if (Files.exists(localModelPath.resolve(name))) {
             try {
@@ -84,6 +88,9 @@ public class InstanSegModel {
             } catch (IOException e) {
                 logger.error("Model directory exists but is not valid", e);
             }
+        } else {
+            // The model may have been deleted or renamed - we won't be able to load it
+            return false;
         }
         return path != null && model != null;
     }
@@ -93,7 +100,8 @@ public class InstanSegModel {
      * @throws IOException If an error occurs when downloading, unzipping, etc.
      */
     public void download(Path localModelPath) throws IOException {
-        if (path != null && model != null) return;
+        if (path != null && Files.exists(path) && model != null)
+            return;
         var zipFile = downloadZipIfNeeded(
                 this.modelURL,
                 localModelPath,
@@ -204,6 +212,10 @@ public class InstanSegModel {
 
     @Override
     public String toString() {
+//        var path = getPath().orElse(null);
+//        if (path == null) {
+//            return getName() + " (not downloaded)";
+//        }
         return getName();
     }
 
