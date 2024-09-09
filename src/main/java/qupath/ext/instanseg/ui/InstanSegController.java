@@ -458,7 +458,7 @@ public class InstanSegController extends BorderPane {
         var nOutputs = model.getOutputChannels().orElse(1);
         comboOutputChannels.getCheckModel().clearChecks();
         comboOutputChannels.getItems().setAll(OutputChannelItem.getOutputsForChannelCount(nOutputs));
-        if (!outputChannelCache.restoreChecks()) {
+        if (!outputChannelCache.restoreChecks() || comboOutputChannels.getCheckModel().isEmpty()) {
             comboOutputChannels.getCheckModel().checkAll();
         }
     }
