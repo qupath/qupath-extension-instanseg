@@ -35,7 +35,7 @@ class InstanSegPreferences {
 
     private static final IntegerProperty numThreadsProperty = PathPrefs.createPersistentPreference(
             "instanseg.num.threads",
-            Math.min(4, Runtime.getRuntime().availableProcessors()));
+            GeneralTools.clipValue(Runtime.getRuntime().availableProcessors() / 2, 2, 4));
 
     private static final IntegerProperty tileSizeProperty = PathPrefs.createPersistentPreference(
             "intanseg.tile.size",
@@ -51,7 +51,7 @@ class InstanSegPreferences {
 
     private static final BooleanProperty randomColorsProperty = PathPrefs.createPersistentPreference(
             "intanseg.random.colors",
-            true);
+            false);
 
     /**
      * MPS should work reliably (and much faster) on Apple Silicon, so set as default.

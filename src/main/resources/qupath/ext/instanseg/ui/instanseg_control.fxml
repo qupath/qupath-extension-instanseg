@@ -71,7 +71,7 @@
                            </tooltip></Label>
                                 <Button fx:id="modelDirButton" mnemonicParsing="false" onAction="#promptForModelDirectory" styleClass="standard-message">
                                     <tooltip>
-                                        <Tooltip text="%ui.options.directory.tooltip" />
+                                        <Tooltip text="%ui.options.directory-not-set.tooltip" />
                                     </tooltip>
                                     <graphic>
                                         <Text styleClass="fa-icon" text="" />
