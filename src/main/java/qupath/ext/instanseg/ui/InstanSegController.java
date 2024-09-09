@@ -8,7 +8,6 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
-import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
@@ -17,7 +16,6 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
@@ -224,6 +222,7 @@ public class InstanSegController extends BorderPane {
     private void configureModelChoices() {
         selectedModel.bind(modelChoiceBox.getSelectionModel().selectedItemProperty());
         selectedModel.addListener((v, o, n) -> refreshModelChoice());
+        modelChoiceBox.setCellFactory(param -> new ModelListCell());
         watcher.getModels().addListener((ListChangeListener<InstanSegModel>) c -> refreshAvailableModels());
         refreshAvailableModels();
     }
@@ -438,7 +437,7 @@ public class InstanSegController extends BorderPane {
      * This may be called when the selected model is changed, or an existing model is downloaded.
      */
     private void refreshModelChoice() {
-        var model = modelChoiceBox.getSelectionModel().getSelectedItem();
+        var model = selectedModel.get();
         if (model == null)
             return;
 
@@ -672,25 +671,9 @@ public class InstanSegController extends BorderPane {
         }
     }
 
-    static void addModelsFromPath(Path path, ComboBox<InstanSegModel> box) {
-        if (path == null || !Files.exists(path) || !Files.isDirectory(path))
-            return;
-        // See https://github.com/controlsfx/controlsfx/issues/1320
-        box.setItems(FXCollections.observableArrayList());
-        try (var ps = Files.list(path)) {
-            for (var file: ps.toList()) {
-                if (InstanSegModel.isValidModel(file)) {
-                    box.getItems().add(InstanSegModel.fromPath(file));
-                }
-            }
-        } catch (IOException e) {
-            logger.error("Unable to list directory", e);
-        }
-    }
-
     @FXML
     private void runInstanSeg() {
-        runInstanSeg(modelChoiceBox.getSelectionModel().getSelectedItem());
+        runInstanSeg(selectedModel.get());
     }
 
     private void runInstanSeg(InstanSegModel model) {

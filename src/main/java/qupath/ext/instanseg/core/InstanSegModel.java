@@ -212,10 +212,10 @@ public class InstanSegModel {
 
     @Override
     public String toString() {
-        var path = getPath().orElse(null);
-        if (path == null) {
-            return getName() + " (not downloaded)";
-        }
+//        var path = getPath().orElse(null);
+//        if (path == null) {
+//            return getName() + " (not downloaded)";
+//        }
         return getName();
     }
 
