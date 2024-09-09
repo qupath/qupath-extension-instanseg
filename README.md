@@ -68,17 +68,17 @@ The dialog should guide you through what to do next:
 
 There are several options available to customize things:
 
-* **Preferred device**: `cpu` to run without a graphics card involved, `gpu` if you've been luck with CUDA configuration, and `mps` if you're using Apple Silicon
+* **Preferred device**: `cpu` to run without a graphics card involved, `gpu` if you've been lucky with CUDA configuration, and `mps` if you're using Apple Silicon
 * **Threads**: Number of threads to use to use for fetching & submitting image tiles; 1 is usually too little, but high numbers probably won't help much - so the default is between 2 and 4.
 * **Tile size**: Large regions are broken into tiles; usually 512 or 1024 pixels is a good choice
 * **Tile padding**: When creating tiles, part of each tile is used as 'padding' and can overlap with neighboring tiles. A small padding means less overlap, and faster processing. But if your objects are too big, they might disappear or become clipped across tiles. If that happens, try increasing this value.
-* **Input channels**: Select which channels to input. Some models take a fix number, others (thanks to ChannelNet) don't care. You can even apply color deconvolution here, if you want an easy way to apply a fluorescence model to a brightfield image.
+* **Input channels**: Select which channels to input. Some models take a fixed number, others (thanks to ChannelNet) don't care. You can even apply color deconvolution here, if you want an easy way to apply a fluorescence model to a brightfield image.
 * **Outputs**: Select what to output. Some models just have one output (e.g. nuclei or cells). Others have multiple outputs, and you can select any combination.
 * **Make measurements**: Optionally add QuPath measurements to whatever InstanSeg detected.
 * **Random colors**: Optionally set the color of each detected object randomly. This helps distinguish neighboring objects.
 
 ## How do I run this across multiple images?
-The extension is scriptable - the core parameters are logged history, and can be converted into a script.
+The extension is scriptable - the core parameters are logged in the history, and can be converted into a script.
 
 See [Workflows to scripts](https://qupath.readthedocs.io/en/stable/docs/scripting/workflows_to_scripts.html) in the docs for more details.
 
