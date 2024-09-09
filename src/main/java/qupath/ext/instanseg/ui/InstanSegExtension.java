@@ -1,6 +1,8 @@
 package qupath.ext.instanseg.ui;
 
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.StringProperty;
 import javafx.scene.Scene;
 import javafx.scene.control.MenuItem;
 import javafx.scene.layout.BorderPane;
@@ -8,6 +10,10 @@ import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.fx.dialogs.Dialogs;
+import qupath.fx.prefs.annotations.DirectoryPref;
+import qupath.fx.prefs.annotations.Pref;
+import qupath.fx.prefs.annotations.PrefCategory;
+import qupath.fx.prefs.controlsfx.PropertySheetUtils;
 import qupath.fx.utils.FXUtils;
 import qupath.lib.common.Version;
 import qupath.lib.gui.QuPathGUI;
@@ -48,6 +54,7 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 		}
 		isInstalled = true;
 		addMenuItem(qupath);
+		installPreferences(qupath);
 	}
 
 
@@ -81,6 +88,14 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 	}
 
 
+	private void installPreferences(QuPathGUI qupath) {
+		qupath.getPreferencePane()
+				.getPropertySheet()
+				.getItems()
+				.addAll(PropertySheetUtils.parseAnnotatedItems(new PreferenceProperties()));
+	}
+
+
 	private void handleStageHeightChange() {
 		stage.sizeToScene();
 		// This fixes a bug where the stage would migrate to the corner of a screen if it is
@@ -110,5 +125,14 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 		return EXTENSION_REPOSITORY;
 	}
 
+	@PrefCategory(bundle="qupath.ext.instanseg.ui.strings", value="title")
+	private static class PreferenceProperties {
+
+		@DirectoryPref(bundle="qupath.ext.instanseg.ui.strings", value="ui.prefs.model-directory")
+		private final StringProperty modelDirectory = InstanSegPreferences.modelDirectoryProperty();
+
+		@Pref(bundle="qupath.ext.instanseg.ui.strings", type=InstanSegPreferences.OnlinePermission.class, value="ui.prefs.permit-online")
+		private final ObjectProperty<InstanSegPreferences.OnlinePermission> permitOnline = InstanSegPreferences.permitOnlineProperty();
+	}
 
 }
