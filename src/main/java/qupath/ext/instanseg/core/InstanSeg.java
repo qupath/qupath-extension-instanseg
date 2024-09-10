@@ -180,6 +180,9 @@ public class InstanSeg {
         if (this.downsample > 0) {
             downsample = this.downsample;
             logger.debug("Calling InstanSeg with user-specified downsample {}", downsample);
+        } else if (!imageData.getServerMetadata().pixelSizeCalibrated()) {
+            downsample = 1.0;
+            logger.debug("No pixel calibration - defaulting to a downsample of 1.0");
         } else {
             downsample = this.model.getPreferredDownsample(imageData.getServer().getPixelCalibration());
             logger.debug("Calling InstanSeg with calculated downsample {}", downsample);
