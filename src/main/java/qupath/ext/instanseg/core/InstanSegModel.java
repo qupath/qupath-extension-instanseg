@@ -212,11 +212,14 @@ public class InstanSegModel {
 
     @Override
     public String toString() {
-//        var path = getPath().orElse(null);
-//        if (path == null) {
-//            return getName() + " (not downloaded)";
-//        }
-        return getName();
+        String name = getName();
+        String parent = getPath().map(Path::getFileName).map(Path::toString).orElse(null);
+        String version = getModel().map(BioimageIoSpec.BioimageIoModel::getVersion).orElse(null);
+        if (parent != null && !Objects.equals(parent, name))
+            name = parent + "/" + name;
+        if (version != null)
+            name += "-" + version;
+        return name;
     }
 
     /**
