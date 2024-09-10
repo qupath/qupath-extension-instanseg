@@ -173,6 +173,9 @@ public class InstanSeg {
         String layoutOutput = "CHW";
 
         // Get the downsample - this may be specified by the user, or determined from the model spec
+        if (!imageData.getServerMetadata().pixelSizeCalibrated()) {
+            logger.warn("Running InstanSeg without pixel calibration --- results may not be as expected!");
+        }
         double downsample;
         if (this.downsample > 0) {
             downsample = this.downsample;
