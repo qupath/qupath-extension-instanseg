@@ -8,6 +8,7 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
@@ -42,8 +43,11 @@ import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.WebViews;
 import qupath.lib.images.ImageData;
+import qupath.lib.images.servers.ImageServer;
 
 import java.awt.image.BufferedImage;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -131,6 +135,9 @@ public class InstanSegController extends BorderPane {
     private static final BooleanBinding isModelDirectoryValid = InstanSegUtils.isModelDirectoryValid(modelDirectoryBinding);
 
     private List<InstanSegModel> remoteModels;
+
+    // Listener for property changes in the current ImageData; these can be required to update the input channels
+    private PropertyChangeListener imageDataPropertyChangeListener = this::handleImageDataPropertyChange;
 
     /**
      * Create an instance of the InstanSeg GUI pane.
@@ -298,8 +305,8 @@ public class InstanSegController extends BorderPane {
 
 
     private void configureInputChannelCombo() {
-        updateInputChannels(qupath.getImageData());
-        qupath.imageDataProperty().addListener((v, o, n) -> updateInputChannels(n));
+        qupath.imageDataProperty().addListener(this::handleImageDataChange);
+        handleImageDataChange(qupath.imageDataProperty(), null, qupath.imageDataProperty().get());
         comboInputChannels.setTitle(getCheckComboBoxText(comboInputChannels));
         comboInputChannels.getItems().addListener((ListChangeListener<InputChannelItem>) c -> {
             comboInputChannels.setTitle(getCheckComboBoxText(comboInputChannels));
@@ -309,6 +316,20 @@ public class InstanSegController extends BorderPane {
         });
         FXUtils.installSelectAllOrNoneMenu(comboInputChannels);
         addSetFromVisible(comboInputChannels);
+    }
+
+    private void handleImageDataChange(ObservableValue<? extends ImageData<BufferedImage>> values, ImageData<BufferedImage> oldValue, ImageData<BufferedImage> newValue) {
+        if (oldValue != null) {
+            oldValue.removePropertyChangeListener(imageDataPropertyChangeListener);
+        }
+        if (newValue != null) {
+            newValue.addPropertyChangeListener(imageDataPropertyChangeListener);
+        }
+        updateInputChannels(newValue);
+    }
+
+    private void handleImageDataPropertyChange(PropertyChangeEvent event) {
+        updateInputChannels(qupath.getImageData());
     }
 
 
