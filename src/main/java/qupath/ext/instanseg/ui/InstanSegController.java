@@ -137,7 +137,7 @@ public class InstanSegController extends BorderPane {
     private List<InstanSegModel> remoteModels;
 
     // Listener for property changes in the current ImageData; these can be required to update the input channels
-    private PropertyChangeListener imageDataPropertyChangeListener = this::handleImageDataPropertyChange;
+    private final PropertyChangeListener imageDataPropertyChangeListener = this::handleImageDataPropertyChange;
 
     /**
      * Create an instance of the InstanSeg GUI pane.
@@ -714,6 +714,9 @@ public class InstanSegController extends BorderPane {
         if (imageData == null) {
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.no-imagedata"));
             return;
+        }
+        if (!imageData.getServerMetadata().pixelSizeCalibrated()) {
+            Dialogs.showWarningNotification(resources.getString("title"), resources.getString("error.no-pixel-size"));
         }
 
         if (!PytorchManager.hasPyTorchEngine()) {

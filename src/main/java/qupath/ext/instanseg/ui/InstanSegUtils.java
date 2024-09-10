@@ -18,10 +18,10 @@ import java.util.Optional;
 class InstanSegUtils {
 
     private InstanSegUtils() {
-        // Prevent instantiation
+        throw new UnsupportedOperationException("This class should not be instantiated.");
     }
 
-    private static ObjectBinding<Path> modelDirectoryBinding = Bindings.createObjectBinding(
+    private static final ObjectBinding<Path> modelDirectoryBinding = Bindings.createObjectBinding(
                 () -> tryToGetPath(InstanSegPreferences.modelDirectoryProperty().get()),
                 InstanSegPreferences.modelDirectoryProperty()
         );
