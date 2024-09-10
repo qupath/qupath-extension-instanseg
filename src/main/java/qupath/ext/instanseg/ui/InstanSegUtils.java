@@ -17,6 +17,10 @@ import java.util.Optional;
  */
 class InstanSegUtils {
 
+    private InstanSegUtils() {
+        // Prevent instantiation
+    }
+
     private static ObjectBinding<Path> modelDirectoryBinding = Bindings.createObjectBinding(
                 () -> tryToGetPath(InstanSegPreferences.modelDirectoryProperty().get()),
                 InstanSegPreferences.modelDirectoryProperty()
