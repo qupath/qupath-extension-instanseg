@@ -19,8 +19,8 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@e6e38bacfdf1a337459f332974bb2327a31aaf4b
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Add release flag if input variable is set
         if: ${{ inputs.release }}
@@ -28,13 +28,14 @@ jobs:
         run: |
           echo "RELEASE_FLAG='-P release=true'" >> $GITHUB_ENV
 
-      - name: Publish snapshot
-        uses: gradle/gradle-build-action@67421db6bd0bf253fb4bd25b31ebb98943c375e1
-        with:
-         arguments: publish -P toolchain=21 $RELEASE_FLAG
+      - name: Publish
+        shell: bash
+        run: |
+          ./gradlew publish -P toolchain=21 $RELEASE_FLAG
         env:
           MAVEN_USER: ${{ secrets.MAVEN_USER }}
           MAVEN_PASS: ${{ secrets.MAVEN_PASS }}
+
       - uses: actions/upload-artifact@v3
         if: ${{ inputs.release }}
         with:
