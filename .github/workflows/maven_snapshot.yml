@@ -7,3 +7,4 @@ jobs:
   build:
     name: Publish snapshot
     uses: ./.github/workflows/maven.yml
+    secrets: inherit
