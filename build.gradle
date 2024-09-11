@@ -1,10 +1,6 @@
 plugins {
-    // Main gradle plugin for building a Java library
     id 'java-library'
-    // Support writing the extension in Groovy (remove this if you don't want to)
-    id 'groovy'
-    // To create a shadow/fat jar that bundle up all dependencies
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'maven-publish'
     // Include this plugin to avoid downloading JavaCPP dependencies for all platforms
     id 'org.bytedeco.gradle-javacpp-platform'
     id 'org.openjfx.javafxplugin' version '0.1.0'
@@ -16,6 +12,7 @@ base {
     archivesName = rootProject.name
     version = '0.0.1-SNAPSHOT'
     description = 'A QuPath extension for running inference with the InstanSeg deep learning model'
+    group = 'io.github.qupath'
 }
 
 ext.qupathVersion = gradle.ext.qupathVersion
@@ -34,24 +31,18 @@ ext.qupathVersion = gradle.ext.qupathVersion
 dependencies {
     // Main QuPath user interface jar.
     // Automatically includes other QuPath jars as subdependencies.
-    shadow "io.github.qupath:qupath-gui-fx:${qupathVersion}"
+    implementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     
-    // used for co-development, should generally be left out
-    // implementation project(":qupath-gui-fx")
-
     // For logging - the version comes from QuPath's version catalog at
     // https://github.com/qupath/qupath/blob/main/gradle/libs.versions.toml
+    implementation libs.slf4j
 
-    // See https://docs.gradle.org/current/userguide/platforms.html
-    shadow libs.slf4j
+    implementation libs.qupath.fxtras
+    implementation libs.bioimageio.spec
+    implementation libs.deepJavaLibrary
+    implementation libs.commonmark
 
-    // If you aren't using Groovy, this can be removed
-    shadow libs.qupath.fxtras
-    shadow libs.bioimageio.spec
-    shadow libs.deepJavaLibrary
-    shadow libs.commonmark
-
-    implementation 'io.github.qupath:qupath-extension-djl:0.3.0'
+    implementation 'io.github.qupath:qupath-extension-djl:0.4.0-SNAPSHOT'
 
     testImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
     testImplementation libs.junit
@@ -65,19 +56,6 @@ jar {
         attributes("Implementation-Title": project.name,
                 "Implementation-Version": archiveVersion,
                 "Automatic-Module-Name": moduleName)
-    }
-}
-
-/**
- * Copy necessary attributes, see
- * - https://github.com/qupath/qupath-extension-template/issues/9
- * - https://github.com/openjfx/javafx-gradle-plugin#variants
- */
-configurations.shadow  {
-    def runtimeAttributes = configurations.runtimeClasspath.attributes
-    runtimeAttributes.keySet().each { key ->
-        if (key in [Usage.USAGE_ATTRIBUTE, OperatingSystemFamily.OPERATING_SYSTEM_ATTRIBUTE, MachineArchitecture.ARCHITECTURE_ATTRIBUTE])
-            attributes.attribute(key, runtimeAttributes.getAttribute(key))
     }
 }
 
@@ -167,4 +145,36 @@ repositories {
         url "https://maven.scijava.org/content/repositories/snapshots"
     }
 
+}
+
+
+publishing {
+    repositories {
+        maven {
+            name = "SciJava"
+            def releasesRepoUrl = uri("https://maven.scijava.org/content/repositories/releases")
+            def snapshotsRepoUrl = uri("https://maven.scijava.org/content/repositories/snapshots")
+            // Use gradle -Prelease publish
+            url = project.hasProperty('release') ? releasesRepoUrl : snapshotsRepoUrl
+            credentials {
+                username = System.getenv("MAVEN_USER")
+                password = System.getenv("MAVEN_PASS")
+            }
+        }
+    }
+
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            pom {
+                licenses {
+                    license {
+                        name = 'Apache License v2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0'
+                    }
+                }
+            }
+        }
+    }
 }
