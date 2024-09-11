@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Helper class for adding measurements to InstanSeg detections.
@@ -73,7 +74,8 @@ public class DetectionMeasurer {
                 builder.deconvolveStains(stains, stainNumbers.stream().mapToInt(i -> i).toArray());
             }
 
-            try (var server2 = builder.build()) {
+            try {
+                var server2 = builder.build();
                 objects.parallelStream().forEach(cell -> {
                     try {
                         ObjectMeasurements.addIntensityMeasurements(server2, cell, downsample, measurements, compartments);
@@ -81,8 +83,12 @@ public class DetectionMeasurer {
                         logger.info(e.getLocalizedMessage(), e);
                     }
                 });
+                // It's possible we have the same server - in which case we don't want to close it twice
+                if (!Objects.equals(server, server2)) {
+                    server2.close();
+                }
             } catch (Exception e) {
-                logger.error("Unable to create transformed server, can't make intensity measurements", e);
+                logger.error("Exception when creating intensity measurements", e);
             }
 
         }
