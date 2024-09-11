@@ -43,7 +43,6 @@ import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.WebViews;
 import qupath.lib.images.ImageData;
-import qupath.lib.images.servers.ImageServer;
 
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
@@ -329,7 +328,10 @@ public class InstanSegController extends BorderPane {
     }
 
     private void handleImageDataPropertyChange(PropertyChangeEvent event) {
-        updateInputChannels(qupath.getImageData());
+        // Update the input channels when the stains or image type changes
+        String name = event.getPropertyName();
+        if ("stains".equals(name) || "imageType".equals(name))
+            updateInputChannels(qupath.getImageData());
     }
 
 
