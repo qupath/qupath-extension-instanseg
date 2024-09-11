@@ -1,4 +1,4 @@
-name: Publish snapshot to SciJava Maven
+name: Publish release to SciJava Maven
 
 on:
   workflow_dispatch:
