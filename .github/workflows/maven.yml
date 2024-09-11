@@ -8,13 +8,17 @@ on:
         type: boolean
         default: false
 
+env:
+  MAVEN_USER: ${{ secrets.MAVEN_USER }}
+  MAVEN_PASS: ${{ secrets.MAVEN_PASS }}
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -26,15 +30,12 @@ jobs:
         if: ${{ inputs.release }}
         shell: bash
         run: |
-          echo "RELEASE_FLAG='-P release=true'" >> $GITHUB_ENV
+          echo "RELEASE_FLAG='-Prelease'" >> $GITHUB_ENV
 
       - name: Publish
         shell: bash
         run: |
           ./gradlew publish -P toolchain=21 $RELEASE_FLAG
-        env:
-          MAVEN_USER: ${{ secrets.MAVEN_USER }}
-          MAVEN_PASS: ${{ secrets.MAVEN_PASS }}
 
       - uses: actions/upload-artifact@v3
         if: ${{ inputs.release }}
