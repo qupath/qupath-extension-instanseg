@@ -135,6 +135,8 @@ public class InstanSegController extends BorderPane {
 
     private List<InstanSegModel> remoteModels;
 
+    private BooleanProperty requestingPyTorch = new SimpleBooleanProperty(false);
+
     // Listener for property changes in the current ImageData; these can be required to update the input channels
     private final PropertyChangeListener imageDataPropertyChangeListener = this::handleImageDataPropertyChange;
 
@@ -438,6 +440,7 @@ public class InstanSegController extends BorderPane {
                         .or(deviceChoices.getSelectionModel().selectedItemProperty().isNull()) // Can't run without a device
                         .or(isModelDirectoryValid.not()) // Can't run or download without a model directory
                         .or(selectedModel.isNull()) // Can't run without a model
+                        .or(requestingPyTorch)
                         .or(Bindings.createBooleanBinding(() -> {
                             var model = selectedModel.get();
                             if (model == null) {
@@ -655,12 +658,22 @@ public class InstanSegController extends BorderPane {
     }
 
     private void updateAvailableDevices() {
-        var available = PytorchManager.getAvailableDevices();
-        deviceChoices.getItems().setAll(available);
-        var selected = InstanSegPreferences.preferredDeviceProperty().get();
+        // Update the available devices if these have changed
+        var available = Set.copyOf(PytorchManager.getAvailableDevices());
+        var items = Set.copyOf(deviceChoices.getItems());
+        var selected = deviceChoices.getSelectionModel().getSelectedItem();
+        if (!available.equals(items)) {
+            deviceChoices.getItems().setAll(available);
+        }
+        // Try to ensure we have something selected - without making unnecessary changes
+        if (selected == null) {
+            selected = InstanSegPreferences.preferredDeviceProperty().get();
+        } else if (Objects.equals(selected, deviceChoices.getSelectionModel().getSelectedItem())) {
+            return;
+        }
         if (available.contains(selected)) {
             deviceChoices.getSelectionModel().select(selected);
-        } else {
+        } else if (!available.isEmpty()) {
             deviceChoices.getSelectionModel().selectFirst();
         }
     }
@@ -794,11 +807,16 @@ public class InstanSegController extends BorderPane {
     }
 
     private boolean ensurePyTorchAvailable() {
-        if (PytorchManager.hasPyTorchEngine()) {
-            return true;
-        } else {
-            downloadPyTorch();
-            return PytorchManager.hasPyTorchEngine();
+        try {
+            FXUtils.runOnApplicationThread(() -> requestingPyTorch.set(true));
+            if (PytorchManager.hasPyTorchEngine()) {
+                return true;
+            } else {
+                downloadPyTorch();
+                return PytorchManager.hasPyTorchEngine();
+            }
+        } finally {
+            FXUtils.runOnApplicationThread(() -> requestingPyTorch.set(false));
         }
     }
 
