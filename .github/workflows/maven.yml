@@ -8,10 +8,6 @@ on:
         type: boolean
         default: false
 
-env:
-  MAVEN_USER: ${{ secrets.MAVEN_USER }}
-  MAVEN_PASS: ${{ secrets.MAVEN_PASS }}
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -36,7 +32,10 @@ jobs:
         shell: bash
         run: |
           ./gradlew publish -P toolchain=21 $RELEASE_FLAG
-
+        env:
+          MAVEN_USER: ${{ secrets.MAVEN_USER }}
+          MAVEN_PASS: ${{ secrets.MAVEN_PASS }}
+          
       - uses: actions/upload-artifact@v3
         if: ${{ inputs.release }}
         with:

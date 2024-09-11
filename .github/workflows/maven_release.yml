@@ -7,5 +7,6 @@ jobs:
   build:
     name: Publish release
     uses: ./.github/workflows/maven.yml
+    secrets: inherit
     with:
       release: true
