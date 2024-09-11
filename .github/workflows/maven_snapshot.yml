@@ -1,0 +1,9 @@
+name: Publish snapshot to SciJava Maven
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Run build
+    uses: ./.github/workflows/build.yml

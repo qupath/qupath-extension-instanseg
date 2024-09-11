@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  jpackage:
-    name: Run JPackage
-    uses: ./.github/workflows/jpackage.yml
+  build:
+    name: Run build
+    uses: ./.github/workflows/build.yml
 
   release:
-    needs: jpackage
+    needs: build
     permissions:
       contents: write
     runs-on: ubuntu-latest
