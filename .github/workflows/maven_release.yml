@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    name: Run build
-    uses: ./.github/workflows/build.yml
+    name: Publish release
+    uses: ./.github/workflows/maven.yml
     with:
       release: true
