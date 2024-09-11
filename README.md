@@ -4,6 +4,12 @@
 
 <img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/images/instanseg_logo.png" />
 
+## 🚧 Work-in-progress - please wait! 🚧 
+
+**We're preparing a QuPath release candidate to make this extension available for testing - please come back in a day or two!**
+
+---
+
 **Welcome to the [InstanSeg](https://github.com/instanseg/instanseg) extension for [QuPath](http://qupath.github.io)!**
 
 **InstanSeg** is a novel deep-learning-based method for segmenting nuclei and cells... and potentially much more.
@@ -31,7 +37,7 @@ To read about InstanSeg's extension to _nucleus + full cell segmentation_ and su
    - One model can provide different outputs: nuclei, cells, or both
 3. It's accurate compared to all the popular alternative methods 
    - In our hands InstanSeg consistently achieved the best F1 score across multiple datasets compared to CellPose, StarDist, HoVerNet and Mesmer. But everyone's images are different & fair benchmarking is hard - check out the preprints & judge what works best for you!
-4. It's *much* faster than other methods
+4. It's faster than other methods (usually _much_ faster)
    - InstanSeg supports GPU acceleration with CUDA _and_ with Apple Silicon (so Mac users can finally have fast segmentation too!)
 5. It's portable 
    - The full pipeline _including postprocessing_ compiles to TorchScript - so you can also run it from [Python](https://github.com/instanseg/instanseg) & [DeepImageJ](https://deepimagej.github.io).
