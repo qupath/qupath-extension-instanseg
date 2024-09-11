@@ -79,7 +79,7 @@ public class PytorchManager {
         try {
             return callOffline(() -> Engine.getEngine("PyTorch"));
         } catch (Exception e) {
-            logger.info("Failed to fetch offline engine", e);
+            logger.debug("Failed to fetch offline engine", e);
             return null;
         }
     }
@@ -92,7 +92,7 @@ public class PytorchManager {
      * @throws Exception
      */
     private static <T> T callOffline(Callable<T> callable) throws Exception {
-        return callWithTempProperty("offline", "true", callable);
+        return callWithTempProperty("ai.djl.offline", "true", callable);
     }
 
     /**
@@ -103,7 +103,7 @@ public class PytorchManager {
      * @throws Exception
      */
     private static <T> T callOnline(Callable<T> callable) throws Exception {
-        return callWithTempProperty("offline", "false", callable);
+        return callWithTempProperty("ai.djl.offline", "false", callable);
     }
 
 
