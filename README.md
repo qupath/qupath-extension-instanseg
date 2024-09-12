@@ -4,9 +4,9 @@
 
 <img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/images/instanseg_logo.png" />
 
-## 🚧 Work-in-progress - please wait! 🚧 
+## 🚧 Work-in-progress! 🚧 
 
-**We're preparing a QuPath release candidate to make this extension available for testing - please come back in a day or two!**
+**The easiest way to try this out is with the [new QuPath 0.6.0 Release Candidate](https://github.com/qupath/qupath/releases)!**
 
 ---
 
@@ -52,10 +52,12 @@ _*-Well, at least as much as your computer's memory allows_
 
 This extension is for **QuPath v0.6.0... which we plan to release in October 2024**.
 
-If you can't wait, you can try a release candidate as soon as one is available - or [build QuPath from source](https://qupath.readthedocs.io/en/0.5/docs/reference/building.html).
+If you can't wait, you can try the [release candidate v0.6.0-rc1](https://github.com/qupath/qupath/releases) - which comes with this extension pre-installed, along with the [Deep Java Library Extension](https://github.com/qupath/qupath-extension-djl).
 
-If it's not preinstalled, you then should [install this extension](https://qupath.readthedocs.io/en/0.5/docs/intro/extensions.html#installing-extensions) - and also the [Deep Java Library Extension](https://github.com/qupath/qupath-extension-djl).
-
+> ### GPU support
+> If you have an NVIDIA graphics card & want to use CUDA, check out [GPU support](https://qupath.readthedocs.io/en/0.5/docs/deep/gpu.html).
+> 
+> If you use a recent Mac with Apple silicon, no special configuration should be needed - just choose 'MPS' as the device (described below).
 
 ## How do I _run_ InstanSeg in QuPath?
 
