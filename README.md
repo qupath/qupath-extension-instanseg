@@ -54,8 +54,8 @@ This extension is for **QuPath v0.6.0... which we plan to release in October 202
 
 If you can't wait, you can try the [release candidate v0.6.0-rc1](https://github.com/qupath/qupath/releases) - which comes with this extension pre-installed, along with the [Deep Java Library Extension](https://github.com/qupath/qupath-extension-djl).
 
-> **GPU support**
-> If you have an NVIDIA graphics card & want CUDA support, check out [GPU support](https://qupath.readthedocs.io/en/0.5/docs/deep/gpu.html).
+> ### GPU support
+> If you have an NVIDIA graphics card & want to use CUDA, check out [GPU support](https://qupath.readthedocs.io/en/0.5/docs/deep/gpu.html).
 > 
 > If you use a recent Mac with Apple silicon, no special configuration should be needed - just choose 'MPS' as the device (described below).
 
