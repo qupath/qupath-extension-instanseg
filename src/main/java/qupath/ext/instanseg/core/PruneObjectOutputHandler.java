@@ -48,19 +48,17 @@ class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
             parentOrProxy.clearChildObjects();
 
             // remove features within N pixels of the region request boundaries
-            var bounds = GeometryTools.createRectangle(
-                    params.getRegionRequest().getX(), params.getRegionRequest().getY(),
-                    params.getRegionRequest().getWidth(), params.getRegionRequest().getHeight());
+            var bounds = GeometryTools.regionToEnvelope(params.getRegionRequest());
 
             int width = params.getServer().getWidth();
             int height = params.getServer().getHeight();
 
             newObjects = newObjects.parallelStream()
-                    .filter(p -> doesntTouchBoundaries(p.getROI().getGeometry().getEnvelopeInternal(), bounds.getEnvelopeInternal(), boundaryThreshold, width, height))
+                    .filter(p -> doesntTouchBoundaries(GeometryTools.roiToEnvelope(p.getROI()), bounds, boundaryThreshold, width, height))
                     .toList();
 
             if (!newObjects.isEmpty()) {
-                // since we're using IoU to merge objects, we want to keep anything that is within the overall object bounding box
+                // Apply the mask of the parent region to the objects
                 var parent = params.getParent().getROI();
                 newObjects = newObjects.parallelStream()
                         .flatMap(p -> PixelProcessorUtils.maskObject(parent, p).stream())
