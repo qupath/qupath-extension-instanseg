@@ -9,6 +9,7 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
+import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathAnnotationObject;
@@ -226,21 +227,18 @@ public class InstanSeg {
                 printResourceCount("Resource count after creating predictors",
                         (BaseNDManager)baseManager.getParentManager());
 
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
+                var tiler = createTiler(downsample, tileDims, padding);
                 var predictionProcessor = new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
+                var outputHandler = createOutputHandler(preferredOutputClass, randomColors, boundaryThreshold);
+                var postProcessor = createPostProcessor();
+
                 var processor = OpenCVProcessor.builder(predictionProcessor)
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(inputChannels)
                                 .apply(parameters.getImageData(), parameters.getRegionRequest()))
-                        .tiler(Tiler.builder(sizeWithoutPadding)
-                                .alignCenter()
-                                .cropTiles(false)
-                                .build()
-                        )
-                        .outputHandler(
-                                new PruneObjectOutputHandler<>(
-                                        new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold))
+                        .tiler(tiler)
+                        .outputHandler(outputHandler)
                         .padding(padding)
-                        .postProcess(createPostProcessor())
+                        .postProcess(postProcessor)
                         .downsample(downsample)
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);
@@ -267,6 +265,32 @@ public class InstanSeg {
     }
 
     /**
+     * Check if we are requesting tiles for debugging purposes.
+     * When this is true, we should create objects that represent the tiles - not the objects to be detected.
+     * @return
+     */
+    private static boolean debugTiles() {
+        return System.getProperty("instanseg.debug.tiles", "false").strip().equalsIgnoreCase("true");
+    }
+
+    private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass, boolean randomColors,
+                                                                    int boundaryThreshold) {
+        if (debugTiles())
+            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
+        return new PruneObjectOutputHandler<>(
+                      new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold);
+    }
+
+    private static Tiler createTiler(double downsample, int tileDims, int padding) {
+        int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
+        return Tiler.builder(sizeWithoutPadding)
+                .alignCenter()
+                .cropTiles(false)
+                .build();
+    }
+
+
+    /**
      * Get the input channels to use; if we don't have any specified, use all of them
      * @param imageData
      * @return
@@ -284,6 +308,8 @@ public class InstanSeg {
     }
 
     private static ObjectProcessor createPostProcessor() {
+        if (debugTiles())
+            return null;
         var merger = ObjectMerger.createIoMinMerger(0.5);
         var fixer = OverlapFixer.builder()
                 .clipOverlaps()

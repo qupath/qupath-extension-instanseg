@@ -143,7 +143,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
             var matOutput = predictor.predict(mat);
 
             // These are useful for spotting issues with the model
-            if (System.getProperty("instanseg.showTiles", "false").equalsIgnoreCase("true")) {
+            if (System.getProperty("instanseg.debug.predictions", "false").equalsIgnoreCase("true")) {
                 OpenCVTools.matToImagePlus("Input " + params.getRegionRequest(), mat).show();
                 OpenCVTools.matToImagePlus("Output " + params.getRegionRequest(), matOutput).show();
             }
