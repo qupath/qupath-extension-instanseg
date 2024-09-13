@@ -5,11 +5,14 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.training.util.ProgressBar;
+import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
+import qupath.lib.experimental.pixels.Parameters;
+import qupath.lib.experimental.pixels.Processor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathAnnotationObject;
@@ -228,7 +231,7 @@ public class InstanSeg {
                         (BaseNDManager)baseManager.getParentManager());
 
                 var tiler = createTiler(downsample, tileDims, padding);
-                var predictionProcessor = new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
+                var predictionProcessor = createProcessor(predictors, inputChannels, tileDims, padToInputSize);
                 var outputHandler = createOutputHandler(preferredOutputClass, randomColors, boundaryThreshold);
                 var postProcessor = createPostProcessor();
 
@@ -243,14 +246,18 @@ public class InstanSeg {
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);
                 int nObjects = pathObjects.stream().mapToInt(PathObject::nChildObjects).sum();
-                return new InstanSegResults(
-                        predictionProcessor.getPixelsProcessedCount(),
-                        predictionProcessor.getTilesProcessedCount(),
-                        predictionProcessor.getTilesFailedCount(),
-                        nObjects,
-                        System.currentTimeMillis() - startTime,
-                        predictionProcessor.wasInterrupted()
-                );
+                if (predictionProcessor instanceof TilePredictionProcessor tileProcessor) {
+                    return new InstanSegResults(
+                            tileProcessor.getPixelsProcessedCount(),
+                            tileProcessor.getTilesProcessedCount(),
+                            tileProcessor.getTilesFailedCount(),
+                            nObjects,
+                            System.currentTimeMillis() - startTime,
+                            tileProcessor.wasInterrupted()
+                    );
+                } else {
+                    return InstanSegResults.emptyInstance();
+                }
             } finally {
                 for (var predictor: predictors) {
                     predictor.close();
@@ -271,6 +278,28 @@ public class InstanSeg {
      */
     private static boolean debugTiles() {
         return System.getProperty("instanseg.debug.tiles", "false").strip().equalsIgnoreCase("true");
+    }
+
+    private static Processor<Mat, Mat, Mat> createProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
+                                                            Collection<? extends ColorTransforms.ColorTransform> inputChannels,
+                                                            int tileDims, boolean padToInputSize) {
+        if (debugTiles())
+            return InstanSeg::createOnes;
+        return new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
+    }
+
+    private static Mat createOnes(Parameters<Mat, Mat> parameters) {
+        var tileRequest = parameters.getTileRequest();
+        int width, height;
+        if (tileRequest == null) {
+            var region = parameters.getRegionRequest();
+            width = (int)Math.round(region.getWidth() / region.getDownsample());
+            height = (int)Math.round(region.getHeight() / region.getDownsample());
+        } else {
+            width = tileRequest.getTileWidth();
+            height = tileRequest.getTileHeight();
+        }
+        return Mat.ones(height, width, opencv_core.CV_8UC1).asMat();
     }
 
     private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass, boolean randomColors,
