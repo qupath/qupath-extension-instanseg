@@ -148,7 +148,7 @@ class DetectionMeasurer {
     /**
      * A builder class for DetectionMeasurer.
      */
-    public static class Builder {
+    static class Builder {
 
         private TaskRunner taskRunner;
         private Collection<ObjectMeasurements.Compartments> compartments = Arrays.asList(ObjectMeasurements.Compartments.values());
