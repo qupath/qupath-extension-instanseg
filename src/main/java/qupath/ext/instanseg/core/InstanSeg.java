@@ -114,9 +114,8 @@ public class InstanSeg {
         validateImageAndObjectsOrThrow(imageData, pathObjects);
         var results = runInstanSeg(imageData, pathObjects);
         if (makeMeasurements) {
-            for (var pathObject : pathObjects) {
-                makeMeasurements(imageData, pathObject.getChildObjects());
-            }
+            var detections = pathObjects.stream().flatMap(p -> p.getChildObjects().stream()).toList();
+            makeMeasurements(imageData, detections);
         }
         return results;
     }
@@ -148,6 +147,7 @@ public class InstanSeg {
     private void makeMeasurements(ImageData<BufferedImage> imageData, Collection<? extends PathObject> detections) {
         double downsample = model.getPreferredDownsample(imageData.getServer().getPixelCalibration());
         DetectionMeasurer.builder()
+                .taskRunner(taskRunner)
                 .downsample(downsample)
                 .build()
                 .makeMeasurements(imageData, detections);
