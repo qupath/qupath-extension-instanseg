@@ -794,7 +794,6 @@ public class InstanSegController extends BorderPane {
         CompletableFuture.supplyAsync(this::ensurePyTorchAvailable, ForkJoinPool.commonPool())
                         .thenAccept((Boolean success) -> {
                             if (success) {
-                                pendingTask.set(task);
                                 // Reset the pending task when it completes (either successfully or not)
                                 task.stateProperty().addListener((observable, oldValue, newValue) -> {
                                     if (Set.of(Worker.State.CANCELLED, Worker.State.SUCCEEDED, Worker.State.FAILED).contains(newValue)) {
@@ -802,6 +801,9 @@ public class InstanSegController extends BorderPane {
                                             pendingTask.set(null);
                                     }
                                 });
+                                // Setting the pending task prompts it to be run (so we need to do it after attaching
+                                // the listener, in case it ends really quickly)
+                                pendingTask.set(task);
                             }
                         });
     }

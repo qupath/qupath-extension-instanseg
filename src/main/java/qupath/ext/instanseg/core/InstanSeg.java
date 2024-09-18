@@ -5,10 +5,14 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.training.util.ProgressBar;
+import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
+import qupath.lib.experimental.pixels.OutputHandler;
+import qupath.lib.experimental.pixels.Parameters;
+import qupath.lib.experimental.pixels.Processor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
 import qupath.lib.objects.PathAnnotationObject;
@@ -226,33 +230,34 @@ public class InstanSeg {
                 printResourceCount("Resource count after creating predictors",
                         (BaseNDManager)baseManager.getParentManager());
 
-                int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
-                var predictionProcessor = new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
+                var tiler = createTiler(downsample, tileDims, padding);
+                var predictionProcessor = createProcessor(predictors, inputChannels, tileDims, padToInputSize);
+                var outputHandler = createOutputHandler(preferredOutputClass, randomColors, boundaryThreshold);
+                var postProcessor = createPostProcessor();
+
                 var processor = OpenCVProcessor.builder(predictionProcessor)
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(inputChannels)
                                 .apply(parameters.getImageData(), parameters.getRegionRequest()))
-                        .tiler(Tiler.builder(sizeWithoutPadding)
-                                .alignCenter()
-                                .cropTiles(false)
-                                .build()
-                        )
-                        .outputHandler(
-                                new PruneObjectOutputHandler<>(
-                                        new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold))
+                        .tiler(tiler)
+                        .outputHandler(outputHandler)
                         .padding(padding)
-                        .postProcess(createPostProcessor())
+                        .postProcess(postProcessor)
                         .downsample(downsample)
                         .build();
                 processor.processObjects(taskRunner, imageData, pathObjects);
                 int nObjects = pathObjects.stream().mapToInt(PathObject::nChildObjects).sum();
-                return new InstanSegResults(
-                        predictionProcessor.getPixelsProcessedCount(),
-                        predictionProcessor.getTilesProcessedCount(),
-                        predictionProcessor.getTilesFailedCount(),
-                        nObjects,
-                        System.currentTimeMillis() - startTime,
-                        predictionProcessor.wasInterrupted()
-                );
+                if (predictionProcessor instanceof TilePredictionProcessor tileProcessor) {
+                    return new InstanSegResults(
+                            tileProcessor.getPixelsProcessedCount(),
+                            tileProcessor.getTilesProcessedCount(),
+                            tileProcessor.getTilesFailedCount(),
+                            nObjects,
+                            System.currentTimeMillis() - startTime,
+                            tileProcessor.wasInterrupted()
+                    );
+                } else {
+                    return InstanSegResults.emptyInstance();
+                }
             } finally {
                 for (var predictor: predictors) {
                     predictor.close();
@@ -265,6 +270,54 @@ public class InstanSeg {
                     System.currentTimeMillis() - startTime, e instanceof InterruptedException);
         }
     }
+
+    /**
+     * Check if we are requesting tiles for debugging purposes.
+     * When this is true, we should create objects that represent the tiles - not the objects to be detected.
+     * @return
+     */
+    private static boolean debugTiles() {
+        return System.getProperty("instanseg.debug.tiles", "false").strip().equalsIgnoreCase("true");
+    }
+
+    private static Processor<Mat, Mat, Mat> createProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
+                                                            Collection<? extends ColorTransforms.ColorTransform> inputChannels,
+                                                            int tileDims, boolean padToInputSize) {
+        if (debugTiles())
+            return InstanSeg::createOnes;
+        return new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
+    }
+
+    private static Mat createOnes(Parameters<Mat, Mat> parameters) {
+        var tileRequest = parameters.getTileRequest();
+        int width, height;
+        if (tileRequest == null) {
+            var region = parameters.getRegionRequest();
+            width = (int)Math.round(region.getWidth() / region.getDownsample());
+            height = (int)Math.round(region.getHeight() / region.getDownsample());
+        } else {
+            width = tileRequest.getTileWidth();
+            height = tileRequest.getTileHeight();
+        }
+        return Mat.ones(height, width, opencv_core.CV_8UC1).asMat();
+    }
+
+    private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass, boolean randomColors,
+                                                                    int boundaryThreshold) {
+        if (debugTiles())
+            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
+        return new PruneObjectOutputHandler<>(
+                      new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold);
+    }
+
+    private static Tiler createTiler(double downsample, int tileDims, int padding) {
+        int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
+        return Tiler.builder(sizeWithoutPadding)
+                .alignCenter()
+                .cropTiles(false)
+                .build();
+    }
+
 
     /**
      * Get the input channels to use; if we don't have any specified, use all of them
@@ -284,6 +337,8 @@ public class InstanSeg {
     }
 
     private static ObjectProcessor createPostProcessor() {
+        if (debugTiles())
+            return null;
         var merger = ObjectMerger.createIoMinMerger(0.5);
         var fixer = OverlapFixer.builder()
                 .clipOverlaps()
