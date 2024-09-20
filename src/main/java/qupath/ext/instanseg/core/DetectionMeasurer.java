@@ -91,7 +91,8 @@ class DetectionMeasurer {
             for (var cell : objects) {
                 tasks.add(new MeasurementTask(server2, cell, downsample, featuresArray, compartments, measurements));
             }
-            taskRunner.runTasks(tasks);
+            String message = objects.size() == 1 ? "Measuring 1 object" : "Measuring " + objects.size() + " objects";
+            taskRunner.runTasks(message, tasks);
             // It's possible we have the same server - in which case we don't want to close it twice
             if (!Objects.equals(server, server2)) {
                 server2.close();
