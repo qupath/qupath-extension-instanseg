@@ -7,10 +7,8 @@ import ai.djl.translate.TranslatorContext;
 import org.bytedeco.opencv.opencv_core.Mat;
 import qupath.ext.djl.DjlTools;
 
-import java.util.Arrays;
 
-
-class MatTranslator implements Translator<Mat, Mat> {
+class MatTranslator implements Translator<Mat, Mat[]> {
 
     private final String inputLayoutNd;
     private final String outputLayoutNd;
@@ -59,9 +57,15 @@ class MatTranslator implements Translator<Mat, Mat> {
     }
 
     @Override
-    public Mat processOutput(TranslatorContext ctx, NDList list) {
+    public Mat[] processOutput(TranslatorContext ctx, NDList list) {
         var array = list.getFirst();
-        return DjlTools.ndArrayToMat(array, outputLayoutNd);
+        var labels = DjlTools.ndArrayToMat(array, outputLayoutNd);
+        var output = new Mat[list.size()];
+        output[0] = labels;
+        for (int i = 1; i < list.size(); i++) {
+            output[i] = DjlTools.ndArrayToMat(list.get(i), "HW");
+        }
+        return output;
     }
 
 }
