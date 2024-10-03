@@ -14,6 +14,7 @@ import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjects;
 import qupath.lib.objects.PathTileObject;
+import qupath.lib.objects.classes.PathClass;
 import qupath.lib.regions.ImagePlane;
 import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
@@ -21,6 +22,7 @@ import qupath.opencv.tools.OpenCVTools;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,7 +30,7 @@ import java.util.Random;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat> {
+class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectConverter<Mat, Mat, Mat[]> {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanSegOutputToObjectConverter.class);
 
@@ -46,18 +48,19 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     }
 
     @Override
-    public List<PathObject> convertToObjects(Parameters<Mat, Mat> params, Mat output) {
+    public List<PathObject> convertToObjects(Parameters<Mat, Mat> params, Mat[] output) {
         if (output == null) {
             return List.of();
         }
-        int nChannels = output.channels();
+        var matLabels = output[0];
+        int nChannels = matLabels.channels();
         if (nChannels < 1 || nChannels > 2)
             throw new IllegalArgumentException("Expected 1 or 2 channels, but found " + nChannels);
 
 
         List<Map<Number, ROI>> roiMaps = new ArrayList<>();
         ImagePlane plane = params.getRegionRequest().getImagePlane();
-        for (var mat : OpenCVTools.splitChannels(output)) {
+        for (var mat : OpenCVTools.splitChannels(matLabels)) {
             var image = OpenCVTools.matToSimpleImage(mat, 0);
             var geoms = ContourTracing.createGeometries(image, params.getRegionRequest(), 1, -1);
             roiMaps.add(geoms.entrySet().stream()
@@ -66,6 +69,17 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                                     Map.Entry::getKey,
                                     entry -> geometryToFilledROI(entry.getValue(), plane)))
             );
+        }
+
+        // If we have two outputs, the second may give classifications - arrange by row
+        Map<Number, double[]> classifications = new HashMap<>();
+        if (output.length > 1) {
+            var matClass = output[1];
+            int nRows = matClass.rows();
+            for (int r = 0; r < nRows; r++) {
+                double[] doubles = OpenCVTools.extractDoubles(matClass.row(r));
+                classifications.put(r, doubles);
+            }
         }
 
         // We reverse the order because the smaller output (e.g. nucleus) comes before the larger out (e.g. cell)
@@ -83,8 +97,11 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             Map<Number, ROI> childROIs = roiMaps.size() >= 2 ? roiMaps.get(1) : Collections.emptyMap();
             pathObjects = parentROIs.entrySet().stream().map(entry -> {
                 var parent = entry.getValue();
-                var child = childROIs.getOrDefault(entry.getKey(), null);
-                return PathObjects.createCellObject(parent, child);
+                var label = entry.getKey();
+                var child = childROIs.getOrDefault(label, null);
+                var cell = PathObjects.createCellObject(parent, child);
+                assignClassificationsIfAvailable(cell, classifications.getOrDefault(label, null));
+                return cell;
             }).toList();
         } else {
             Function<ROI, PathObject> createObjectFun = createObjectFun(preferredObjectClass);
@@ -92,17 +109,19 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             Map<Number, ROI> parentMap = roiMaps.getFirst();
             List<Map<Number, ROI>> childMaps = roiMaps.size() == 1 ? Collections.emptyList() : roiMaps.subList(1, roiMaps.size());
             for (var entry : parentMap.entrySet()) {
+                var label = entry.getKey();
                 var roi = entry.getValue();
                 var pathObject = createObjectFun.apply(roi);
                 if (roiMaps.size() > 1) {
                     for (var subMap : childMaps) {
-                        var childROI = subMap.get(entry.getKey());
+                        var childROI = subMap.get(label);
                         if (childROI != null) {
                             var childObject = createObjectFun.apply(childROI);
                             pathObject.addChildObject(childObject);
                         }
                     }
                 }
+                assignClassificationsIfAvailable(pathObject, classifications.getOrDefault(label, null));
                 pathObjects.add(pathObject);
             }
         }
@@ -114,6 +133,25 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
         return pathObjects;
     }
+
+    private static void assignClassificationsIfAvailable(PathObject pathObject, double[] values) {
+        if (values == null)
+            return;
+        try (var ml = pathObject.getMeasurementList()) {
+            int maxInd = 0;
+            double maxVal = values[0];
+            for (int i = 0; i < values.length; i++) {
+                double val = values[i];
+                if (val > maxVal) {
+                    maxVal = val;
+                    maxInd = i;
+                }
+                pathObject.getMeasurementList().put("Prediction " + i, val);
+            }
+            pathObject.setPathClass(PathClass.fromString("Class " + maxInd));
+        }
+    }
+
 
     /**
      * Assign a random color to a PathObject and all descendants, returning the object.
