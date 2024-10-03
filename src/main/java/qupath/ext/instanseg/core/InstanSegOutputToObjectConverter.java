@@ -78,7 +78,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             int nRows = matClass.rows();
             for (int r = 0; r < nRows; r++) {
                 double[] doubles = OpenCVTools.extractDoubles(matClass.row(r));
-                classifications.put(r, doubles);
+                classifications.put(r+1, doubles);
             }
         }
 
