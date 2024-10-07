@@ -7,12 +7,14 @@ import qupath.ext.instanseg.core.InstanSeg;
 import qupath.ext.instanseg.core.InstanSegModel;
 import qupath.ext.instanseg.core.InstanSegResults;
 import qupath.fx.dialogs.Dialogs;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.TaskRunnerFX;
 import qupath.lib.images.ImageData;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -99,7 +101,7 @@ class InstanSegTask extends Task<Void> {
                                 .build()
                                 .detectObjects()
                             """,
-                path.get(),
+                modelPathToString(path.get()),
                 device,
                 InputChannelItem.toConstructorString(channels),
                 outputChannels.length == 0 ? "" : Arrays.stream(outputChannels)
@@ -125,6 +127,13 @@ class InstanSegTask extends Task<Void> {
             Dialogs.showErrorMessage(resources.getString("title"), errorMessage);
         }
         return null;
+    }
+
+    private static String modelPathToString(Path path) {
+        if (GeneralTools.isWindows())
+            return path.toString().replaceAll("\\\\", "/");
+        else
+            return path.toString();
     }
 
 }
