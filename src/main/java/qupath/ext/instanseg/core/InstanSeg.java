@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
+import qupath.lib.experimental.pixels.PixelProcessor;
 import qupath.lib.experimental.pixels.Processor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
@@ -208,7 +209,7 @@ public class InstanSeg {
         var inputChannels = getInputChannels(imageData);
 
         try (var model = Criteria.builder()
-                .setTypes(Mat.class, Mat.class)
+                .setTypes(Mat.class, Mat[].class)
                 .optModelUrls(String.valueOf(modelPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
@@ -220,7 +221,7 @@ public class InstanSeg {
             printResourceCount("Resource count before prediction",
                     (BaseNDManager)baseManager.getParentManager());
             baseManager.debugDump(2);
-            BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
+            BlockingQueue<Predictor<Mat, Mat[]>> predictors = new ArrayBlockingQueue<>(nPredictors);
 
             try {
                 for (int i = 0; i < nPredictors; i++) {
@@ -234,8 +235,9 @@ public class InstanSeg {
                 var predictionProcessor = createProcessor(predictors, inputChannels, tileDims, padToInputSize);
                 var outputHandler = createOutputHandler(preferredOutputClass, randomColors, boundaryThreshold);
                 var postProcessor = createPostProcessor();
-
-                var processor = OpenCVProcessor.builder(predictionProcessor)
+                var processor = new PixelProcessor.Builder<Mat, Mat, Mat[]>()
+                        .processor(predictionProcessor)
+                        .maskSupplier(OpenCVProcessor.createMatMaskSupplier())
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(inputChannels)
                                 .apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(tiler)
@@ -271,6 +273,7 @@ public class InstanSeg {
         }
     }
 
+
     /**
      * Check if we are requesting tiles for debugging purposes.
      * When this is true, we should create objects that represent the tiles - not the objects to be detected.
@@ -280,7 +283,7 @@ public class InstanSeg {
         return System.getProperty("instanseg.debug.tiles", "false").strip().equalsIgnoreCase("true");
     }
 
-    private static Processor<Mat, Mat, Mat> createProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
+    private static Processor<Mat, Mat, Mat[]> createProcessor(BlockingQueue<Predictor<Mat, Mat[]>> predictors,
                                                             Collection<? extends ColorTransforms.ColorTransform> inputChannels,
                                                             int tileDims, boolean padToInputSize) {
         if (debugTiles())
@@ -288,7 +291,7 @@ public class InstanSeg {
         return new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
     }
 
-    private static Mat createOnes(Parameters<Mat, Mat> parameters) {
+    private static Mat[] createOnes(Parameters<Mat, Mat> parameters) {
         var tileRequest = parameters.getTileRequest();
         int width, height;
         if (tileRequest == null) {
@@ -299,13 +302,14 @@ public class InstanSeg {
             width = tileRequest.getTileWidth();
             height = tileRequest.getTileHeight();
         }
-        return Mat.ones(height, width, opencv_core.CV_8UC1).asMat();
+        return new Mat[]{Mat.ones(height, width, opencv_core.CV_8UC1).asMat()};
     }
 
-    private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass, boolean randomColors,
+    private static OutputHandler<Mat, Mat, Mat[]> createOutputHandler(Class<? extends PathObject> preferredOutputClass, boolean randomColors,
                                                                     int boundaryThreshold) {
-        if (debugTiles())
-            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
+        // TODO: Reinstate this for Mat[] output (it was written for Mat output)
+//        if (debugTiles())
+//            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
         return new PruneObjectOutputHandler<>(
                       new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold);
     }
