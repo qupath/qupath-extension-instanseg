@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.ui;
 
+import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.ObjectBinding;
@@ -339,6 +340,10 @@ public class InstanSegController extends BorderPane {
 
     private void updateInputChannels(ImageData<BufferedImage> imageData) {
         if (imageData == null) {
+            return;
+        }
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> updateInputChannels(imageData));
             return;
         }
         // Store the checks without changing the current value
