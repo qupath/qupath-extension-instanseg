@@ -843,7 +843,12 @@ public class InstanSegController extends BorderPane {
     @FXML
     private void selectAllTMACores() {
         var hierarchy = qupath.getImageData().getHierarchy();
-        hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getTMAGrid().getTMACoreList(), null);
+        hierarchy.getSelectionModel().setSelectedObjects(
+                hierarchy
+                        .getTMAGrid().getTMACoreList()
+                        .stream().filter(core -> !core.isMissing())
+                        .toList(),
+                null);
     }
 
     private void promptToUpdateDirectory(StringProperty dirPath) {
