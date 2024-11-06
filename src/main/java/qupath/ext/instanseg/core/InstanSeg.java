@@ -162,7 +162,10 @@ public class InstanSeg {
             return InstanSegResults.emptyInstance();
         }
         Path modelPath = oModelPath.get().resolve("instanseg.pt");
-        int nPredictors = 1; // todo: change me?
+
+        // Provide some way to change the number of predictors, even if this can't be specified through the UI
+        // See https://forum.image.sc/t/instanseg-under-utilizing-cpu-only-2-3-cores/104496/7
+        int nPredictors = Integer.parseInt(System.getProperty("instanseg.numPredictors", "1"));
 
         // Optionally pad images so that every tile has the required size.
         // This is useful if the model requires a specific input size - but InstanSeg should be able to handle this
@@ -240,7 +243,7 @@ public class InstanSeg {
                                 .apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(tiler)
                         .outputHandler(outputHandler)
-                        .padding(padding)
+                        .padding((int)Math.round(padding * downsample))
                         .postProcess(postProcessor)
                         .downsample(downsample)
                         .build();
@@ -302,12 +305,17 @@ public class InstanSeg {
         return Mat.ones(height, width, opencv_core.CV_8UC1).asMat();
     }
 
-    private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass, boolean randomColors,
+    private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass,
+                                                                    boolean randomColors,
                                                                     int boundaryThreshold) {
         if (debugTiles())
             return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
-        return new PruneObjectOutputHandler<>(
-                      new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors), boundaryThreshold);
+        var converter = new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors);
+        if (boundaryThreshold >= 0) {
+            return new PruneObjectOutputHandler<>(converter, boundaryThreshold);
+        } else {
+            return OutputHandler.createObjectOutputHandler(converter);
+        }
     }
 
     private static Tiler createTiler(double downsample, int tileDims, int padding) {
