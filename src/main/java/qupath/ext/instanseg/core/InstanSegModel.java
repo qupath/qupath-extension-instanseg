@@ -48,8 +48,8 @@ public class InstanSegModel {
     }
 
     private InstanSegModel(String name, URL modelURL) {
-        this.modelURL = modelURL;
         this.name = name;
+        this.modelURL = modelURL;
     }
 
     /**
@@ -215,8 +215,9 @@ public class InstanSegModel {
         String name = getName();
         String parent = getPath().map(Path::getFileName).map(Path::toString).orElse(null);
         String version = getModel().map(BioimageIoSpec.BioimageIoModel::getVersion).orElse(null);
-        if (parent != null && !Objects.equals(parent, name))
+        if (parent != null && !parent.equals(name)) {
             name = parent + "/" + name;
+        }
         if (version != null)
             name += "-" + version;
         return name;
