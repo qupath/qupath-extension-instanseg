@@ -180,7 +180,7 @@ public class InstanSegModel {
         if (requested > 0 && current > 0) {
             return getPreferredDownsample(current, requested);
         } else {
-            logger.warn("Invalid pixel size of {} for pixel calibration {}", requested, cal);
+            logger.warn("Invalid pixel size of {} for {}", requested, cal);
             return 1.0;
         }
     }
@@ -193,6 +193,7 @@ public class InstanSegModel {
      * @return The exact downsample, unless it's close to an integer, in which case the integer.
      */
     static double getPreferredDownsample(double currentPixelSize, double requestedPixelSize) {
+        System.out.println(requestedPixelSize);
         double downsample = requestedPixelSize / currentPixelSize;
         double downsampleRounded = Math.round(downsample);
         if (GeneralTools.almostTheSame(downsample, Math.round(downsample), 0.01)) {
@@ -358,9 +359,11 @@ public class InstanSegModel {
             var config = model.getConfig().getOrDefault("qupath", null);
             if (config instanceof Map configMap) {
                 var axes = (List) configMap.get("axes");
+                String x = (String) ((Map) (axes.get(0))).get("step");
+                String y = (String) ((Map) (axes.get(1))).get("step");
                 return Optional.of(Map.of(
-                        "x", (Double) ((Map) (axes.get(0))).get("step"),
-                        "y", (Double) ((Map) (axes.get(1))).get("step")
+                        "x", Double.valueOf(x),
+                        "y", Double.valueOf(y)
                 ));
             }
             return Optional.of(Map.of("x", 1.0, "y", 1.0));
