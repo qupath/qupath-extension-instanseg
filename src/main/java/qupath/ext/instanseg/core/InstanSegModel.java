@@ -245,7 +245,6 @@ public class InstanSegModel {
         return name;
     }
 
-
     /**
      * Try to check the number of channels in the model.
      * @return The integer if the model is downloaded, otherwise empty
@@ -264,7 +263,6 @@ public class InstanSegModel {
         }
     }
 
-
     /**
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
@@ -272,7 +270,6 @@ public class InstanSegModel {
     private Optional<BioimageIoSpec.BioimageIoModel> getModel() {
         return Optional.ofNullable(model);
     }
-
 
     private static Path downloadZipIfNeeded(URL url, Path localDirectory, String filename) throws IOException {
         var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
@@ -341,8 +338,6 @@ public class InstanSegModel {
         bos.close();
     }
 
-
-
     private String getREADMEString(Path path) {
         var file = path.resolve(name + "_README.md");
         if (Files.exists(file)) {
@@ -387,6 +382,5 @@ public class InstanSegModel {
             return (int)Math.round(output.getShape().getOffset()[ind] * 2);
         });
     }
-
 
 }
