@@ -30,7 +30,7 @@ public class ModelListCell extends ListCell<InstanSegModel> {
             setGraphic(null);
             setTooltip(null);
         } else {
-            setText(model.getName());
+            setText(model.toString());
             var dir = InstanSegUtils.getLocalModelDirectory().orElse(null);
             if (dir != null && !model.isDownloaded(dir)) {
                 setGraphic(web);
@@ -38,7 +38,7 @@ public class ModelListCell extends ListCell<InstanSegModel> {
                 setTooltip(tooltip);
             } else {
                 setGraphic(null);
-                tooltip.setText(model.getName());
+                tooltip.setText(model.toString());
                 setTooltip(tooltip);
             }
         }

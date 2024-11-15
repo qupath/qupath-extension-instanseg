@@ -282,7 +282,6 @@ public class InstanSegController extends BorderPane {
 
     /**
      * Open the model directory in the system file browser when double-clicked.
-     * @param event
      */
     @FXML
     void handleModelDirectoryLabelClick(MouseEvent event) {
@@ -357,22 +356,28 @@ public class InstanSegController extends BorderPane {
             // Return if we could store previously-saved checks - this will fail if the items have changed,
             // of if there were no previous checks (e.g. because its'a new model)
             return;
-        } else if (imageData.isBrightfield()) {
-            comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
-            var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-            if (model != null && modelDir != null && model.isDownloaded(modelDir)) {
-                var modelChannels = model.getNumChannels();
-                if (modelChannels.isPresent()) {
-                    int nModelChannels = modelChannels.get();
-                    if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
-                        comboInputChannels.getCheckModel().clearChecks();
-                        comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
-                    }
-                }
+        }
 
-            }
-        } else {
+        if (!imageData.isBrightfield()) {
+            // if fluorescence or similar, then bung in all channels
             comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
+            return;
+        }
+
+        // if brightfield, then check R, G, and B
+        comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
+        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
+        // todo: not clear why this is needed. is this handling the checkcombobox weirdness on clearing checks, or?
+        if (model != null && modelDir != null && model.isDownloaded(modelDir)) {
+            var modelChannels = model.getNumChannels();
+            if (modelChannels.isPresent()) {
+                int nModelChannels = modelChannels.get();
+                if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
+                    comboInputChannels.getCheckModel().clearChecks();
+                    comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
+                }
+            }
+
         }
     }
 

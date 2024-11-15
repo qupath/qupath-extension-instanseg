@@ -146,15 +146,15 @@ class Watcher {
                     // because this is read from rdf.yaml.
                     // To reduce the risk of this causing trouble, do a full directory refresh on any change.
                     if (kind == ENTRY_CREATE) {
-                        logger.info("File created: {}", rawEvent);
+                        logger.debug("File created: {}", rawEvent);
                         refreshAllModelPaths();
                     }
                     if (kind == ENTRY_DELETE) {
-                        logger.info("File deleted: {}", rawEvent);
+                        logger.debug("File deleted: {}", rawEvent);
                         refreshAllModelPaths();
                     }
                     if (kind == ENTRY_MODIFY) {
-                        logger.info("File modified: {}", rawEvent);
+                        logger.debug("File modified: {}", rawEvent);
                         refreshAllModelPaths();
                     }
                 }
