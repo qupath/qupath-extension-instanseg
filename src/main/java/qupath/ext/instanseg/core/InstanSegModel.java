@@ -193,7 +193,6 @@ public class InstanSegModel {
      * @return The exact downsample, unless it's close to an integer, in which case the integer.
      */
     static double getPreferredDownsample(double currentPixelSize, double requestedPixelSize) {
-        System.out.println(requestedPixelSize);
         double downsample = requestedPixelSize / currentPixelSize;
         double downsampleRounded = Math.round(downsample);
         if (GeneralTools.almostTheSame(downsample, Math.round(downsample), 0.01)) {
