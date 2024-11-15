@@ -44,6 +44,8 @@ import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.WebViews;
 import qupath.lib.images.ImageData;
+import qupath.lib.objects.PathObjectTools;
+import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
@@ -843,17 +845,16 @@ public class InstanSegController extends BorderPane {
     private void selectAllAnnotations() {
         var hierarchy = qupath.getImageData().getHierarchy();
         hierarchy.getSelectionModel().setSelectedObjects(hierarchy.getAnnotationObjects(), null);
+        var step = new DefaultScriptableWorkflowStep("Select all annotations", "selectAnnotations()");
+        qupath.imageDataProperty().get().getHistoryWorkflow().addStep(step);
     }
 
     @FXML
     private void selectAllTMACores() {
         var hierarchy = qupath.getImageData().getHierarchy();
-        hierarchy.getSelectionModel().setSelectedObjects(
-                hierarchy
-                        .getTMAGrid().getTMACoreList()
-                        .stream().filter(core -> !core.isMissing())
-                        .toList(),
-                null);
+        hierarchy.getSelectionModel().setSelectedObjects(PathObjectTools.getTMACoreObjects(hierarchy, false),null);
+        var step = new DefaultScriptableWorkflowStep("Select all TMA cores", "selectTMACores()");
+        qupath.imageDataProperty().get().getHistoryWorkflow().addStep(step);
     }
 
     private void promptToUpdateDirectory(StringProperty dirPath) {
