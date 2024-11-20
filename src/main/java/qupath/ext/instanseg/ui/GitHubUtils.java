@@ -83,7 +83,7 @@ public class GitHubUtils {
     static List<GitHubRelease> getReleases(Path modelDir) {
         Path cachedReleases = modelDir == null ? null : modelDir.resolve("releases.json");
 
-        String uString = "https://api.github.com/repos/instanseg/InstanSeg/releases";
+        String uString = "https://api.github.com/repos/alanocallaghan/InstanSeg/releases";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(uString))
                 .GET()

@@ -30,6 +30,7 @@ import java.util.Objects;
 public class InstanSegModel {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
+    private String version;
     private URL modelURL = null;
 
     /**
@@ -44,11 +45,13 @@ public class InstanSegModel {
     private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
+        this.version = model.getVersion();
         this.name = model.getName();
     }
 
-    private InstanSegModel(String name, URL modelURL) {
+    private InstanSegModel(String name, String version, URL modelURL) {
         this.name = name;
+        this.version = version;
         this.modelURL = modelURL;
     }
 
@@ -68,29 +71,28 @@ public class InstanSegModel {
      * @param browserDownloadUrl The download URL from eg GitHub
      * @return A handle on the created model
      */
-    public static InstanSegModel fromURL(String name, URL browserDownloadUrl) {
-        return new InstanSegModel(name, browserDownloadUrl);
+    public static InstanSegModel fromURL(String name, String version, URL browserDownloadUrl) {
+        return new InstanSegModel(name, version, browserDownloadUrl);
     }
 
     /**
      * Check if the model has been downloaded already.
-     * @return True if a flag has been set.
+     * @return True if the model has a known path that exists and is valid, or if a suitable directory can be found in the localModelPath
      */
     public boolean isDownloaded(Path localModelPath) {
         // Check path first - *sometimes* the model might be downloaded, but have a name
         // that doesn't match with the filename (although we'd prefer this didn't happen...)
-        if (path != null && model != null && Files.exists(path))
+        if (path != null && model != null && isValidModel(path))
             return true;
-        // todo: this should also check if the contents are what we expect
-        if (Files.exists(localModelPath.resolve(name))) {
-            try {
-                download(localModelPath);
-            } catch (IOException e) {
-                logger.error("Model directory exists but is not valid", e);
-            }
-        } else {
+        if (!Files.exists(localModelPath.resolve(name).resolve(version))) {
             // The model may have been deleted or renamed - we won't be able to load it
             return false;
+        }
+
+        try {
+            download(localModelPath);
+        } catch (IOException e) {
+            logger.error("Model directory exists but is not valid", e);
         }
         return path != null && model != null;
     }
@@ -100,14 +102,16 @@ public class InstanSegModel {
      * @throws IOException If an error occurs when downloading, unzipping, etc.
      */
     public void download(Path localModelPath) throws IOException {
-        if (path != null && Files.exists(path) && model != null)
+        if (path != null && isValidModel(path) && model != null) {
             return;
+        }
         var zipFile = downloadZipIfNeeded(
                 this.modelURL,
                 localModelPath,
-                name);
+                name + "-" + version);
         this.path = unzipIfNeeded(zipFile);
         this.model = BioimageIoSpec.parseModel(path.toFile());
+        this.version = model.getVersion();
     }
 
     /**
@@ -213,8 +217,8 @@ public class InstanSegModel {
     @Override
     public String toString() {
         String name = getName();
-        String parent = getPath().map(Path::getFileName).map(Path::toString).orElse(null);
-        String version = getModel().map(BioimageIoSpec.BioimageIoModel::getVersion).orElse(null);
+        String parent = getPath().map(Path::getParent).map(Path::getFileName).map(Path::toString).orElse(null);
+        String version = getModel().map(BioimageIoSpec.BioimageIoModel::getVersion).orElse(this.version);
         if (parent != null && !parent.equals(name)) {
             name = parent + "/" + name;
         }
@@ -290,16 +294,20 @@ public class InstanSegModel {
         return Files.exists(zipFile);
     }
 
-    private static Path unzipIfNeeded(Path zipFile) throws IOException {
-        var outdir = zipFile.resolveSibling(zipFile.getFileName().toString().replace(".zip", ""));
+    private Path unzipIfNeeded(Path zipFile) throws IOException {
+        var zipSpec = BioimageIoSpec.parseModel(zipFile);
+        String version = zipSpec.getVersion();
+        var outdir = zipFile.resolveSibling(zipSpec.getName()).resolve(version);
         if (!isUnpackedAlready(outdir)) {
             try {
-                unzip(zipFile, zipFile.getParent());
+                unzip(zipFile, outdir);
                 // Files.delete(zipFile);
             } catch (IOException e) {
+                logger.error("Error unzipping model", e);
                 // clean up files just in case!
-                Files.deleteIfExists(zipFile);
                 Files.deleteIfExists(outdir);
+            } finally {
+                Files.deleteIfExists(zipFile);
             }
         }
         return outdir;
@@ -311,7 +319,7 @@ public class InstanSegModel {
 
     private static void unzip(Path zipFile, Path destination) throws IOException {
         if (!Files.exists(destination)) {
-            Files.createDirectory(destination);
+            Files.createDirectories(destination);
         }
         ZipInputStream zipIn = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile.toFile())));
         ZipEntry entry = zipIn.getNextEntry();

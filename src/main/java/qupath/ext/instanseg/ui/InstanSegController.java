@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -549,6 +550,7 @@ public class InstanSegController extends BorderPane {
             });
         } catch (IOException ex) {
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+            logger.error("Error download model", ex);
         }
         return model;
     }
@@ -618,15 +620,18 @@ public class InstanSegController extends BorderPane {
             logger.info("No releases found.");
             return List.of();
         }
-        var release = releases.getFirst();
-        var assets = GitHubUtils.getAssets(release);
         List<InstanSegModel> models = new ArrayList<>();
-        for (var asset : assets) {
-            models.add(
-                    InstanSegModel.fromURL(
-                            asset.getName().replace(".zip", ""),
-                            asset.getUrl())
-            );
+        for (var release: releases) {
+            var assets = GitHubUtils.getAssets(release);
+            for (var asset: assets) {
+                models.add(
+                        InstanSegModel.fromURL(
+                                asset.getName().replace(".zip", ""),
+                                release.getName(),
+                                asset.getUrl()
+                        )
+                );
+            }
         }
         return List.copyOf(models);
     }

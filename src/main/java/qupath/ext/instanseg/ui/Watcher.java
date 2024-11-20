@@ -74,11 +74,11 @@ class Watcher {
         // Currently, we look *only* in the model directory for models
         // But we could register subdirectories here if we wanted (e.g. 'local', 'downloaded')
         if (oldPath != null) {
-            unregister(oldPath);
+            unregister(oldPath.resolve("local"));
         }
-        if (newPath != null && Files.isDirectory(newPath)) {
+        if (newPath != null && Files.isDirectory(newPath.resolve("local"))) {
             try {
-                register(newPath);
+                register(newPath.resolve("local"));
             } catch (IOException e) {
                 logger.error("Unable to register new model directory", e);
             }
