@@ -358,8 +358,8 @@ public class InstanSegModel {
             var config = model.getConfig().getOrDefault("qupath", null);
             if (config instanceof Map configMap) {
                 var axes = (List) configMap.get("axes");
-                String x = (String) ((Map) (axes.get(0))).get("step");
-                String y = (String) ((Map) (axes.get(1))).get("step");
+                String x = String.valueOf(((Map) (axes.get(0))).get("step"));
+                String y = String.valueOf(((Map) (axes.get(1))).get("step"));
                 return Optional.of(Map.of(
                         "x", Double.valueOf(x),
                         "y", Double.valueOf(y)
