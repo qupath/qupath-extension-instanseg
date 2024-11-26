@@ -15,6 +15,15 @@ base {
     group = "io.github.qupath"
 }
 
+javafx {
+    version = libs.versions.jdk.get()
+    modules = listOf(
+        "javafx.controls",
+        "javafx.fxml",
+        "javafx.web"
+    )
+}
+
 val qupathVersion = gradle.extra["qupath.app.version"]
 
 /**
