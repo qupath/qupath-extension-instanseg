@@ -54,7 +54,7 @@ class Watcher {
     //Binding to the directory we want to watch for models.
     private final ObjectBinding<Path> modelDirectoryBinding = InstanSegUtils.getModelDirectoryBinding();
 
-    private static Watcher instance = new Watcher();
+    private static final Watcher instance = new Watcher();
 
     private Watcher() {
         modelDirectoryBinding.addListener(this::handleModelDirectoryChange);
@@ -130,6 +130,7 @@ class Watcher {
             if (key.watchable() instanceof Path dir) {
 
                 for (WatchEvent<?> rawEvent : key.pollEvents()) {
+                    @SuppressWarnings("unchecked")
                     WatchEvent<Path> event = (WatchEvent<Path>)rawEvent;
                     WatchEvent.Kind<Path> kind = event.kind();
                     Path fileName = event.context();

@@ -1,5 +1,8 @@
 package qupath.ext.instanseg.ui;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -50,11 +53,20 @@ import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -62,6 +74,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -69,6 +82,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.FutureTask;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -212,7 +226,7 @@ public class InstanSegController extends BorderPane {
             }
         }
         var remoteAndNotLocal = remoteModels.stream()
-                .filter(m -> !localModelNames.containsKey(m.getName()))
+                // .filter(m -> !localModelNames.containsKey(m.getName()))
                 .sorted(comparator)
                 .toList();
         list.addAll(localModels);
@@ -615,23 +629,38 @@ public class InstanSegController extends BorderPane {
                 return List.of();
             }
         }
-        var releases = GitHubUtils.getReleases(InstanSegUtils.getModelDirectory().orElse(null));
-        if (releases.isEmpty()) {
-            logger.info("No releases found.");
+        String cont = null;
+        try {
+            Path modelDir = InstanSegUtils.getModelDirectory().orElse(null);
+            Path cachedReleases = modelDir == null ? null : modelDir.resolve("releases.json");
+            var uri = new URI("https://raw.githubusercontent.com/alanocallaghan/qupath-extension-instanseg/refs/heads/versioning/index.json");
+            InputStream in = uri.toURL().openStream();
+            cont = new BufferedReader(new InputStreamReader(in))
+                    .lines().collect(Collectors.joining("\n"));
+
+            if (cachedReleases != null && Files.exists(cachedReleases.getParent())) {
+                Files.writeString(cachedReleases, cont);
+            } else {
+                logger.debug("Unable to cache release information - no model directory specified");
+            }
+        } catch (IOException | URISyntaxException e) {
+            Dialogs.showErrorNotification(resources.getString("title"), e);
+            logger.error("Unable to fetch models from index", e);
             return List.of();
         }
+        var g = new Gson();
+        var remoteModels = g.fromJson(cont, RemoteModel[].class);
+
+
         List<InstanSegModel> models = new ArrayList<>();
-        for (var release: releases) {
-            var assets = GitHubUtils.getAssets(release);
-            for (var asset: assets) {
-                models.add(
-                        InstanSegModel.fromURL(
-                                asset.getName().replace(".zip", ""),
-                                release.getName(),
-                                asset.getUrl()
-                        )
-                );
-            }
+        for (var remoteModel: remoteModels) {
+            models.add(
+                    InstanSegModel.fromURL(
+                            remoteModel.getName(),
+                            remoteModel.getVersion(),
+                            remoteModel.getUrl()
+                    )
+            );
         }
         return List.copyOf(models);
     }
