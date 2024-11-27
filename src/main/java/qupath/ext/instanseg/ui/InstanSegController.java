@@ -629,11 +629,11 @@ public class InstanSegController extends BorderPane {
                 return List.of();
             }
         }
-        String cont = null;
+        Path modelDir = InstanSegUtils.getModelDirectory().orElse(null);
+        Path cachedReleases = modelDir == null ? null : modelDir.resolve("releases.json");
+        String cont;
         try {
-            Path modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-            Path cachedReleases = modelDir == null ? null : modelDir.resolve("releases.json");
-            var uri = new URI("https://raw.githubusercontent.com/alanocallaghan/qupath-extension-instanseg/refs/heads/versioning/index.json");
+            var uri = new URI("https://raw.githubusercontent.com/alanocallaghan/instanseg/refs/heads/model-downloading/assets/instanseg-model-index.json");
             InputStream in = uri.toURL().openStream();
             cont = new BufferedReader(new InputStreamReader(in))
                     .lines().collect(Collectors.joining("\n"));
@@ -650,7 +650,6 @@ public class InstanSegController extends BorderPane {
         }
         var g = new Gson();
         var remoteModels = g.fromJson(cont, RemoteModel[].class);
-
 
         List<InstanSegModel> models = new ArrayList<>();
         for (var remoteModel: remoteModels) {
