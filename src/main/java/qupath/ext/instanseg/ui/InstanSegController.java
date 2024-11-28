@@ -629,27 +629,12 @@ public class InstanSegController extends BorderPane {
                 return List.of();
             }
         }
-        Path modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        Path cachedReleases = modelDir == null ? null : modelDir.resolve("releases.json");
-        String cont;
-        try {
-            var uri = new URI("https://raw.githubusercontent.com/alanocallaghan/instanseg/refs/heads/model-downloading/assets/instanseg-model-index.json");
-            InputStream in = uri.toURL().openStream();
-            cont = new BufferedReader(new InputStreamReader(in))
-                    .lines().collect(Collectors.joining("\n"));
-
-            if (cachedReleases != null && Files.exists(cachedReleases.getParent())) {
-                Files.writeString(cachedReleases, cont);
-            } else {
-                logger.debug("Unable to cache release information - no model directory specified");
-            }
-        } catch (IOException | URISyntaxException e) {
-            Dialogs.showErrorNotification(resources.getString("title"), e);
-            logger.error("Unable to fetch models from index", e);
-            return List.of();
-        }
-        var g = new Gson();
-        var remoteModels = g.fromJson(cont, RemoteModel[].class);
+        InputStream in = InstanSegController.class.getResourceAsStream("model-index.json");
+        String cont = new BufferedReader(new InputStreamReader(in))
+                .lines()
+                .collect(Collectors.joining("\n"));
+        var gson = new Gson();
+        var remoteModels = gson.fromJson(cont, RemoteModel[].class);
 
         List<InstanSegModel> models = new ArrayList<>();
         for (var remoteModel: remoteModels) {
