@@ -84,7 +84,7 @@ public class InstanSegModel {
         // that doesn't match with the filename (although we'd prefer this didn't happen...)
         if (path != null && model != null && isValidModel(path))
             return true;
-        if (!Files.exists(localModelPath.resolve(name).resolve(version))) {
+        if (!Files.exists(localModelPath.resolve(getFolderName(name, version)))) {
             // The model may have been deleted or renamed - we won't be able to load it
             return false;
         }
@@ -108,7 +108,7 @@ public class InstanSegModel {
         var zipFile = downloadZipIfNeeded(
                 this.modelURL,
                 localModelPath,
-                name + "-" + version);
+                getFolderName(name, version));
         this.path = unzipIfNeeded(zipFile);
         this.model = BioimageIoSpec.parseModel(path.toFile());
         this.version = model.getVersion();
@@ -297,7 +297,7 @@ public class InstanSegModel {
     private Path unzipIfNeeded(Path zipFile) throws IOException {
         var zipSpec = BioimageIoSpec.parseModel(zipFile);
         String version = zipSpec.getVersion();
-        var outdir = zipFile.resolveSibling(zipSpec.getName()).resolve(version);
+        var outdir = zipFile.resolveSibling(getFolderName(zipSpec.getName(), version));
         if (!isUnpackedAlready(outdir)) {
             try {
                 unzip(zipFile, outdir);
@@ -311,6 +311,10 @@ public class InstanSegModel {
             }
         }
         return outdir;
+    }
+
+    private String getFolderName(String name, String version) {
+        return name + "-" + version;
     }
 
     private static boolean isUnpackedAlready(Path outdir) {
