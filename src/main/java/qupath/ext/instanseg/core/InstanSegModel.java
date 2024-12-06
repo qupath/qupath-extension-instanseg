@@ -314,6 +314,9 @@ public class InstanSegModel {
     }
 
     private String getFolderName(String name, String version) {
+        if (version == null) {
+            return name;
+        }
         return name + "-" + version;
     }
 
