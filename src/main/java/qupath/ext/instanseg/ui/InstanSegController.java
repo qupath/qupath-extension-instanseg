@@ -216,7 +216,6 @@ public class InstanSegController extends BorderPane {
             }
         }
         var remoteAndNotLocal = remoteModels.stream()
-                // .filter(m -> !localModelNames.containsKey(m.getName()))
                 .sorted(comparator)
                 .toList();
         list.addAll(localModels);
@@ -374,7 +373,6 @@ public class InstanSegController extends BorderPane {
         // if brightfield, then check R, G, and B
         comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        // todo: not clear why this is needed. is this handling the checkcombobox weirdness on clearing checks, or?
         if (model != null && modelDir != null && model.isValid()) {
             var modelChannels = model.getNumChannels();
             if (modelChannels.isPresent()) {
