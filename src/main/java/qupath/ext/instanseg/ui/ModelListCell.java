@@ -1,6 +1,5 @@
 package qupath.ext.instanseg.ui;
 
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.Tooltip;
 import org.controlsfx.glyphfont.FontAwesome;
@@ -32,7 +31,7 @@ public class ModelListCell extends ListCell<InstanSegModel> {
         } else {
             setText(model.toString());
             var dir = InstanSegUtils.getLocalModelDirectory().orElse(null);
-            if (dir != null && !model.isDownloaded(dir)) {
+            if (dir != null && !model.isValid()) {
                 setGraphic(web);
                 tooltip.setText(resources.getString("ui.model-not-downloaded.tooltip"));
                 setTooltip(tooltip);

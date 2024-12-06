@@ -247,6 +247,7 @@ public class InstanSeg {
                         .postProcess(postProcessor)
                         .downsample(downsample)
                         .build();
+
                 processor.processObjects(taskRunner, imageData, pathObjects);
                 int nObjects = pathObjects.stream().mapToInt(PathObject::nChildObjects).sum();
                 if (predictionProcessor instanceof TilePredictionProcessor tileProcessor) {
