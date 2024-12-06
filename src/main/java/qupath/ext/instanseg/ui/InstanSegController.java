@@ -375,7 +375,7 @@ public class InstanSegController extends BorderPane {
         comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
         // todo: not clear why this is needed. is this handling the checkcombobox weirdness on clearing checks, or?
-        if (model != null && modelDir != null && model.isDownloaded(modelDir)) {
+        if (model != null && modelDir != null && model.isValid()) {
             var modelChannels = model.getNumChannels();
             if (modelChannels.isPresent()) {
                 int nModelChannels = modelChannels.get();
@@ -464,7 +464,7 @@ public class InstanSegController extends BorderPane {
                                 return true;
                             }
                             var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-                            if (modelDir != null && !model.isDownloaded(modelDir)) {
+                            if (modelDir != null && !model.isValid()) {
                                 return false; // to enable "download and run"
                             }
                             return false;
@@ -488,7 +488,7 @@ public class InstanSegController extends BorderPane {
             return;
 
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        boolean isDownloaded = modelDir != null && model.isDownloaded(modelDir);
+        boolean isDownloaded = modelDir != null && model.isValid();
         if (!isDownloaded || qupath.getImageData() == null) {
             return;
         }
@@ -545,7 +545,7 @@ public class InstanSegController extends BorderPane {
         try {
             Dialogs.showInfoNotification(resources.getString("title"),
                     String.format(resources.getString("ui.popup.fetching"), model.getName()));
-            model.download(modelDir);
+            model.download(modelDir.resolve("downloaded"));
             Dialogs.showInfoNotification(resources.getString("title"),
                     String.format(resources.getString("ui.popup.available"), model.getName()));
             FXUtils.runOnApplicationThread(() -> {
@@ -767,12 +767,12 @@ public class InstanSegController extends BorderPane {
             return;
         }
 
-        if (!model.isDownloaded(modelPath)) {
+        if (!model.isValid()) {
             if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup")))
                 return;
             downloadModelAsync(model)
                     .thenAccept((InstanSegModel suppliedModel) -> {
-                        if (suppliedModel == null || !suppliedModel.isDownloaded(modelPath)) {
+                        if (suppliedModel == null || !suppliedModel.isValid()) {
                             Dialogs.showErrorNotification(resources.getString("title"), String.format(resources.getString("error.localModel")));
                         } else {
                             runInstanSeg(suppliedModel);

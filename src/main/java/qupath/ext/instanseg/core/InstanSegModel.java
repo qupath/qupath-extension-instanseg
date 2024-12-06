@@ -79,22 +79,13 @@ public class InstanSegModel {
      * Check if the model has been downloaded already.
      * @return True if the model has a known path that exists and is valid, or if a suitable directory can be found in the localModelPath
      */
-    public boolean isDownloaded(Path localModelPath) {
+    public boolean isValid() {
         // Check path first - *sometimes* the model might be downloaded, but have a name
         // that doesn't match with the filename (although we'd prefer this didn't happen...)
         if (path != null && model != null && isValidModel(path))
             return true;
-        if (!Files.exists(localModelPath.resolve(getFolderName(name, version)))) {
-            // The model may have been deleted or renamed - we won't be able to load it
-            return false;
-        }
-
-        try {
-            download(localModelPath);
-        } catch (IOException e) {
-            logger.error("Model directory exists but is not valid", e);
-        }
-        return path != null && model != null;
+        // The model may have been deleted or renamed - we won't be able to load it
+        return false;
     }
 
     /**
@@ -276,7 +267,8 @@ public class InstanSegModel {
     }
 
     private static Path downloadZipIfNeeded(URL url, Path localDirectory, String filename) throws IOException {
-        var zipFile = localDirectory.resolve(Path.of(filename + ".zip"));
+        Files.createDirectories(localDirectory); // just in case...
+        var zipFile = localDirectory.resolve(filename + ".zip");
         if (!isDownloadedAlready(zipFile)) {
             try (InputStream stream = url.openStream()) {
                 try (ReadableByteChannel readableByteChannel = Channels.newChannel(stream)) {
@@ -290,8 +282,16 @@ public class InstanSegModel {
     }
 
     private static boolean isDownloadedAlready(Path zipFile) {
-        // todo: validate contents somehow
-        return Files.exists(zipFile);
+        if (!Files.exists(zipFile)) {
+            return false;
+        }
+        try {
+            BioimageIoSpec.parseModel(zipFile.toFile());
+        } catch (IOException e) {
+            logger.warn("Invalid zip file", e);
+            return false;
+        }
+        return true;
     }
 
     private Path unzipIfNeeded(Path zipFile) throws IOException {

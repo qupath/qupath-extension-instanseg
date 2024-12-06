@@ -70,7 +70,7 @@ class InstanSegUtils {
                         return false;
                     }
                     var modelDir = getModelDirectory().orElse(null);
-                    return modelDir != null && model.isDownloaded(modelDir);
+                    return modelDir != null && model.isValid();
                 },
                 selectedModel, needsUpdating,
                 InstanSegPreferences.modelDirectoryProperty());
