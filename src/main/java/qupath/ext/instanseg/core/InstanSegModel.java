@@ -20,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -246,6 +248,50 @@ public class InstanSegModel {
      */
     public Optional<Integer> getNumChannels() {
         return getModel().flatMap(model -> Optional.of(extractChannelNum(model)));
+    }
+
+    /**
+     * Try to check the output tensors from the model spec.
+     * @return The output tensors if the model is downloaded, otherwise empty.
+     */
+    public Optional<List<BioimageIoSpec.OutputTensor>> getOutputs() {
+        return getModel().flatMap(model -> Optional.ofNullable(model.getOutputs()));
+    }
+
+    /**
+     * Try to check the output classes from the model spec.
+     * @return The output classes if the model is downloaded, and it's present, otherwise empty.
+     */
+    public List<String> getClasses() {
+        var config = model.getConfig().getOrDefault("qupath", null);
+        if (config instanceof Map configMap) {
+            List<String> classes = new ArrayList<>();
+            var tmp = (List) configMap.get("classes");
+            System.out.println(tmp);
+            for (var t: tmp) {
+                classes.add(t.toString());
+            }
+            return classes;
+        }
+        return List.of();
+    }
+
+    public enum OutputType {
+        // "instance segmentation" "cell embeddings" "cell classes" "cell probabilities" "semantic segmentation"
+        INSTANCE_SEGMENTATION("instance_segmentation"),
+        CELL_EMBEDDINGS("cell_embeddings"),
+        CELL_PROBABILITIES("cell_probabilities"),
+        CELL_CLASSES("cell_classes"),
+        SEMANTIC_SEGMENTATION("semantic_segmentation");
+
+        private final String type;
+        OutputType(String type) {
+            this.type = type;
+        }
+        @Override
+        public String toString() {
+            return type;
+        }
     }
 
     private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {

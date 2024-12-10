@@ -4,6 +4,7 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.bioimageio.spec.BioimageIoSpec;
 import qupath.lib.analysis.images.ContourTracing;
 import qupath.lib.common.ColorTools;
 import qupath.lib.experimental.pixels.OutputHandler;
@@ -41,9 +42,16 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
      * This may be turned off or made optional in the future.
      */
     private final boolean randomColors;
+    private final List<BioimageIoSpec.OutputTensor> outputTensors;
+    private final List<String> outputClasses;
 
-    InstanSegOutputToObjectConverter(Class<? extends PathObject> preferredObjectClass, boolean randomColors) {
-        this.preferredObjectClass = preferredObjectClass;
+    InstanSegOutputToObjectConverter(List<BioimageIoSpec.OutputTensor> outputTensors,
+                                     List<String> outputClasses,
+                                     Class<? extends PathObject> preferredOutputType,
+                                     boolean randomColors) {
+        this.outputTensors = outputTensors;
+        this.outputClasses = outputClasses;
+        this.preferredObjectClass = preferredOutputType;
         this.randomColors = randomColors;
     }
 
@@ -71,14 +79,23 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             );
         }
 
+        // "instance segmentation" "cell embeddings" "cell classes" "cell probabilities" "semantic segmentation"
         // If we have two outputs, the second may give classifications - arrange by row
-        Map<Number, double[]> classifications = new HashMap<>();
+        List<Map<Number, double[]>> auxiliaryValues = new ArrayList<>();
+        auxiliaryValues.add(new HashMap<>());
         if (output.length > 1) {
-            var matClass = output[1];
-            int nRows = matClass.rows();
-            for (int r = 0; r < nRows; r++) {
-                double[] doubles = OpenCVTools.extractDoubles(matClass.row(r));
-                classifications.put(r+1, doubles);
+            Map<Number, double[]> auxVals = new HashMap<>();
+            System.out.println(output[1].dims());
+            System.out.println(output[1].rows());
+            System.out.println(output[1].cols());
+            for (int i = 1; i < output.length; i++) {
+                var matClass = output[i];
+                int nRows = matClass.rows();
+                for (int r = 0; r < nRows; r++) {
+                    double[] doubles = OpenCVTools.extractDoubles(matClass.row(r));
+                    auxVals.put(r+1, doubles);
+                }
+                auxiliaryValues.add(auxVals);
             }
         }
 
@@ -100,7 +117,14 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 var label = entry.getKey();
                 var child = childROIs.getOrDefault(label, null);
                 var cell = PathObjects.createCellObject(parent, child);
-                assignClassificationsIfAvailable(cell, classifications.getOrDefault(label, null));
+                for (int i = 1; i < output.length; i++) {
+                    handleAuxOutput(
+                            cell,
+                            auxiliaryValues.get(i).getOrDefault(label, null),
+                            InstanSegModel.OutputType.valueOf(outputTensors.get(i).getName().toUpperCase()),
+                            outputClasses
+                    );
+                }
                 return cell;
             }).toList();
         } else {
@@ -121,7 +145,14 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                         }
                     }
                 }
-                assignClassificationsIfAvailable(pathObject, classifications.getOrDefault(label, null));
+                for (int i = 1; i < output.length; i++) {
+                    handleAuxOutput(
+                            pathObject,
+                            auxiliaryValues.get(i).getOrDefault(label, null),
+                            InstanSegModel.OutputType.valueOf(outputTensors.get(i).getName().toUpperCase()),
+                            outputClasses
+                    );
+                }
                 pathObjects.add(pathObject);
             }
         }
@@ -134,21 +165,42 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         return pathObjects;
     }
 
-    private static void assignClassificationsIfAvailable(PathObject pathObject, double[] values) {
+    private static void handleAuxOutput(PathObject pathObject, double[] values, InstanSegModel.OutputType outputType, List<String> outputClasses) {
         if (values == null)
             return;
-        try (var ml = pathObject.getMeasurementList()) {
-            int maxInd = 0;
-            double maxVal = values[0];
+        if (outputType == InstanSegModel.OutputType.CELL_PROBABILITIES) {
+            try (var ml = pathObject.getMeasurementList()) {
+                int maxInd = 0;
+                double maxVal = values[0];
+                for (int i = 0; i < values.length; i++) {
+                    double val = values[i];
+                    if (val > maxVal) {
+                        maxVal = val;
+                        maxInd = i;
+                    }
+                    ml.put("Probability " + i, val);
+                }
+                pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
+                // todo: get class names from RDF
+            }
+        }
+        if (outputType == InstanSegModel.OutputType.CELL_EMBEDDINGS) {
+            try (var ml = pathObject.getMeasurementList()) {
+                for (int i = 0; i < values.length; i++) {
+                    double val = values[i];
+                    ml.put("Embedding " + i, val);
+                }
+            }
+        }
+        if (outputType == InstanSegModel.OutputType.CELL_CLASSES) {
             for (int i = 0; i < values.length; i++) {
                 double val = values[i];
-                if (val > maxVal) {
-                    maxVal = val;
-                    maxInd = i;
-                }
-                pathObject.getMeasurementList().put("Prediction " + i, val);
+                pathObject.setPathClass(PathClass.fromString("Class " + outputClasses.get((int)val)));
+                // todo: get class names from RDF
             }
-            pathObject.setPathClass(PathClass.fromString("Class " + maxInd));
+        }
+        if (outputType == InstanSegModel.OutputType.SEMANTIC_SEGMENTATION) {
+            throw new UnsupportedOperationException("No idea what to do here!");
         }
     }
 

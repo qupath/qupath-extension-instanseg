@@ -5,9 +5,7 @@ import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import org.controlsfx.control.CheckComboBox;
-import org.controlsfx.control.CheckModel;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -22,7 +20,7 @@ public class CheckModelCache<S, T> {
 
     private final ObjectProperty<S> value = new SimpleObjectProperty<>();
     private final CheckComboBox<T> checkbox;
-    private final Map<S, List<T>> lastChecks = new WeakHashMap<>();
+    private final Map<S, List<Integer>> lastChecks = new WeakHashMap<>();
 
     private CheckModelCache(ObservableValue<S> value, CheckComboBox<T> checkbox) {
         this.value.bind(value);
@@ -48,7 +46,7 @@ public class CheckModelCache<S, T> {
 
     private void handleValueChange(ObservableValue<? extends S> observable, S oldValue, S newValue) {
         if (oldValue != null) {
-            lastChecks.put(oldValue, List.copyOf(checkbox.getCheckModel().getCheckedItems()));
+            lastChecks.put(oldValue, List.copyOf(checkbox.getCheckModel().getCheckedIndices()));
         }
     }
 
@@ -72,11 +70,11 @@ public class CheckModelCache<S, T> {
      * @return true if the checks were restored, false otherwise
      */
     public boolean restoreChecks() {
-        List<T> checks = lastChecks.get(value.get());
-        if (checks != null && new HashSet<>(checkbox.getItems()).containsAll(checks)) {
+        List<Integer> checks = lastChecks.get(value.get());
+        if (checks != null && checks.stream().allMatch(i -> i < checkbox.getItems().size())) {
             var checkModel = checkbox.getCheckModel();
             checkModel.clearChecks();
-            checks.forEach(checkModel::check);
+            checks.forEach(checkModel::checkIndices);
             return true;
         } else {
             return false;
@@ -108,7 +106,7 @@ public class CheckModelCache<S, T> {
     public boolean snapshotChecks() {
         var val = value.get();
         if (val != null) {
-            lastChecks.put(val, List.copyOf(checkbox.getCheckModel().getCheckedItems()));
+            lastChecks.put(val, List.copyOf(checkbox.getCheckModel().getCheckedIndices()));
             return true;
         } else {
             return false;
