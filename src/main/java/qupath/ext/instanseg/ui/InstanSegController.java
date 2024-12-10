@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.ui;
 
+import com.google.gson.Gson;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -50,8 +51,11 @@ import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -68,6 +72,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.FutureTask;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -211,7 +216,6 @@ public class InstanSegController extends BorderPane {
             }
         }
         var remoteAndNotLocal = remoteModels.stream()
-                .filter(m -> !localModelNames.containsKey(m.getName()))
                 .sorted(comparator)
                 .toList();
         list.addAll(localModels);
@@ -369,8 +373,7 @@ public class InstanSegController extends BorderPane {
         // if brightfield, then check R, G, and B
         comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        // todo: not clear why this is needed. is this handling the checkcombobox weirdness on clearing checks, or?
-        if (model != null && modelDir != null && model.isDownloaded(modelDir)) {
+        if (model != null && modelDir != null && model.isValid()) {
             var modelChannels = model.getNumChannels();
             if (modelChannels.isPresent()) {
                 int nModelChannels = modelChannels.get();
@@ -459,7 +462,7 @@ public class InstanSegController extends BorderPane {
                                 return true;
                             }
                             var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-                            if (modelDir != null && !model.isDownloaded(modelDir)) {
+                            if (modelDir != null && !model.isValid()) {
                                 return false; // to enable "download and run"
                             }
                             return false;
@@ -483,7 +486,7 @@ public class InstanSegController extends BorderPane {
             return;
 
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        boolean isDownloaded = modelDir != null && model.isDownloaded(modelDir);
+        boolean isDownloaded = modelDir != null && model.isValid();
         if (!isDownloaded || qupath.getImageData() == null) {
             return;
         }
@@ -540,7 +543,7 @@ public class InstanSegController extends BorderPane {
         try {
             Dialogs.showInfoNotification(resources.getString("title"),
                     String.format(resources.getString("ui.popup.fetching"), model.getName()));
-            model.download(modelDir);
+            model.download(modelDir.resolve("downloaded"));
             Dialogs.showInfoNotification(resources.getString("title"),
                     String.format(resources.getString("ui.popup.available"), model.getName()));
             FXUtils.runOnApplicationThread(() -> {
@@ -549,6 +552,7 @@ public class InstanSegController extends BorderPane {
             });
         } catch (IOException ex) {
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.downloading"));
+            logger.error("Error download model", ex);
         }
         return model;
     }
@@ -613,19 +617,21 @@ public class InstanSegController extends BorderPane {
                 return List.of();
             }
         }
-        var releases = GitHubUtils.getReleases(InstanSegUtils.getModelDirectory().orElse(null));
-        if (releases.isEmpty()) {
-            logger.info("No releases found.");
-            return List.of();
-        }
-        var release = releases.getFirst();
-        var assets = GitHubUtils.getAssets(release);
+        InputStream in = InstanSegController.class.getResourceAsStream("model-index.json");
+        String cont = new BufferedReader(new InputStreamReader(in))
+                .lines()
+                .collect(Collectors.joining("\n"));
+        var gson = new Gson();
+        var remoteModels = gson.fromJson(cont, RemoteModel[].class);
+
         List<InstanSegModel> models = new ArrayList<>();
-        for (var asset : assets) {
+        for (var remoteModel: remoteModels) {
             models.add(
                     InstanSegModel.fromURL(
-                            asset.getName().replace(".zip", ""),
-                            asset.getUrl())
+                            remoteModel.getName(),
+                            remoteModel.getVersion(),
+                            remoteModel.getUrl()
+                    )
             );
         }
         return List.copyOf(models);
@@ -759,12 +765,12 @@ public class InstanSegController extends BorderPane {
             return;
         }
 
-        if (!model.isDownloaded(modelPath)) {
+        if (!model.isValid()) {
             if (!Dialogs.showYesNoDialog(resources.getString("title"), resources.getString("ui.model-popup")))
                 return;
             downloadModelAsync(model)
                     .thenAccept((InstanSegModel suppliedModel) -> {
-                        if (suppliedModel == null || !suppliedModel.isDownloaded(modelPath)) {
+                        if (suppliedModel == null || !suppliedModel.isValid()) {
                             Dialogs.showErrorNotification(resources.getString("title"), String.format(resources.getString("error.localModel")));
                         } else {
                             runInstanSeg(suppliedModel);

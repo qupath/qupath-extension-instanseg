@@ -2,7 +2,7 @@
 
 [![Forum](https://img.shields.io/badge/forum-image.sc-green)](https://forum.image.sc/tag/qupath)
 
-<img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/images/instanseg_logo.png" />
+<img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/assets/instanseg_logo.png" />
 
 ## 🚧 Work-in-progress! 🚧 
 

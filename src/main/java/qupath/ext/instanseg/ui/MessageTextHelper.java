@@ -130,7 +130,7 @@ class MessageTextHelper {
         if (deviceChoiceBox.getSelectionModel().isEmpty())
             return resources.getString("ui.error.no-device");
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        if (modelDir != null && modelChoiceBox.getSelectionModel().getSelectedItem().isDownloaded(modelDir)) {
+        if (modelDir != null && modelChoiceBox.getSelectionModel().getSelectedItem().isValid()) {
             // shouldn't happen if downloaded anyway!
             var modelChannels = modelChoiceBox.getSelectionModel().getSelectedItem().getNumChannels();
             if (modelChannels.isPresent()) {
