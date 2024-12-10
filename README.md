@@ -2,7 +2,7 @@
 
 [![Forum](https://img.shields.io/badge/forum-image.sc-green)](https://forum.image.sc/tag/qupath)
 
-<img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/images/instanseg_logo.png" />
+<img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/assets/instanseg_logo.png" />
 
 ## 🚧 Work-in-progress! 🚧 
 
@@ -77,7 +77,7 @@ The dialog should guide you through what to do next:
 There are several options available to customize things:
 
 * **Preferred device**: `cpu` to run without a graphics card involved, `gpu` if you've been lucky with CUDA configuration, and `mps` if you're using Apple Silicon
-* **Threads**: Number of threads to use to use for fetching & submitting image tiles; 1 is usually too little, but high numbers probably won't help much - so the default is between 2 and 4.
+* **Threads**: Number of threads to use for fetching & submitting image tiles; 1 is usually too little, but high numbers probably won't help much - so the default is between 2 and 4.
 * **Tile size**: Large regions are broken into tiles; usually 512 or 1024 pixels is a good choice
 * **Tile padding**: When creating tiles, part of each tile is used as 'padding' and can overlap with neighboring tiles. A small padding means less overlap, and faster processing. But if your objects are too big, they might disappear or become clipped across tiles. If that happens, try increasing this value.
 * **Input channels**: Select which channels to input. Some models take a fixed number, others (thanks to ChannelNet) don't care. You can even apply color deconvolution here, if you want an easy way to apply a fluorescence model to a brightfield image.

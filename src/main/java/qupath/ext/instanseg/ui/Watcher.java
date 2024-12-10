@@ -54,7 +54,7 @@ class Watcher {
     //Binding to the directory we want to watch for models.
     private final ObjectBinding<Path> modelDirectoryBinding = InstanSegUtils.getModelDirectoryBinding();
 
-    private static Watcher instance = new Watcher();
+    private static final Watcher instance = new Watcher();
 
     private Watcher() {
         modelDirectoryBinding.addListener(this::handleModelDirectoryChange);
@@ -74,11 +74,11 @@ class Watcher {
         // Currently, we look *only* in the model directory for models
         // But we could register subdirectories here if we wanted (e.g. 'local', 'downloaded')
         if (oldPath != null) {
-            unregister(oldPath);
+            unregister(oldPath.resolve("local"));
         }
-        if (newPath != null && Files.isDirectory(newPath)) {
+        if (newPath != null && Files.isDirectory(newPath.resolve("local"))) {
             try {
-                register(newPath);
+                register(newPath.resolve("local"));
             } catch (IOException e) {
                 logger.error("Unable to register new model directory", e);
             }
@@ -130,6 +130,7 @@ class Watcher {
             if (key.watchable() instanceof Path dir) {
 
                 for (WatchEvent<?> rawEvent : key.pollEvents()) {
+                    @SuppressWarnings("unchecked")
                     WatchEvent<Path> event = (WatchEvent<Path>)rawEvent;
                     WatchEvent.Kind<Path> kind = event.kind();
                     Path fileName = event.context();
@@ -146,15 +147,15 @@ class Watcher {
                     // because this is read from rdf.yaml.
                     // To reduce the risk of this causing trouble, do a full directory refresh on any change.
                     if (kind == ENTRY_CREATE) {
-                        logger.info("File created: {}", rawEvent);
+                        logger.debug("File created: {}", rawEvent);
                         refreshAllModelPaths();
                     }
                     if (kind == ENTRY_DELETE) {
-                        logger.info("File deleted: {}", rawEvent);
+                        logger.debug("File deleted: {}", rawEvent);
                         refreshAllModelPaths();
                     }
                     if (kind == ENTRY_MODIFY) {
-                        logger.info("File modified: {}", rawEvent);
+                        logger.debug("File modified: {}", rawEvent);
                         refreshAllModelPaths();
                     }
                 }
