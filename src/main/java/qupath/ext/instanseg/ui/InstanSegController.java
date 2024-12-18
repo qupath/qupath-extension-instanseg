@@ -382,7 +382,6 @@ public class InstanSegController extends BorderPane {
                     comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
                 }
             }
-
         }
     }
 

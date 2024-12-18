@@ -20,12 +20,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.Objects;
+
+import static qupath.bioimageio.spec.BioimageIoSpec.getAxesString;
 
 public class InstanSegModel {
 
@@ -248,8 +251,54 @@ public class InstanSegModel {
         return getModel().flatMap(model -> Optional.of(extractChannelNum(model)));
     }
 
+    /**
+     * Try to check the output tensors from the model spec.
+     * @return The output tensors if the model is downloaded, otherwise empty.
+     */
+    public Optional<List<BioimageIoSpec.OutputTensor>> getOutputs() {
+        return getModel().flatMap(model -> Optional.ofNullable(model.getOutputs()));
+    }
+
+    /**
+     * Try to check the output classes from the model spec.
+     * @return The output classes if the model is downloaded, and it's present, otherwise empty.
+     */
+    public List<String> getClasses() {
+        var config = model.getConfig().getOrDefault("qupath", null);
+        if (config instanceof Map configMap) {
+            List<String> classes = new ArrayList<>();
+            var el = configMap.get("classes");
+            if (el != null && el instanceof List elList) {
+                for (var t: elList) {
+                    classes.add(t.toString());
+                }
+            }
+            return classes;
+        }
+        return List.of();
+    }
+
+    public enum OutputType {
+        // "instance segmentation" "cell embeddings" "cell classes" "cell probabilities" "semantic segmentation"
+        INSTANCE_SEGMENTATION("instance_segmentation"),
+        CELL_EMBEDDINGS("cell_embeddings"),
+        CELL_PROBABILITIES("cell_probabilities"),
+        CELL_CLASSES("cell_classes"),
+        SEMANTIC_SEGMENTATION("semantic_segmentation");
+
+        private final String type;
+        OutputType(String type) {
+            this.type = type;
+        }
+        @Override
+        public String toString() {
+            return type;
+        }
+    }
+
     private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {
-        int ind = model.getInputs().getFirst().getAxes().toLowerCase().indexOf("c");
+        String axes = getAxesString(model.getInputs().getFirst().getAxes());
+        int ind = axes.indexOf("c");
         var shape = model.getInputs().getFirst().getShape();
         if (shape.getShapeStep()[ind] == 1) {
             return ANY_CHANNELS;
@@ -391,7 +440,7 @@ public class InstanSegModel {
     public Optional<Integer> getOutputChannels() {
         return getModel().map(model -> {
             var output = model.getOutputs().getFirst();
-            String axes = output.getAxes().toLowerCase();
+            String axes = getAxesString(output.getAxes());
             int ind = axes.indexOf("c");
             var shape = output.getShape().getShape();
             if (shape != null && shape.length > ind)

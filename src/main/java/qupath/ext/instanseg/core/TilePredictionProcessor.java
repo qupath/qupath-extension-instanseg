@@ -32,11 +32,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
+class TilePredictionProcessor implements Processor<Mat, Mat, Mat[]> {
 
     private static final Logger logger = LoggerFactory.getLogger(TilePredictionProcessor.class);
 
-    private final BlockingQueue<Predictor<Mat, Mat>> predictors;
+    private final BlockingQueue<Predictor<Mat, Mat[]>> predictors;
 
     private final int inputWidth;
     private final int inputHeight;
@@ -59,7 +59,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
      */
     private final Map<ROI, ImageOp> normalization = Collections.synchronizedMap(new WeakHashMap<>());
 
-    TilePredictionProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
+    TilePredictionProcessor(BlockingQueue<Predictor<Mat, Mat[]>> predictors,
                             Collection<? extends ColorTransforms.ColorTransform> channels,
                             int inputWidth, int inputHeight, boolean doPadding) {
         this.predictors = predictors;
@@ -108,7 +108,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
     }
 
     @Override
-    public Mat process(Parameters<Mat, Mat> params) throws IOException {
+    public Mat[] process(Parameters<Mat, Mat> params) throws IOException {
 
         var mat = params.getImage();
 
@@ -136,7 +136,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
             mat = mat2;
         }
 
-        Predictor<Mat, Mat> predictor = null;
+        Predictor<Mat, Mat[]> predictor = null;
         try {
             predictor = predictors.take();
             logger.debug("Predicting tile {}", mat);
@@ -148,9 +148,12 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat> {
                 OpenCVTools.matToImagePlus("Output " + params.getRegionRequest(), matOutput).show();
             }
 
-            matOutput.convertTo(matOutput, opencv_core.CV_32S);
+            // Handle the first output (labels)
+            // There may be other outputs (classiications, features), but we don't handle those here
+            matOutput[0].convertTo(matOutput[0], opencv_core.CV_32S);
             if (padding != null)
-                matOutput = OpenCVTools.crop(matOutput, padding);
+                matOutput[0] = OpenCVTools.crop(matOutput[0], padding);
+
             return matOutput;
         } catch (TranslateException e) {
             nTilesFailed.incrementAndGet();
