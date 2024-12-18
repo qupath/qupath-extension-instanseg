@@ -21,13 +21,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.Objects;
+
+import static qupath.bioimageio.spec.BioimageIoSpec.getAxesString;
 
 public class InstanSegModel {
 
@@ -266,10 +267,11 @@ public class InstanSegModel {
         var config = model.getConfig().getOrDefault("qupath", null);
         if (config instanceof Map configMap) {
             List<String> classes = new ArrayList<>();
-            var tmp = (List) configMap.get("classes");
-            System.out.println(tmp);
-            for (var t: tmp) {
-                classes.add(t.toString());
+            var el = configMap.get("classes");
+            if (el != null && el instanceof List elList) {
+                for (var t: elList) {
+                    classes.add(t.toString());
+                }
             }
             return classes;
         }
@@ -295,7 +297,8 @@ public class InstanSegModel {
     }
 
     private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {
-        int ind = model.getInputs().getFirst().getAxes().toLowerCase().indexOf("c");
+        String axes = getAxesString(model.getInputs().getFirst().getAxes());
+        int ind = axes.indexOf("c");
         var shape = model.getInputs().getFirst().getShape();
         if (shape.getShapeStep()[ind] == 1) {
             return ANY_CHANNELS;
@@ -437,7 +440,7 @@ public class InstanSegModel {
     public Optional<Integer> getOutputChannels() {
         return getModel().map(model -> {
             var output = model.getOutputs().getFirst();
-            String axes = output.getAxes().toLowerCase();
+            String axes = getAxesString(output.getAxes());
             int ind = axes.indexOf("c");
             var shape = output.getShape().getShape();
             if (shape != null && shape.length > ind)

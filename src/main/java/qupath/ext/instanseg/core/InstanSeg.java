@@ -156,7 +156,6 @@ public class InstanSeg {
     }
 
     private InstanSegResults runInstanSeg(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects) {
-
         long startTime = System.currentTimeMillis();
         Optional<Path> oModelPath = model.getPath();
         if (oModelPath.isEmpty()) {

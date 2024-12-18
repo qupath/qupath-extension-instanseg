@@ -85,9 +85,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         auxiliaryValues.add(new HashMap<>());
         if (output.length > 1) {
             Map<Number, double[]> auxVals = new HashMap<>();
-            System.out.println(output[1].dims());
-            System.out.println(output[1].rows());
-            System.out.println(output[1].cols());
             for (int i = 1; i < output.length; i++) {
                 var matClass = output[i];
                 int nRows = matClass.rows();
