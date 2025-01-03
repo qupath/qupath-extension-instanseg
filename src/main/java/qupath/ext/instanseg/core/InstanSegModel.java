@@ -102,8 +102,10 @@ public class InstanSegModel {
                 getFolderName(name, version),
                 downloadIfNotValid);
         this.path = unzipIfNeeded(zipFile);
-        this.model = BioimageIoSpec.parseModel(path.toFile());
-        this.version = model.getVersion();
+        if (this.path != null) {
+            this.model = BioimageIoSpec.parseModel(path.toFile());
+            this.version = model.getVersion();
+        }
     }
 
     /**
@@ -270,7 +272,10 @@ public class InstanSegModel {
     private static Path checkZipExists(URL url, Path downloadDirectory, String filename, boolean downloadIfNot) throws IOException {
         Files.createDirectories(downloadDirectory);
         var zipFile = downloadDirectory.resolve(filename + ".zip");
-        if (!isDownloadedAlready(zipFile) && downloadIfNot) {
+        if (!isDownloadedAlready(zipFile)) {
+            if (!downloadIfNot) {
+                return null;
+            }
             try (InputStream stream = url.openStream()) {
                 try (ReadableByteChannel readableByteChannel = Channels.newChannel(stream)) {
                     try (FileOutputStream fos = new FileOutputStream(zipFile.toFile())) {
@@ -296,6 +301,9 @@ public class InstanSegModel {
     }
 
     private Path unzipIfNeeded(Path zipFile) throws IOException {
+        if (zipFile == null) {
+            return null;
+        }
         var zipSpec = BioimageIoSpec.parseModel(zipFile);
         String version = zipSpec.getVersion();
         var outdir = zipFile.resolveSibling(getFolderName(zipSpec.getName(), version));
@@ -307,7 +315,6 @@ public class InstanSegModel {
                 logger.error("Error unzipping model", e);
                 // clean up files just in case!
                 Files.deleteIfExists(outdir);
-            } finally {
                 Files.deleteIfExists(zipFile);
             }
         }
