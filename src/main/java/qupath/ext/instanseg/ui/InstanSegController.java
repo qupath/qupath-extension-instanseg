@@ -487,9 +487,7 @@ public class InstanSegController extends BorderPane {
 
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
         try {
-            System.out.println(model.isValid());
             model.checkIfDownloaded(modelDir.resolve("downloaded"), false);
-            System.out.println(model.isValid());
         } catch (IOException e) {
             logger.warn("Downloaded model is missing zip or RDF file(s); this shouldn't happen", e);
             Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.checkingModel"));
