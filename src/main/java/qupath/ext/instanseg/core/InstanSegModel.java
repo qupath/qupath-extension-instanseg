@@ -92,14 +92,15 @@ public class InstanSegModel {
      * Trigger a download for a model
      * @throws IOException If an error occurs when downloading, unzipping, etc.
      */
-    public void download(Path downloadedModelDir) throws IOException {
+    public void checkIfDownloaded(Path downloadedModelDir, boolean downloadIfNotValid) throws IOException {
         if (path != null && isValidModel(path) && model != null) {
             return;
         }
-        var zipFile = downloadZipIfNeeded(
+        var zipFile = checkZipExists(
                 this.modelURL,
                 downloadedModelDir,
-                getFolderName(name, version));
+                getFolderName(name, version),
+                downloadIfNotValid);
         this.path = unzipIfNeeded(zipFile);
         this.model = BioimageIoSpec.parseModel(path.toFile());
         this.version = model.getVersion();
@@ -266,10 +267,10 @@ public class InstanSegModel {
         return Optional.ofNullable(model);
     }
 
-    private static Path downloadZipIfNeeded(URL url, Path downloadDirectory, String filename) throws IOException {
+    private static Path checkZipExists(URL url, Path downloadDirectory, String filename, boolean downloadIfNot) throws IOException {
         Files.createDirectories(downloadDirectory);
         var zipFile = downloadDirectory.resolve(filename + ".zip");
-        if (!isDownloadedAlready(zipFile)) {
+        if (!isDownloadedAlready(zipFile) && downloadIfNot) {
             try (InputStream stream = url.openStream()) {
                 try (ReadableByteChannel readableByteChannel = Channels.newChannel(stream)) {
                     try (FileOutputStream fos = new FileOutputStream(zipFile.toFile())) {
