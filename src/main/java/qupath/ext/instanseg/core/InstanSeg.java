@@ -207,6 +207,7 @@ public class InstanSeg {
         // Create an int[] representing a boolean array of channels to use
         boolean[] outputChannelArray = null;
         if (outputChannels != null && outputChannels.length > 0) {
+            //noinspection OptionalGetWithoutIsPresent
             outputChannelArray = new boolean[model.getOutputChannels().get()]; // safe to call get because of previous checks
             for (int c : outputChannels) {
                 if (c < 0 || c >= outputChannelArray.length) {
@@ -244,7 +245,7 @@ public class InstanSeg {
 
                 var tiler = createTiler(downsample, tileDims, padding);
                 var predictionProcessor = createProcessor(predictors, inputChannels, tileDims, padToInputSize);
-                var outputHandler = createOutputHandler(preferredOutputType, randomColors, boundaryThreshold, outputTensors, outputClasses);
+                var outputHandler = createOutputHandler(preferredOutputType, randomColors, boundaryThreshold, outputTensors);
                 var postProcessor = createPostProcessor();
                 var processor = new PixelProcessor.Builder<Mat, Mat, Mat[]>()
                         .processor(predictionProcessor)
@@ -321,12 +322,11 @@ public class InstanSeg {
     private static OutputHandler<Mat, Mat, Mat[]> createOutputHandler(Class<? extends PathObject> preferredOutputClass,
                                                                       boolean randomColors,
                                                                       int boundaryThreshold,
-                                                                      List<BioimageIoSpec.OutputTensor> outputTensors,
-                                                                      List<String> outputClasses) {
+                                                                      List<BioimageIoSpec.OutputTensor> outputTensors) {
         // TODO: Reinstate this for Mat[] output (it was written for Mat output)
 //        if (debugTiles())
 //            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
-        var converter = new InstanSegOutputToObjectConverter(outputTensors, outputClasses, preferredOutputClass, randomColors);
+        var converter = new InstanSegOutputToObjectConverter(outputTensors, preferredOutputClass, randomColors);
         if (boundaryThreshold >= 0) {
             return new PruneObjectOutputHandler<>(converter, boundaryThreshold);
         } else {

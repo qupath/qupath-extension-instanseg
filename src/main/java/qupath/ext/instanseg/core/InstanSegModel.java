@@ -281,9 +281,9 @@ public class InstanSegModel {
     public enum OutputType {
         // "instance segmentation" "cell embeddings" "cell classes" "cell probabilities" "semantic segmentation"
         INSTANCE_SEGMENTATION("instance_segmentation"),
-        CELL_EMBEDDINGS("cell_embeddings"),
-        CELL_PROBABILITIES("cell_probabilities"),
-        CELL_CLASSES("cell_classes"),
+        DETECTION_EMBEDDINGS("detection_embeddings"),
+        DETECTION_LOGITS("detection_logits"),
+        DETECTION_CLASSES("detection_classes"),
         SEMANTIC_SEGMENTATION("semantic_segmentation");
 
         private final String type;

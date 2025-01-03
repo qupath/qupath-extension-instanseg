@@ -43,14 +43,11 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
      */
     private final boolean randomColors;
     private final List<BioimageIoSpec.OutputTensor> outputTensors;
-    private final List<String> outputClasses;
 
     InstanSegOutputToObjectConverter(List<BioimageIoSpec.OutputTensor> outputTensors,
-                                     List<String> outputClasses,
                                      Class<? extends PathObject> preferredOutputType,
                                      boolean randomColors) {
         this.outputTensors = outputTensors;
-        this.outputClasses = outputClasses;
         this.preferredObjectClass = preferredOutputType;
         this.randomColors = randomColors;
     }
@@ -118,8 +115,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                     handleAuxOutput(
                             cell,
                             auxiliaryValues.get(i).getOrDefault(label, null),
-                            InstanSegModel.OutputType.valueOf(outputTensors.get(i).getName().toUpperCase()),
-                            outputClasses
+                            outputTensors.get(i)
                     );
                 }
                 return cell;
@@ -146,8 +142,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                     handleAuxOutput(
                             pathObject,
                             auxiliaryValues.get(i).getOrDefault(label, null),
-                            InstanSegModel.OutputType.valueOf(outputTensors.get(i).getName().toUpperCase()),
-                            outputClasses
+                            outputTensors.get(i)
                     );
                 }
                 pathObjects.add(pathObject);
@@ -162,40 +157,44 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         return pathObjects;
     }
 
-    private static void handleAuxOutput(PathObject pathObject, double[] values, InstanSegModel.OutputType outputType, List<String> outputClasses) {
+    private static void handleAuxOutput(PathObject pathObject, double[] values, BioimageIoSpec.OutputTensor outputTensor) {
+        List<String> outputClasses = List.of(); // todo
         if (values == null)
             return;
-        if (outputType == InstanSegModel.OutputType.CELL_PROBABILITIES) {
-            try (var ml = pathObject.getMeasurementList()) {
-                int maxInd = 0;
-                double maxVal = values[0];
-                for (int i = 0; i < values.length; i++) {
-                    double val = values[i];
-                    if (val > maxVal) {
-                        maxVal = val;
-                        maxInd = i;
+        var outputType = InstanSegModel.OutputType.valueOf(outputTensor.getName().toUpperCase());
+        switch(outputType) {
+            case DETECTION_LOGITS -> {
+                try (var ml = pathObject.getMeasurementList()) {
+                    int maxInd = 0;
+                    double maxVal = values[0];
+                    for (int i = 0; i < values.length; i++) {
+                        double val = values[i];
+                        if (val > maxVal) {
+                            maxVal = val;
+                            maxInd = i;
+                        }
+                        ml.put("Logit class " + i, val);
                     }
-                    ml.put("Probability " + i, val);
-                }
-                pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
-                // todo: get class names from RDF
-            }
-        }
-        if (outputType == InstanSegModel.OutputType.CELL_EMBEDDINGS) {
-            try (var ml = pathObject.getMeasurementList()) {
-                for (int i = 0; i < values.length; i++) {
-                    double val = values[i];
-                    ml.put("Embedding " + i, val);
+                    pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
+                    // todo: get class names from RDF
                 }
             }
-        }
-        if (outputType == InstanSegModel.OutputType.CELL_CLASSES) {
-            for (int i = 0; i < values.length; i++) {
-                double val = values[i];
-                pathObject.setPathClass(PathClass.fromString("Class " + outputClasses.get((int)val)));
-                // todo: get class names from RDF
+            case DETECTION_EMBEDDINGS -> {
+                try (var ml = pathObject.getMeasurementList()) {
+                    for (int i = 0; i < values.length; i++) {
+                        double val = values[i];
+                        ml.put("Embedding " + i, val);
+                    }
+                }
+            }
+            case DETECTION_CLASSES -> {
+                for (double val : values) {
+                    pathObject.setPathClass(PathClass.fromString("Class " + outputClasses.get((int) val)));
+                    // todo: get class names from RDF
+                }
             }
         }
+
         if (outputType == InstanSegModel.OutputType.SEMANTIC_SEGMENTATION) {
             throw new UnsupportedOperationException("No idea what to do here!");
         }
