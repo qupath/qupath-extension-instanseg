@@ -485,6 +485,12 @@ public class InstanSegController extends BorderPane {
             return;
 
         var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
+        try {
+            model.checkIfDownloaded(modelDir.resolve("downloaded"), false);
+        } catch (IOException e) {
+            logger.debug("Error checking zip or RDF file(s); this shouldn't happen", e);
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.checkingModel"));
+        }
         boolean isDownloaded = modelDir != null && model.isValid();
         if (!isDownloaded || qupath.getImageData() == null) {
             return;
@@ -542,7 +548,7 @@ public class InstanSegController extends BorderPane {
         try {
             Dialogs.showInfoNotification(resources.getString("title"),
                     String.format(resources.getString("ui.popup.fetching"), model.getName()));
-            model.download(modelDir.resolve("downloaded"));
+            model.checkIfDownloaded(modelDir.resolve("downloaded"), true);
             Dialogs.showInfoNotification(resources.getString("title"),
                     String.format(resources.getString("ui.popup.available"), model.getName()));
             FXUtils.runOnApplicationThread(() -> {
