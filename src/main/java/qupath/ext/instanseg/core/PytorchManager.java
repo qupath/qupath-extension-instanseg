@@ -50,7 +50,7 @@ public class PytorchManager {
                 availableDevices.add(name);
             }
             // If we could use MPS, but don't have it already, add it
-            if (GeneralTools.isMac() && "aarch64".equals(System.getProperty("os.arch"))) {
+            if (GeneralTools.isMac()) {
                 availableDevices.add("mps");
             }
             // CPU should always be available
