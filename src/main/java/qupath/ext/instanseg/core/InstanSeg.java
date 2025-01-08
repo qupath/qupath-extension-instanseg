@@ -396,7 +396,7 @@ public class InstanSeg {
         private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
         private Class<? extends PathObject> preferredOutputClass;
-        private Map<String, ?> optionalArgs;
+        private Map<String, Object> optionalArgs;
 
         Builder() {}
 
@@ -664,7 +664,7 @@ public class InstanSeg {
          * @return A modified builder.
          */
         public Builder args(Map<String, ?> optionalArgs) {
-            this.optionalArgs = (optionalArgs);
+            this.optionalArgs.putAll(optionalArgs);
             return this;
         }
 
