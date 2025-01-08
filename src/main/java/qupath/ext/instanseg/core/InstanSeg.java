@@ -396,7 +396,7 @@ public class InstanSeg {
         private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
         private Class<? extends PathObject> preferredOutputClass;
-        private final Map<String, Object> optionalArgs = new HashMap<>();
+        private Map<String, ?> optionalArgs;
 
         Builder() {}
 
@@ -663,21 +663,11 @@ public class InstanSeg {
          * @param optionalArgs The argument names and values.
          * @return A modified builder.
          */
-        public Builder args(Map<String, Object> optionalArgs) {
-            this.optionalArgs.putAll(optionalArgs);
+        public Builder args(Map<String, ?> optionalArgs) {
+            this.optionalArgs = (optionalArgs);
             return this;
         }
 
-        /**
-         * Set a number of optional arguments
-         * @param name The argument name.
-         * @param value The argument value.
-         * @return A modified builder.
-         */
-        public Builder arg(String name, Object value) {
-            optionalArgs.put(name, value);
-            return this;
-        }
 
         /**
          * Request to make measurements from the objects created by InstanSeg.
