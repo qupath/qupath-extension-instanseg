@@ -5,6 +5,7 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.training.util.ProgressBar;
+import java.util.HashMap;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
@@ -37,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -57,10 +59,18 @@ public class InstanSeg {
     private final Device device;
     private final TaskRunner taskRunner;
     private final Class<? extends PathObject> preferredOutputClass;
+    private final Map<String, Object> optionalArgs;
 
     // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently.
     // However we might want to reinstate it, possibly as a proportion of the padding amount.
     private final int boundaryThreshold = 1;
+
+    /**
+     * Run inference for the currently selected PathObjects in the current image.
+     */
+    public InstanSegResults detectObjects() {
+        return detectObjects(QP.getCurrentImageData());
+    }
 
     private InstanSeg(Builder builder) {
         this.tileDims = builder.tileDims;
@@ -74,13 +84,7 @@ public class InstanSeg {
         this.preferredOutputClass = builder.preferredOutputClass;
         this.randomColors = builder.randomColors;
         this.makeMeasurements = builder.makeMeasurements;
-    }
-
-    /**
-     * Run inference for the currently selected PathObjects in the current image.
-     */
-    public InstanSegResults detectObjects() {
-        return detectObjects(QP.getCurrentImageData());
+        this.optionalArgs = builder.optionalArgs;
     }
 
     /**
@@ -215,7 +219,7 @@ public class InstanSeg {
                 .optModelUrls(String.valueOf(modelPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
-                .optTranslator(new MatTranslator(layout, layoutOutput, outputChannelArray))
+                .optTranslator(new MatTranslator(layout, layoutOutput, outputChannelArray, optionalArgs))
                 .build()
                 .loadModel()) {
 
@@ -392,6 +396,7 @@ public class InstanSeg {
         private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
         private Class<? extends PathObject> preferredOutputClass;
+        private final Map<String, Object> optionalArgs = new HashMap<>();
 
         Builder() {}
 
@@ -650,6 +655,27 @@ public class InstanSeg {
          */
         public Builder outputAnnotations() {
             this.preferredOutputClass = PathAnnotationObject.class;
+            return this;
+        }
+
+        /**
+         * Set a number of optional arguments
+         * @param optionalArgs The argument names and values.
+         * @return A modified builder.
+         */
+        public Builder args(Map<String, Object> optionalArgs) {
+            this.optionalArgs.putAll(optionalArgs);
+            return this;
+        }
+
+        /**
+         * Set a number of optional arguments
+         * @param name The argument name.
+         * @param value The argument value.
+         * @return A modified builder.
+         */
+        public Builder arg(String name, Object value) {
+            optionalArgs.put(name, value);
             return this;
         }
 
