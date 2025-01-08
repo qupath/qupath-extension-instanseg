@@ -158,7 +158,11 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     }
 
     private static void handleAuxOutput(PathObject pathObject, double[] values, BioimageIoSpec.OutputTensor outputTensor) {
-        List<String> outputClasses = List.of(); // todo
+        List<String> outputClasses = new ArrayList<>(); // todo: get from RDF
+        int nClasses = outputTensor.getShape().getShape()[2];
+        for (int i = 0; i < nClasses; i++) {
+            outputClasses.add("Class" + i);
+        }
         if (values == null)
             return;
         var outputType = InstanSegModel.OutputType.valueOf(outputTensor.getName().toUpperCase());
