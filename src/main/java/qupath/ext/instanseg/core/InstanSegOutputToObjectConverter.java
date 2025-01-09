@@ -158,11 +158,18 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     }
 
     private static void handleAuxOutput(PathObject pathObject, double[] values, BioimageIoSpec.OutputTensor outputTensor) {
-        List<String> outputClasses = new ArrayList<>(); // todo: get from RDF
-        int nClasses = outputTensor.getShape().getShape()[2];
-        for (int i = 0; i < nClasses; i++) {
-            outputClasses.add("Class" + i);
+        List<String> outputClasses;
+        var description = outputTensor.getDataDescription();
+        if (description instanceof BioimageIoSpec.NominalOrOrdinalDataDescription dataDescription) {
+            outputClasses = dataDescription.getValues().stream().map(Object::toString).toList();
+        } else {
+            outputClasses = new ArrayList<>();
+            int nClasses = outputTensor.getShape().getShape()[2]; // batch, object, class
+            for (int i = 0; i < nClasses; i++) {
+                outputClasses.add("Class" + i);
+            }
         }
+
         if (values == null)
             return;
         var outputType = InstanSegModel.OutputType.valueOf(outputTensor.getName().toUpperCase());
@@ -177,10 +184,9 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                             maxVal = val;
                             maxInd = i;
                         }
-                        ml.put("Logit class " + i, val);
+                        ml.put("Logit " + outputClasses.get(i), val);
                     }
                     pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
-                    // todo: get class names from RDF
                 }
             }
             case DETECTION_EMBEDDINGS -> {
@@ -193,8 +199,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             }
             case DETECTION_CLASSES -> {
                 for (double val : values) {
-                    pathObject.setPathClass(PathClass.fromString("Class " + outputClasses.get((int) val)));
-                    // todo: get class names from RDF
+                    pathObject.setPathClass(PathClass.fromString(outputClasses.get((int) val)));
                 }
             }
         }
