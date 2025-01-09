@@ -65,12 +65,6 @@ public class InstanSeg {
     // However we might want to reinstate it, possibly as a proportion of the padding amount.
     private final int boundaryThreshold = 1;
 
-    /**
-     * Run inference for the currently selected PathObjects in the current image.
-     */
-    public InstanSegResults detectObjects() {
-        return detectObjects(QP.getCurrentImageData());
-    }
 
     private InstanSeg(Builder builder) {
         this.tileDims = builder.tileDims;
@@ -85,6 +79,13 @@ public class InstanSeg {
         this.randomColors = builder.randomColors;
         this.makeMeasurements = builder.makeMeasurements;
         this.optionalArgs = builder.optionalArgs;
+    }
+
+    /**
+     * Run inference for the currently selected PathObjects in the current image.
+     */
+    public InstanSegResults detectObjects() {
+        return detectObjects(QP.getCurrentImageData());
     }
 
     /**

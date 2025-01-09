@@ -8,6 +8,7 @@ import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorContext;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.bytedeco.opencv.opencv_core.Mat;
@@ -22,7 +23,7 @@ class MatTranslator implements Translator<Mat, Mat> {
     private final String inputLayoutNd;
     private final String outputLayoutNd;
     private final int[] outputChannels;
-    private final Map<String, ?> optionalArgs;
+    private final Map<String, Object> optionalArgs = new HashMap<>();
 
     /**
      * Create a translator from InstanSeg input to output.
@@ -35,7 +36,7 @@ class MatTranslator implements Translator<Mat, Mat> {
         this.inputLayoutNd = inputLayoutNd;
         this.outputLayoutNd = outputLayoutNd;
         this.outputChannels = convertBooleanArray(outputChannels);
-        this.optionalArgs = optionalArgs;
+        this.optionalArgs.putAll(optionalArgs);
     }
 
     private static int[] convertBooleanArray(boolean[] array) {
