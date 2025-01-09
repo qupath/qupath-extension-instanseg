@@ -91,7 +91,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat[]> {
      * The number of channels does not influence the result.
      * <p>
      * One use of this is to help assess the impact of padding on the processing time.
-     * @return the pixels that were processed
+     * @return the pixels that were processed.
      */
     public long getPixelsProcessedCount() {
         return nPixelsProcessed.get();
@@ -101,7 +101,7 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat[]> {
      * Check if the processing was interrupted.
      * This can be used to determine if the processing was stopped prematurely,
      * and failed tiles were not necessarily errors.
-     * @return
+     * @return whether processing was interrupted.
      */
     public boolean wasInterrupted() {
         return wasInterrupted.get();
@@ -192,7 +192,13 @@ class TilePredictionProcessor implements Processor<Mat, Mat, Mat[]> {
      * @return Percentile-based normalisation based on the bounding box,
      * or default tile-based percentile normalisation if that fails.
      */
-    private static ImageOp getNormalization(ImageData<BufferedImage> imageData, ROI roi, Collection<ColorTransforms.ColorTransform> channels, double lowPerc, double highPerc) {
+    private static ImageOp getNormalization(
+            ImageData<BufferedImage> imageData,
+            ROI roi,
+            Collection<ColorTransforms.ColorTransform> channels,
+            double lowPerc,
+            double highPerc) {
+
         var defaults = ImageOps.Normalize.percentile(lowPerc, highPerc, true, 1e-6);
         try {
             BufferedImage image;

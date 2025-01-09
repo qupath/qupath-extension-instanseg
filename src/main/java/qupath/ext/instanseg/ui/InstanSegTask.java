@@ -14,7 +14,6 @@ import qupath.lib.images.ImageData;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;

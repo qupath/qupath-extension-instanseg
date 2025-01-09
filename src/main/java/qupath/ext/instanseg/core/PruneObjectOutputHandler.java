@@ -41,7 +41,7 @@ class PruneObjectOutputHandler<S, T, U> implements OutputHandler<S, T, U> {
             List<PathObject> newObjects = converter.convertToObjects(params, output);
             if (newObjects == null)
                 return false;
-            // If using a proxy object (eg tile),
+            // If using a proxy object (e.g. tile),
             // we want to remove things touching the tile boundary,
             // then add the objects to the proxy rather than the parent
             var parentOrProxy = params.getParentOrProxy();

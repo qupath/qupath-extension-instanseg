@@ -63,8 +63,8 @@ class InputChannelItem {
 
     /**
      * Get a list of available channels for the given image data.
-     * @param imageData
-     * @return
+     * @param imageData The image data.
+     * @return A list of channels, including color deconvolution channels if present.
      */
     static List<InputChannelItem> getAvailableChannels(ImageData<?> imageData) {
         List<InputChannelItem> list = new ArrayList<>();

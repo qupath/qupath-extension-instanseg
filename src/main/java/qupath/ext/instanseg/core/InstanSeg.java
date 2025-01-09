@@ -315,7 +315,9 @@ public class InstanSeg {
             width = tileRequest.getTileWidth();
             height = tileRequest.getTileHeight();
         }
-        return new Mat[]{Mat.ones(height, width, opencv_core.CV_8UC1).asMat()};
+        try (var ones = Mat.ones(height, width, opencv_core.CV_8UC1)) {
+            return new Mat[]{ones.asMat()};
+        }
     }
 
 
@@ -345,8 +347,8 @@ public class InstanSeg {
 
     /**
      * Get the input channels to use; if we don't have any specified, use all of them
-     * @param imageData
-     * @return
+     * @param imageData The image data
+     * @return The possible input channels.
      */
     private List<ColorTransforms.ColorTransform> getInputChannels(ImageData<BufferedImage> imageData) {
         if (inputChannels == null || inputChannels.isEmpty()) {
@@ -375,8 +377,8 @@ public class InstanSeg {
     /**
      * Print resource count for debugging purposes.
      * If we are not logging at debug level, do nothing.
-     * @param title
-     * @param manager
+     * @param title The name to be used in the log.
+     * @param manager The NDManager to print from.
      */
     private static void printResourceCount(String title, BaseNDManager manager) {
         if (logger.isDebugEnabled()) {
@@ -565,7 +567,7 @@ public class InstanSeg {
 
         /**
          * Optionally request that random colors be used for the output objects.
-         * @param doRandomColors
+         * @param doRandomColors Whether to use random colors for output object.
          * @return this builder
          */
         public Builder randomColors(boolean doRandomColors) {

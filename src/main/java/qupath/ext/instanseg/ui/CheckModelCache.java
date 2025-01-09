@@ -34,11 +34,11 @@ public class CheckModelCache<S, T> {
      * <p>
      * This can then be used to restore the checks later, if needed.
      *
-     * @param value
-     * @param checkBox
-     * @return
-     * @param <S>
-     * @param <T>
+     * @param value the observable value that this cache corresponds to (e.g., a specific model's name).
+     * @param checkBox the CheckComboBox containing the possibly checked items.
+     * @return A {@link CheckModelCache}
+     * @param <S> The observable value type.
+     * @param <T> The type of checked item.
      */
     public static <S, T> CheckModelCache<S, T> create(ObservableValue<S> value, CheckComboBox<T> checkBox) {
         return new CheckModelCache<>(value, checkBox);
@@ -52,7 +52,7 @@ public class CheckModelCache<S, T> {
 
     /**
      * Get the value property.
-     * @return
+     * @return The value property.
      */
     public ReadOnlyObjectProperty<S> valueProperty() {
         return value;
@@ -101,7 +101,7 @@ public class CheckModelCache<S, T> {
      * Create a snapshot of the checks currently associated with the observable value.
      * This is useful in case some other checkbox manipulation is required without switching the value,
      * and we want to restore the checks later (e.g. changing the items).
-     * @return
+     * @return whether the snapshot was possible.
      */
     public boolean snapshotChecks() {
         var val = value.get();

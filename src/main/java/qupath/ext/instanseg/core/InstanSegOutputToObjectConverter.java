@@ -212,16 +212,15 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
     /**
      * Assign a random color to a PathObject and all descendants, returning the object.
-     * @param pathObject
-     * @param rng
-     * @return
+     *
+     * @param pathObject The PathObject
+     * @param rng A random number generator.
      */
-    private static PathObject assignRandomColor(PathObject pathObject, Random rng) {
+    private static void assignRandomColor(PathObject pathObject, Random rng) {
         pathObject.setColor(randomRGB(rng));
         for (var child : pathObject.getChildObjects()) {
             assignRandomColor(child, rng);
         }
-        return pathObject;
     }
 
     private static ROI geometryToFilledROI(Geometry geom, ImagePlane plane) {
@@ -245,8 +244,8 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
     /**
      * Create annotations that are locked by default, to reduce the risk of editing them accidentally.
-     * @param roi
-     * @return
+     * @param roi The region of interest
+     * @return A locked annotation object.
      */
     private static PathObject createLockedAnnotation(ROI roi) {
         var annotation = PathObjects.createAnnotationObject(roi);
