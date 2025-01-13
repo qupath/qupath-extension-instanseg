@@ -5,7 +5,6 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.training.util.ProgressBar;
-import java.util.HashMap;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
@@ -37,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,10 +59,10 @@ public class InstanSeg {
     private final Device device;
     private final TaskRunner taskRunner;
     private final Class<? extends PathObject> preferredOutputClass;
-    private final Map<String, Object> optionalArgs;
+    private final Map<String, Object> optionalArgs = new LinkedHashMap<>();
 
     // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently.
-    // However we might want to reinstate it, possibly as a proportion of the padding amount.
+    // However, we might want to reinstate it, possibly as a proportion of the padding amount.
     private final int boundaryThreshold = 1;
 
 
@@ -78,7 +78,7 @@ public class InstanSeg {
         this.preferredOutputClass = builder.preferredOutputClass;
         this.randomColors = builder.randomColors;
         this.makeMeasurements = builder.makeMeasurements;
-        this.optionalArgs = builder.optionalArgs;
+        this.optionalArgs.putAll(builder.optionalArgs);
     }
 
     /**
