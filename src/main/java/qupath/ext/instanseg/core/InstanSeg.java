@@ -159,7 +159,6 @@ public class InstanSeg {
     }
 
     private InstanSegResults runInstanSeg(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects) {
-
         long startTime = System.currentTimeMillis();
 
         Optional<Path> oModelPath = model.getPath();
@@ -397,7 +396,7 @@ public class InstanSeg {
         private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
         private Class<? extends PathObject> preferredOutputClass;
-        private Map<String, Object> optionalArgs;
+        private final Map<String, Object> optionalArgs = new LinkedHashMap<>();
 
         Builder() {}
 
@@ -668,6 +667,19 @@ public class InstanSeg {
             this.optionalArgs.putAll(optionalArgs);
             return this;
         }
+
+
+        /**
+         * Set a number of optional arguments
+         * @param key The argument name
+         * @param value The argument value
+         * @return A modified builder.
+         */
+        public Builder arg(String key, Object value) {
+            this.optionalArgs.put(key, value);
+            return this;
+        }
+
 
 
         /**
