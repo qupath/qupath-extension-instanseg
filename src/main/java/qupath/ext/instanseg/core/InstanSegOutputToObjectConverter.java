@@ -4,7 +4,8 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.bioimageio.spec.BioimageIoSpec;
+import qupath.bioimageio.spec.tensor.OutputTensor;
+import qupath.bioimageio.spec.tensor.Tensors;
 import qupath.lib.analysis.images.ContourTracing;
 import qupath.lib.common.ColorTools;
 import qupath.lib.experimental.pixels.OutputHandler;
@@ -42,9 +43,9 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
      * This may be turned off or made optional in the future.
      */
     private final boolean randomColors;
-    private final List<BioimageIoSpec.OutputTensor> outputTensors;
+    private final List<OutputTensor> outputTensors;
 
-    InstanSegOutputToObjectConverter(List<BioimageIoSpec.OutputTensor> outputTensors,
+    InstanSegOutputToObjectConverter(List<OutputTensor> outputTensors,
                                      Class<? extends PathObject> preferredOutputType,
                                      boolean randomColors) {
         this.outputTensors = outputTensors;
@@ -157,10 +158,10 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         return pathObjects;
     }
 
-    private static void handleAuxOutput(PathObject pathObject, double[] values, BioimageIoSpec.OutputTensor outputTensor) {
+    private static void handleAuxOutput(PathObject pathObject, double[] values, OutputTensor outputTensor) {
         List<String> outputClasses;
         var description = outputTensor.getDataDescription();
-        if (description instanceof BioimageIoSpec.NominalOrOrdinalDataDescription dataDescription) {
+        if (description instanceof Tensors.NominalOrOrdinalDataDescription dataDescription) {
             outputClasses = dataDescription.getValues().stream().map(Object::toString).toList();
         } else {
             outputClasses = new ArrayList<>();

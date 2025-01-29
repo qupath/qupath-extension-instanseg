@@ -9,7 +9,7 @@ import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.bioimageio.spec.BioimageIoSpec;
+import qupath.bioimageio.spec.tensor.OutputTensor;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
@@ -163,7 +163,7 @@ public class InstanSeg {
         }
         Path modelPath = oModelPath.get().resolve("instanseg.pt");
 
-        Optional<List<BioimageIoSpec.OutputTensor>> oOutputTensors = this.model.getOutputs();
+        Optional<List<OutputTensor>> oOutputTensors = this.model.getOutputs();
         if (oOutputTensors.isEmpty()) {
             throw new IllegalArgumentException("No output tensors available even though model is available");
         }
@@ -324,7 +324,7 @@ public class InstanSeg {
     private static OutputHandler<Mat, Mat, Mat[]> createOutputHandler(Class<? extends PathObject> preferredOutputClass,
                                                                       boolean randomColors,
                                                                       int boundaryThreshold,
-                                                                      List<BioimageIoSpec.OutputTensor> outputTensors) {
+                                                                      List<OutputTensor> outputTensors) {
         // TODO: Reinstate this for Mat[] output (it was written for Mat output)
 //        if (debugTiles())
 //            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());

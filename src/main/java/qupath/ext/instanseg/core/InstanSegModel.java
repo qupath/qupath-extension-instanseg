@@ -2,12 +2,15 @@ package qupath.ext.instanseg.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.bioimageio.spec.BioimageIoSpec;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+
+import qupath.bioimageio.spec.Model;
+import qupath.bioimageio.spec.Resource;
+import qupath.bioimageio.spec.tensor.OutputTensor;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.images.servers.PixelCalibration;
 
@@ -28,7 +31,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.Objects;
 
-import static qupath.bioimageio.spec.BioimageIoSpec.getAxesString;
+import static qupath.bioimageio.spec.tensor.axes.Axes.getAxesString;
+
 
 public class InstanSegModel {
 
@@ -42,10 +46,10 @@ public class InstanSegModel {
     public static final int ANY_CHANNELS = -1;
 
     private Path path = null;
-    private BioimageIoSpec.BioimageIoModel model = null;
+    private Model model = null;
     private final String name;
 
-    private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
+    private InstanSegModel(Model bioimageIoModel) {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
         this.version = model.getVersion();
@@ -65,7 +69,7 @@ public class InstanSegModel {
      * @throws IOException If the directory can't be found or isn't a valid model directory.
      */
     public static InstanSegModel fromPath(Path path) throws IOException {
-        return new InstanSegModel(BioimageIoSpec.parseModel(path));
+        return new InstanSegModel(Model.parseModel(path));
     }
 
     /**
@@ -106,7 +110,7 @@ public class InstanSegModel {
                 downloadIfNotValid);
         this.path = unzipIfNeeded(zipFile);
         if (this.path != null) {
-            this.model = BioimageIoSpec.parseModel(path.toFile());
+            this.model = Model.parseModel(path.toFile());
             this.version = model.getVersion();
         }
     }
@@ -215,7 +219,7 @@ public class InstanSegModel {
     public String toString() {
         String name = getName();
         String parent = getPath().map(Path::getParent).map(Path::getFileName).map(Path::toString).orElse(null);
-        String version = getModel().map(BioimageIoSpec.BioimageIoModel::getVersion).orElse(this.version);
+        String version = getModel().map(Resource::getVersion).orElse(this.version);
         if (parent != null && !parent.equals(name)) {
             name = parent + "/" + name;
         }
@@ -258,7 +262,7 @@ public class InstanSegModel {
      * Try to check the output tensors from the model spec.
      * @return The output tensors if the model is downloaded, otherwise empty.
      */
-    public Optional<List<BioimageIoSpec.OutputTensor>> getOutputs() {
+    public Optional<List<OutputTensor>> getOutputs() {
         return getModel().flatMap(model -> Optional.ofNullable(model.getOutputs()));
     }
 
@@ -299,7 +303,7 @@ public class InstanSegModel {
         }
     }
 
-    private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {
+    private static int extractChannelNum(Model model) {
         String axes = getAxesString(model.getInputs().getFirst().getAxes());
         int ind = axes.indexOf("c");
         var shape = model.getInputs().getFirst().getShape();
@@ -314,7 +318,7 @@ public class InstanSegModel {
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
-    private Optional<BioimageIoSpec.BioimageIoModel> getModel() {
+    private Optional<Model> getModel() {
         return Optional.ofNullable(model);
     }
 
@@ -341,7 +345,7 @@ public class InstanSegModel {
             return false;
         }
         try {
-            BioimageIoSpec.parseModel(zipFile.toFile());
+            Model.parseModel(zipFile.toFile());
         } catch (IOException e) {
             logger.warn("Invalid zip file", e);
             return false;
@@ -353,7 +357,7 @@ public class InstanSegModel {
         if (zipFile == null) {
             return null;
         }
-        var zipSpec = BioimageIoSpec.parseModel(zipFile);
+        var zipSpec = Model.parseModel(zipFile);
         String version = zipSpec.getVersion();
         var outdir = zipFile.resolveSibling(getFolderName(zipSpec.getName(), version));
         if (!isUnpackedAlready(outdir)) {
