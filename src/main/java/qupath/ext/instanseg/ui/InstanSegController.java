@@ -478,22 +478,21 @@ public class InstanSegController extends BorderPane {
      * This may be called when the selected model is changed, or an existing model is downloaded.
      */
     private void refreshModelChoice() {
+        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
+        if (modelDir == null)
+            return;
+
         var model = selectedModel.get();
         if (model == null)
             return;
 
-        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        if (modelDir != null) {
-            try {
-                model.checkIfDownloaded(modelDir.resolve("downloaded"), false);
-            } catch (IOException e) {
-                logger.debug("Error checking zip or RDF file(s); this shouldn't happen", e);
-                Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.checkingModel"));
-            }
+        try {
+            model.checkIfDownloaded(modelDir.resolve("downloaded"), false);
+        } catch (IOException e) {
+            logger.debug("Error checking zip or RDF file(s); this shouldn't happen", e);
+            Dialogs.showErrorNotification(resources.getString("title"), resources.getString("error.checkingModel"));
         }
-
-        boolean isDownloaded = modelDir != null && model.isValid();
-        if (!isDownloaded || qupath.getImageData() == null) {
+        if (!model.isValid() || qupath.getImageData() == null) {
             return;
         }
         var numChannels = model.getNumChannels();

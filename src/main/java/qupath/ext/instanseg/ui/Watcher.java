@@ -242,7 +242,7 @@ class Watcher {
             try {
                 set.add(InstanSegModel.fromPath(modelPath));
             } catch (IOException e) {
-                logger.error("Unable to load model from path", e);
+                logger.error("Unable to load model from {}", modelPath, e);
             }
         }
         models.setAll(set);
