@@ -301,6 +301,16 @@ public class InstanSegModel {
         public String toString() {
             return type;
         }
+
+        public static OutputType fromString(String value) {
+            for (OutputType t: values()) {
+                if (t.type.equalsIgnoreCase(value)) {
+                    return t;
+                }
+            }
+            logger.error("Unknown output type {}", value);
+            return null;
+        }
     }
 
     private static int extractChannelNum(Model model) {

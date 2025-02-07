@@ -22,13 +22,7 @@ import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
 import qupath.opencv.tools.OpenCVTools;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -104,6 +98,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 (roiMaps.size() == 2 && preferredObjectClass == null);
 
         List<PathObject> pathObjects;
+        Map<String, List<String>> outputNameToClasses = fetchOutputClasses(outputTensors);
         if (createCells) {
             Map<Number, ROI> parentROIs = roiMaps.get(0);
             Map<Number, ROI> childROIs = roiMaps.size() >= 2 ? roiMaps.get(1) : Collections.emptyMap();
@@ -113,10 +108,12 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 var child = childROIs.getOrDefault(label, null);
                 var cell = PathObjects.createCellObject(parent, child);
                 for (int i = 1; i < output.length; i++) {
+                    // todo: handle paired logits and class labels
                     handleAuxOutput(
                             cell,
                             auxiliaryValues.get(i).getOrDefault(label, null),
-                            outputTensors.get(i)
+                            outputTensors.get(i),
+                            outputNameToClasses.get(outputTensors.get(i).getName())
                     );
                 }
                 return cell;
@@ -140,10 +137,12 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                     }
                 }
                 for (int i = 1; i < output.length; i++) {
+                    // todo: handle paired logits and class labels
                     handleAuxOutput(
                             pathObject,
                             auxiliaryValues.get(i).getOrDefault(label, null),
-                            outputTensors.get(i)
+                            outputTensors.get(i),
+                            outputNameToClasses.get(outputTensors.get(i).getName())
                     );
                 }
                 pathObjects.add(pathObject);
@@ -158,36 +157,86 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         return pathObjects;
     }
 
-    private static void handleAuxOutput(PathObject pathObject, double[] values, OutputTensor outputTensor) {
-        List<String> outputClasses;
+    private Map<String, List<String>> fetchOutputClasses(List<OutputTensor> outputTensors) {
+        Map<String, List<String>> out = new HashMap<>();
+        // todo: loop through and check type
+        // if there's only one output, or if there's no pairing, then return nothing
+        if (outputTensors.size() == 1) {
+            return out;
+        }
+
+        var classOutputs = outputTensors.stream().filter(ot -> ot.getName().startsWith("detection_classes")).toList();
+        var logitOutputs = outputTensors.stream().filter(ot -> ot.getName().startsWith("detection_logits")).toList();
+
+        var classTypeToClassNames = classOutputs.stream()
+                .collect(
+                        Collectors.toMap(
+                                co -> co.getName(),
+                                co -> getClassNames(co)
+                        )
+                );
+        out.putAll(classTypeToClassNames);
+        // try to find logits that correspond to classes (eg, detection_classes_foo and detection_logits_foo)
+        var logitNameToClassName = logitOutputs.stream().collect(Collectors.toMap(
+                lo -> lo.getName(),
+                lo -> {
+                    var matchingClassNames = classTypeToClassNames.entrySet().stream()
+                        .filter(es -> {
+                            return es.getKey().replace("detection_classes_", "").equals(lo.getName().replace("detection_logits_", ""));
+                        }).toList();
+                    if (matchingClassNames.size() > 1) {
+                        logger.warn("More than one matching class name for logits {}, choosing the first", lo.getName());
+                    } else if (matchingClassNames.size() == 0) {
+                        // try to get default class names anyway...
+                        return getClassNames(lo);
+                    }
+                    return matchingClassNames.getFirst().getValue();
+            }));
+        out.putAll(logitNameToClassName);
+        return out;
+    }
+
+    private List<String> getClassNames(OutputTensor outputTensor) {
         var description = outputTensor.getDataDescription();
-        if (description instanceof Tensors.NominalOrOrdinalDataDescription dataDescription) {
+        List<String> outputClasses;
+        if (description != null && description instanceof Tensors.NominalOrOrdinalDataDescription dataDescription) {
             outputClasses = dataDescription.getValues().stream().map(Object::toString).toList();
         } else {
             outputClasses = new ArrayList<>();
-            int nClasses = outputTensor.getShape().getShape()[2]; // batch, object, class
+            int nClasses = outputTensor.getShape().getShape()[2]; // output axes are batch, index, class
             for (int i = 0; i < nClasses; i++) {
                 outputClasses.add("Class" + i);
             }
         }
+        return outputClasses;
+    }
 
+    private static void handleAuxOutput(PathObject pathObject, double[] values, OutputTensor outputTensor, List<String> outputClasses) {
         if (values == null)
             return;
-        var outputType = InstanSegModel.OutputType.valueOf(outputTensor.getName().toUpperCase());
+        var outputType = InstanSegModel.OutputType.fromString(outputTensor.getName());
+        if (outputType == null) {
+            return;
+        }
         switch(outputType) {
             case DETECTION_LOGITS -> {
                 try (var ml = pathObject.getMeasurementList()) {
-                    int maxInd = 0;
-                    double maxVal = values[0];
+//                    int maxInd = 0;
+//                    double maxVal = values[0];
                     for (int i = 0; i < values.length; i++) {
                         double val = values[i];
-                        if (val > maxVal) {
-                            maxVal = val;
-                            maxInd = i;
-                        }
+//                        if (val > maxVal) {
+//                            maxVal = val;
+//                            maxInd = i;
+//                        }
                         ml.put("Logit " + outputClasses.get(i), val);
                     }
-                    pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
+//                    pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
+                }
+            }
+            case DETECTION_CLASSES -> {
+                for (double val : values) {
+                    pathObject.setPathClass(PathClass.fromString(outputClasses.get((int) val)));
                 }
             }
             case DETECTION_EMBEDDINGS -> {
@@ -196,11 +245,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                         double val = values[i];
                         ml.put("Embedding " + i, val);
                     }
-                }
-            }
-            case DETECTION_CLASSES -> {
-                for (double val : values) {
-                    pathObject.setPathClass(PathClass.fromString(outputClasses.get((int) val)));
                 }
             }
         }
