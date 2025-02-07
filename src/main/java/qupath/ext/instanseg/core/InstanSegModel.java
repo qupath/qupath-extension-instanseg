@@ -69,7 +69,7 @@ public class InstanSegModel {
      * @throws IOException If the directory can't be found or isn't a valid model directory.
      */
     public static InstanSegModel fromPath(Path path) throws IOException {
-        return new InstanSegModel(Model.parseModel(path));
+        return new InstanSegModel(Model.parse(path));
     }
 
     /**
@@ -110,7 +110,7 @@ public class InstanSegModel {
                 downloadIfNotValid);
         this.path = unzipIfNeeded(zipFile);
         if (this.path != null) {
-            this.model = Model.parseModel(path.toFile());
+            this.model = Model.parse(path.toFile());
             this.version = model.getVersion();
         }
     }
@@ -345,7 +345,7 @@ public class InstanSegModel {
             return false;
         }
         try {
-            Model.parseModel(zipFile.toFile());
+            Model.parse(zipFile.toFile());
         } catch (IOException e) {
             logger.warn("Invalid zip file", e);
             return false;
@@ -357,7 +357,7 @@ public class InstanSegModel {
         if (zipFile == null) {
             return null;
         }
-        var zipSpec = Model.parseModel(zipFile);
+        var zipSpec = Model.parse(zipFile);
         String version = zipSpec.getVersion();
         var outdir = zipFile.resolveSibling(getFolderName(zipSpec.getName(), version));
         if (!isUnpackedAlready(outdir)) {
