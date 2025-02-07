@@ -77,7 +77,7 @@ public class InstanSeg {
         this.model = builder.model;
         this.device = builder.device;
         this.taskRunner = builder.taskRunner;
-        this.preferredOutputType = builder.preferredOutputClass;
+        this.preferredOutputType = builder.preferredOutputType;
         this.randomColors = builder.randomColors;
         this.makeMeasurements = builder.makeMeasurements;
         this.optionalArgs.putAll(builder.optionalArgs);
@@ -326,14 +326,14 @@ public class InstanSeg {
     }
 
 
-    private static OutputHandler<Mat, Mat, Mat[]> createOutputHandler(Class<? extends PathObject> preferredOutputClass,
+    private static OutputHandler<Mat, Mat, Mat[]> createOutputHandler(Class<? extends PathObject> preferredOutputType,
                                                                       boolean randomColors,
                                                                       int boundaryThreshold,
                                                                       List<OutputTensor> outputTensors) {
         // TODO: Reinstate this for Mat[] output (it was written for Mat output)
 //        if (debugTiles())
 //            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
-        var converter = new InstanSegOutputToObjectConverter(outputTensors, preferredOutputClass, randomColors);
+        var converter = new InstanSegOutputToObjectConverter(outputTensors, preferredOutputType, randomColors);
         if (boundaryThreshold >= 0) {
             return new PruneObjectOutputHandler<>(converter, boundaryThreshold);
         } else {
@@ -413,7 +413,7 @@ public class InstanSeg {
         private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
         private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
-        private Class<? extends PathObject> preferredOutputClass;
+        private Class<? extends PathObject> preferredOutputType;
         private final Map<String, Object> optionalArgs = new LinkedHashMap<>();
 
         Builder() {}
@@ -654,7 +654,7 @@ public class InstanSeg {
          * @return this builder
          */
         public Builder outputCells() {
-            this.preferredOutputClass = PathCellObject.class;
+            this.preferredOutputType = PathCellObject.class;
             return this;
         }
 
@@ -663,7 +663,7 @@ public class InstanSeg {
          * @return this builder
          */
         public Builder outputDetections() {
-            this.preferredOutputClass = PathDetectionObject.class;
+            this.preferredOutputType = PathDetectionObject.class;
             return this;
         }
 
@@ -672,7 +672,7 @@ public class InstanSeg {
          * @return this builder
          */
         public Builder outputAnnotations() {
-            this.preferredOutputClass = PathAnnotationObject.class;
+            this.preferredOutputType = PathAnnotationObject.class;
             return this;
         }
 
