@@ -22,7 +22,14 @@ import qupath.lib.roi.GeometryTools;
 import qupath.lib.roi.interfaces.ROI;
 import qupath.opencv.tools.OpenCVTools;
 
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Random;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -214,24 +221,18 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     private static void handleAuxOutput(PathObject pathObject, double[] values, OutputTensor outputTensor, List<String> outputClasses) {
         if (values == null)
             return;
-        var outputType = InstanSegModel.OutputType.fromString(outputTensor.getName());
-        if (outputType == null) {
+        var outputType = InstanSegModel.OutputTensorType.fromString(outputTensor.getName());
+        if (outputType.isEmpty()) {
             return;
         }
-        switch(outputType) {
+        switch(outputType.get()) {
             case DETECTION_LOGITS -> {
+                // we could also assign classes here, but assume for now this is handled internally and supplied as binary output
                 try (var ml = pathObject.getMeasurementList()) {
-//                    int maxInd = 0;
-//                    double maxVal = values[0];
                     for (int i = 0; i < values.length; i++) {
                         double val = values[i];
-//                        if (val > maxVal) {
-//                            maxVal = val;
-//                            maxInd = i;
-//                        }
                         ml.put("Logit " + outputClasses.get(i), val);
                     }
-//                    pathObject.setPathClass(PathClass.fromString(outputClasses.get(maxInd)));
                 }
             }
             case DETECTION_CLASSES -> {
@@ -247,10 +248,9 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                     }
                 }
             }
-        }
-
-        if (outputType == InstanSegModel.OutputType.SEMANTIC_SEGMENTATION) {
-            throw new UnsupportedOperationException("No idea what to do here!");
+            case SEMANTIC_SEGMENTATION -> {
+                throw new UnsupportedOperationException("No idea what to do here!");
+            }
         }
     }
 

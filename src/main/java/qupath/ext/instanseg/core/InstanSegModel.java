@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -267,25 +266,9 @@ public class InstanSegModel {
     }
 
     /**
-     * Try to check the output classes from the model spec.
-     * @return The output classes if the model is downloaded, and it's present, otherwise empty.
+     * Types of output tensors that may be supported by InstanSeg models.
      */
-    public List<String> getClasses() {
-        var config = model.getConfig().getOrDefault("qupath", null);
-        if (config instanceof Map configMap) {
-            List<String> classes = new ArrayList<>();
-            var el = configMap.get("classes");
-            if (el != null && el instanceof List elList) {
-                for (var t: elList) {
-                    classes.add(t.toString());
-                }
-            }
-            return classes;
-        }
-        return List.of();
-    }
-
-    public enum OutputType {
+    public enum OutputTensorType {
         // "instance segmentation" "cell embeddings" "cell classes" "cell probabilities" "semantic segmentation"
         INSTANCE_SEGMENTATION("instance_segmentation"),
         DETECTION_EMBEDDINGS("detection_embeddings"),
@@ -294,22 +277,29 @@ public class InstanSegModel {
         SEMANTIC_SEGMENTATION("semantic_segmentation");
 
         private final String type;
-        OutputType(String type) {
+
+        OutputTensorType(String type) {
             this.type = type;
         }
+
         @Override
         public String toString() {
             return type;
         }
 
-        public static OutputType fromString(String value) {
-            for (OutputType t: values()) {
+        /**
+         * Get the output type from a string, ignoring case
+         * @param value the input String to be matched against the possible values
+         * @return the matching output type, or empty if no match
+         */
+        public static Optional<OutputTensorType> fromString(String value) {
+            for (OutputTensorType t: values()) {
                 if (t.type.equalsIgnoreCase(value)) {
-                    return t;
+                    return Optional.of(t);
                 }
             }
             logger.error("Unknown output type {}", value);
-            return null;
+            return Optional.empty();
         }
     }
 

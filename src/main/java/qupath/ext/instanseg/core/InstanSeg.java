@@ -174,11 +174,6 @@ public class InstanSeg {
         }
         var outputTensors = oOutputTensors.get();
 
-        List<String> outputClasses = this.model.getClasses();
-        if (outputClasses.isEmpty() && outputTensors.size() > 1) {
-            logger.warn("No output classes available, classes will be set as 'Class 1' etc.");
-        }
-
         // Provide some way to change the number of predictors, even if this can't be specified through the UI
         // See https://forum.image.sc/t/instanseg-under-utilizing-cpu-only-2-3-cores/104496/7
         int nPredictors = Integer.parseInt(System.getProperty("instanseg.numPredictors", "1"));
