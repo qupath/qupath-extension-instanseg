@@ -115,7 +115,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 var child = childROIs.getOrDefault(label, null);
                 var cell = PathObjects.createCellObject(parent, child);
                 for (int i = 1; i < output.length; i++) {
-                    // todo: handle paired logits and class labels
                     handleAuxOutput(
                             cell,
                             auxiliaryValues.get(i).getOrDefault(label, null),
