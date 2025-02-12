@@ -144,7 +144,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                     }
                 }
                 for (int i = 1; i < output.length; i++) {
-                    // todo: handle paired logits and class labels
                     handleAuxOutput(
                             pathObject,
                             auxiliaryValues.get(i).getOrDefault(label, null),
@@ -166,8 +165,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
     private Map<String, List<String>> fetchOutputClasses(List<OutputTensor> outputTensors) {
         Map<String, List<String>> out = new HashMap<>();
-        // todo: loop through and check type
-        // if there's only one output, or if there's no pairing, then return nothing
         if (outputTensors.size() == 1) {
             return out;
         }
@@ -189,7 +186,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 lo -> {
                     var matchingClassNames = classTypeToClassNames.entrySet().stream()
                         .filter(es -> {
-                            return es.getKey().replace("detection_classes_", "").equals(lo.getName().replace("detection_logits_", ""));
+                            return es.getKey().replace("detection_classes", "").equals(lo.getName().replace("detection_logits", ""));
                         }).toList();
                     if (matchingClassNames.size() > 1) {
                         logger.warn("More than one matching class name for logits {}, choosing the first", lo.getName());
@@ -210,9 +207,10 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
             outputClasses = dataDescription.getValues().stream().map(Object::toString).toList();
         } else {
             outputClasses = new ArrayList<>();
-            int nClasses = outputTensor.getShape().getShape()[2]; // output axes are batch, index, class
+            // todo: identify axes by type/id/description
+            int nClasses = outputTensor.getShape().getShape()[1]; // output axes are index, class
             for (int i = 0; i < nClasses; i++) {
-                outputClasses.add("Class" + i);
+                outputClasses.add("Class " + i);
             }
         }
         return outputClasses;
@@ -231,7 +229,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 try (var ml = pathObject.getMeasurementList()) {
                     for (int i = 0; i < values.length; i++) {
                         double val = values[i];
-                        ml.put("Logit " + outputClasses.get(i), val);
+                        ml.put("Logit: " + outputClasses.get(i), val);
                     }
                 }
             }
