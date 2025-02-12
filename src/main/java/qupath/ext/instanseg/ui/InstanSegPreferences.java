@@ -3,7 +3,6 @@ package qupath.ext.instanseg.ui;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.Property;
 import javafx.beans.property.StringProperty;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.prefs.PathPrefs;
@@ -56,7 +55,7 @@ class InstanSegPreferences {
     /**
      * MPS should work reliably (and much faster) on Apple Silicon, so set as default.
      * Everywhere else, use CPU as we can't count on a GPU/CUDA being available.
-     * @return
+     * @return The default device string.
      */
     private static String getDefaultDevice() {
         if (GeneralTools.isMac() && "aarch64".equals(System.getProperty("os.arch"))) {

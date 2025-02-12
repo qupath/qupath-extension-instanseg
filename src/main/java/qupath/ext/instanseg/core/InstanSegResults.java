@@ -21,7 +21,7 @@ public record InstanSegResults(
 
     /**
      * Get an empty instance of InstanSegResults.
-     * @return
+     * @return An empty instance with default values.
      */
     public static InstanSegResults emptyInstance() {
         return EMPTY;

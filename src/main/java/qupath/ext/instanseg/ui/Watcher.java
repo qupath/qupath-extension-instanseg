@@ -64,7 +64,7 @@ class Watcher {
 
     /**
      * Get a singleton instance of the Watcher.
-     * @return
+     * @return The watcher.
      */
     static Watcher getInstance() {
         return instance;
@@ -176,7 +176,7 @@ class Watcher {
 
     /**
      * Add the model, after checking it won't be a duplicate.
-     * @param model
+     * @param model The model.
      */
     private void ensureModelInList(InstanSegModel model) {
         for (var existingModel : models) {
@@ -232,7 +232,7 @@ class Watcher {
 
     /**
      * Update all models in response to a change in the model paths.
-     * @param change
+     * @param change The change event.
      */
     private void handleModelPathsChanged(ListChangeListener.Change<? extends Path> change) {
         if (!Platform.isFxApplicationThread())
@@ -250,13 +250,12 @@ class Watcher {
 
     /**
      * Get all the local models in a directory.
-     * @param dir
-     * @return
+     * @param dir The model directory.
+     * @return A list of model paths.
      */
     private static List<Path> getModelPathsInDir(Path dir) {
-        try {
-            return Files.list(dir)
-                    .filter(InstanSegModel::isValidModel)
+        try (var paths = Files.list(dir)) {
+            return paths.filter(InstanSegModel::isValidModel)
                     .toList();
         } catch (IOException e) {
             logger.error("Unable to list files in directory", e);
@@ -272,7 +271,7 @@ class Watcher {
      * Any calling code needs to figure out of models are really the same or different, which requires some
      * decision-making (e.g. is a model that has been downloaded the same as the local representation...?
      * Or are two models the same if the directories are duplicated, so that one has a different path...?).
-     * @return
+     * @return A list of models.
      */
     ObservableList<InstanSegModel> getModels() {
         return modelsUnmodifiable;

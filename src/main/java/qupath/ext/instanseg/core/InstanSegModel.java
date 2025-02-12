@@ -2,12 +2,15 @@ package qupath.ext.instanseg.core;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import qupath.bioimageio.spec.BioimageIoSpec;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+
+import qupath.bioimageio.spec.Model;
+import qupath.bioimageio.spec.Resource;
+import qupath.bioimageio.spec.tensor.OutputTensor;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.images.servers.PixelCalibration;
 
@@ -27,6 +30,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.Objects;
 
+import static qupath.bioimageio.spec.tensor.axes.Axes.getAxesString;
+
+
 public class InstanSegModel {
 
     private static final Logger logger = LoggerFactory.getLogger(InstanSegModel.class);
@@ -39,10 +45,10 @@ public class InstanSegModel {
     public static final int ANY_CHANNELS = -1;
 
     private Path path = null;
-    private BioimageIoSpec.BioimageIoModel model = null;
+    private Model model = null;
     private final String name;
 
-    private InstanSegModel(BioimageIoSpec.BioimageIoModel bioimageIoModel) {
+    private InstanSegModel(Model bioimageIoModel) {
         this.model = bioimageIoModel;
         this.path = Paths.get(model.getBaseURI());
         this.version = model.getVersion();
@@ -62,7 +68,7 @@ public class InstanSegModel {
      * @throws IOException If the directory can't be found or isn't a valid model directory.
      */
     public static InstanSegModel fromPath(Path path) throws IOException {
-        return new InstanSegModel(BioimageIoSpec.parseModel(path));
+        return new InstanSegModel(Model.parse(path));
     }
 
     /**
@@ -103,7 +109,7 @@ public class InstanSegModel {
                 downloadIfNotValid);
         this.path = unzipIfNeeded(zipFile);
         if (this.path != null) {
-            this.model = BioimageIoSpec.parseModel(path.toFile());
+            this.model = Model.parse(path.toFile());
             this.version = model.getVersion();
         }
     }
@@ -212,7 +218,7 @@ public class InstanSegModel {
     public String toString() {
         String name = getName();
         String parent = getPath().map(Path::getParent).map(Path::getFileName).map(Path::toString).orElse(null);
-        String version = getModel().map(BioimageIoSpec.BioimageIoModel::getVersion).orElse(this.version);
+        String version = getModel().map(Resource::getVersion).orElse(this.version);
         if (parent != null && !parent.equals(name)) {
             name = parent + "/" + name;
         }
@@ -251,8 +257,55 @@ public class InstanSegModel {
         return getModel().flatMap(model -> Optional.of(extractChannelNum(model)));
     }
 
-    private static int extractChannelNum(BioimageIoSpec.BioimageIoModel model) {
-        int ind = model.getInputs().getFirst().getAxes().toLowerCase().indexOf("c");
+    /**
+     * Try to check the output tensors from the model spec.
+     * @return The output tensors if the model is downloaded, otherwise empty.
+     */
+    public Optional<List<OutputTensor>> getOutputs() {
+        return getModel().flatMap(model -> Optional.ofNullable(model.getOutputs()));
+    }
+
+    /**
+     * Types of output tensors that may be supported by InstanSeg models.
+     */
+    public enum OutputTensorType {
+        // "instance segmentation" "cell embeddings" "cell classes" "cell probabilities" "semantic segmentation"
+        INSTANCE_SEGMENTATION("instance_segmentation"),
+        DETECTION_EMBEDDINGS("detection_embeddings"),
+        DETECTION_LOGITS("detection_logits"),
+        DETECTION_CLASSES("detection_classes"),
+        SEMANTIC_SEGMENTATION("semantic_segmentation");
+
+        private final String type;
+
+        OutputTensorType(String type) {
+            this.type = type;
+        }
+
+        @Override
+        public String toString() {
+            return type;
+        }
+
+        /**
+         * Get the output type from a string, ignoring case
+         * @param value the input String to be matched against the possible values
+         * @return the matching output type, or empty if no match
+         */
+        public static Optional<OutputTensorType> fromString(String value) {
+            for (OutputTensorType t: values()) {
+                if (t.type.equalsIgnoreCase(value)) {
+                    return Optional.of(t);
+                }
+            }
+            logger.error("Unknown output type {}", value);
+            return Optional.empty();
+        }
+    }
+
+    private static int extractChannelNum(Model model) {
+        String axes = getAxesString(model.getInputs().getFirst().getAxes());
+        int ind = axes.indexOf("c");
         var shape = model.getInputs().getFirst().getShape();
         if (shape.getShapeStep()[ind] == 1) {
             return ANY_CHANNELS;
@@ -265,7 +318,7 @@ public class InstanSegModel {
      * Retrieve the BioImage model spec.
      * @return The BioImageIO model spec for this InstanSeg model.
      */
-    private Optional<BioimageIoSpec.BioimageIoModel> getModel() {
+    private Optional<Model> getModel() {
         return Optional.ofNullable(model);
     }
 
@@ -292,7 +345,7 @@ public class InstanSegModel {
             return false;
         }
         try {
-            BioimageIoSpec.parseModel(zipFile.toFile());
+            Model.parse(zipFile.toFile());
         } catch (IOException e) {
             logger.warn("Invalid zip file", e);
             return false;
@@ -304,7 +357,7 @@ public class InstanSegModel {
         if (zipFile == null) {
             return null;
         }
-        var zipSpec = BioimageIoSpec.parseModel(zipFile);
+        var zipSpec = Model.parse(zipFile);
         String version = zipSpec.getVersion();
         var outdir = zipFile.resolveSibling(getFolderName(zipSpec.getName(), version));
         if (!isUnpackedAlready(outdir)) {
@@ -399,7 +452,7 @@ public class InstanSegModel {
     public Optional<Integer> getOutputChannels() {
         return getModel().map(model -> {
             var output = model.getOutputs().getFirst();
-            String axes = output.getAxes().toLowerCase();
+            String axes = getAxesString(output.getAxes());
             int ind = axes.indexOf("c");
             var shape = output.getShape().getShape();
             if (shape != null && shape.length > ind)

@@ -12,10 +12,10 @@ import java.util.ResourceBundle;
 
 public class ModelListCell extends ListCell<InstanSegModel> {
 
-    private ResourceBundle resources = InstanSegResources.getResources();
+    private final ResourceBundle resources = InstanSegResources.getResources();
 
-    private Glyph web = createOnlineIcon();
-    private Tooltip tooltip;
+    private final Glyph web = createOnlineIcon();
+    private final Tooltip tooltip;
 
     public ModelListCell() {
         super();

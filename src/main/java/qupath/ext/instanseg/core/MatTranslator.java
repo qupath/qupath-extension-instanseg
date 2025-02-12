@@ -4,20 +4,20 @@ import ai.djl.Device;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
+import org.bytedeco.opencv.opencv_core.Mat;
 import ai.djl.translate.Translator;
 import ai.djl.translate.TranslatorContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import qupath.ext.djl.DjlTools;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.bytedeco.opencv.opencv_core.Mat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import qupath.ext.djl.DjlTools;
 
 
-class MatTranslator implements Translator<Mat, Mat> {
+class MatTranslator implements Translator<Mat, Mat[]> {
     private static final Logger logger = LoggerFactory.getLogger(MatTranslator.class);
 
     private final String inputLayoutNd;
@@ -104,9 +104,15 @@ class MatTranslator implements Translator<Mat, Mat> {
     }
 
     @Override
-    public Mat processOutput(TranslatorContext ctx, NDList list) {
+    public Mat[] processOutput(TranslatorContext ctx, NDList list) {
         var array = list.getFirst();
-        return DjlTools.ndArrayToMat(array, outputLayoutNd);
+        var labels = DjlTools.ndArrayToMat(array, outputLayoutNd);
+        var output = new Mat[list.size()];
+        output[0] = labels;
+        for (int i = 1; i < list.size(); i++) {
+            output[i] = DjlTools.ndArrayToMat(list.get(i), "HW");
+        }
+        return output;
     }
 
 }

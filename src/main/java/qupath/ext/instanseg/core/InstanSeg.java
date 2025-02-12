@@ -9,9 +9,11 @@ import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.bioimageio.spec.tensor.OutputTensor;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
+import qupath.lib.experimental.pixels.PixelProcessor;
 import qupath.lib.experimental.pixels.Processor;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ColorTransforms;
@@ -58,7 +60,7 @@ public class InstanSeg {
     private final InstanSegModel model;
     private final Device device;
     private final TaskRunner taskRunner;
-    private final Class<? extends PathObject> preferredOutputClass;
+    private final Class<? extends PathObject> preferredOutputType;
     private final Map<String, Object> optionalArgs = new LinkedHashMap<>();
 
     // This was previously an adjustable parameter, but it's now fixed at 1 because we handle overlaps differently.
@@ -75,7 +77,7 @@ public class InstanSeg {
         this.model = builder.model;
         this.device = builder.device;
         this.taskRunner = builder.taskRunner;
-        this.preferredOutputClass = builder.preferredOutputClass;
+        this.preferredOutputType = builder.preferredOutputType;
         this.randomColors = builder.randomColors;
         this.makeMeasurements = builder.makeMeasurements;
         this.optionalArgs.putAll(builder.optionalArgs);
@@ -160,12 +162,17 @@ public class InstanSeg {
 
     private InstanSegResults runInstanSeg(ImageData<BufferedImage> imageData, Collection<? extends PathObject> pathObjects) {
         long startTime = System.currentTimeMillis();
-
         Optional<Path> oModelPath = model.getPath();
         if (oModelPath.isEmpty()) {
             return InstanSegResults.emptyInstance();
         }
         Path modelPath = oModelPath.get().resolve("instanseg.pt");
+
+        Optional<List<OutputTensor>> oOutputTensors = this.model.getOutputs();
+        if (oOutputTensors.isEmpty()) {
+            throw new IllegalArgumentException("No output tensors available even though model is available");
+        }
+        var outputTensors = oOutputTensors.get();
 
         // Provide some way to change the number of predictors, even if this can't be specified through the UI
         // See https://forum.image.sc/t/instanseg-under-utilizing-cpu-only-2-3-cores/104496/7
@@ -179,8 +186,6 @@ public class InstanSeg {
             logger.warn("Padding to input size is turned on - this is likely to be slower (but could help fix any issues)");
         }
         String layout = "CHW";
-
-        // TODO: Remove C if not needed (added for instanseg_v0_2_0.pt) - still relevant?
         String layoutOutput = "CHW";
 
         // Get the downsample - this may be specified by the user, or determined from the model spec
@@ -202,6 +207,7 @@ public class InstanSeg {
         // Create an int[] representing a boolean array of channels to use
         boolean[] outputChannelArray = null;
         if (outputChannels != null && outputChannels.length > 0) {
+            //noinspection OptionalGetWithoutIsPresent
             outputChannelArray = new boolean[model.getOutputChannels().get()]; // safe to call get because of previous checks
             for (int c : outputChannels) {
                 if (c < 0 || c >= outputChannelArray.length) {
@@ -215,7 +221,7 @@ public class InstanSeg {
         var inputChannels = getInputChannels(imageData);
 
         try (var model = Criteria.builder()
-                .setTypes(Mat.class, Mat.class)
+                .setTypes(Mat.class, Mat[].class)
                 .optModelUrls(String.valueOf(modelPath.toUri()))
                 .optProgress(new ProgressBar())
                 .optDevice(device) // Remove this line if devices are problematic!
@@ -227,7 +233,7 @@ public class InstanSeg {
             printResourceCount("Resource count before prediction",
                     (BaseNDManager)baseManager.getParentManager());
             baseManager.debugDump(2);
-            BlockingQueue<Predictor<Mat, Mat>> predictors = new ArrayBlockingQueue<>(nPredictors);
+            BlockingQueue<Predictor<Mat, Mat[]>> predictors = new ArrayBlockingQueue<>(nPredictors);
 
             try {
                 for (int i = 0; i < nPredictors; i++) {
@@ -239,10 +245,11 @@ public class InstanSeg {
 
                 var tiler = createTiler(downsample, tileDims, padding);
                 var predictionProcessor = createProcessor(predictors, inputChannels, tileDims, padToInputSize);
-                var outputHandler = createOutputHandler(preferredOutputClass, randomColors, boundaryThreshold);
+                var outputHandler = createOutputHandler(preferredOutputType, randomColors, boundaryThreshold, outputTensors);
                 var postProcessor = createPostProcessor();
-
-                var processor = OpenCVProcessor.builder(predictionProcessor)
+                var processor = new PixelProcessor.Builder<Mat, Mat, Mat[]>()
+                        .processor(predictionProcessor)
+                        .maskSupplier(OpenCVProcessor.createMatMaskSupplier())
                         .imageSupplier((parameters) -> ImageOps.buildImageDataOp(inputChannels)
                                 .apply(parameters.getImageData(), parameters.getRegionRequest()))
                         .tiler(tiler)
@@ -279,16 +286,17 @@ public class InstanSeg {
         }
     }
 
+
     /**
      * Check if we are requesting tiles for debugging purposes.
      * When this is true, we should create objects that represent the tiles - not the objects to be detected.
-     * @return
+     * @return Whether the system debugging property is set.
      */
     private static boolean debugTiles() {
         return System.getProperty("instanseg.debug.tiles", "false").strip().equalsIgnoreCase("true");
     }
 
-    private static Processor<Mat, Mat, Mat> createProcessor(BlockingQueue<Predictor<Mat, Mat>> predictors,
+    private static Processor<Mat, Mat, Mat[]> createProcessor(BlockingQueue<Predictor<Mat, Mat[]>> predictors,
                                                             Collection<? extends ColorTransforms.ColorTransform> inputChannels,
                                                             int tileDims, boolean padToInputSize) {
         if (debugTiles())
@@ -296,7 +304,7 @@ public class InstanSeg {
         return new TilePredictionProcessor(predictors, inputChannels, tileDims, tileDims, padToInputSize);
     }
 
-    private static Mat createOnes(Parameters<Mat, Mat> parameters) {
+    private static Mat[] createOnes(Parameters<Mat, Mat> parameters) {
         var tileRequest = parameters.getTileRequest();
         int width, height;
         if (tileRequest == null) {
@@ -307,15 +315,20 @@ public class InstanSeg {
             width = tileRequest.getTileWidth();
             height = tileRequest.getTileHeight();
         }
-        return Mat.ones(height, width, opencv_core.CV_8UC1).asMat();
+        try (var ones = Mat.ones(height, width, opencv_core.CV_8UC1)) {
+            return new Mat[]{ones.asMat()};
+        }
     }
 
-    private static OutputHandler<Mat, Mat, Mat> createOutputHandler(Class<? extends PathObject> preferredOutputClass,
-                                                                    boolean randomColors,
-                                                                    int boundaryThreshold) {
-        if (debugTiles())
-            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
-        var converter = new InstanSegOutputToObjectConverter(preferredOutputClass, randomColors);
+
+    private static OutputHandler<Mat, Mat, Mat[]> createOutputHandler(Class<? extends PathObject> preferredOutputType,
+                                                                      boolean randomColors,
+                                                                      int boundaryThreshold,
+                                                                      List<OutputTensor> outputTensors) {
+        // TODO: Reinstate this for Mat[] output (it was written for Mat output)
+//        if (debugTiles())
+//            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
+        var converter = new InstanSegOutputToObjectConverter(outputTensors, preferredOutputType, randomColors);
         if (boundaryThreshold >= 0) {
             return new PruneObjectOutputHandler<>(converter, boundaryThreshold);
         } else {
@@ -334,8 +347,8 @@ public class InstanSeg {
 
     /**
      * Get the input channels to use; if we don't have any specified, use all of them
-     * @param imageData
-     * @return
+     * @param imageData The image data
+     * @return The possible input channels.
      */
     private List<ColorTransforms.ColorTransform> getInputChannels(ImageData<BufferedImage> imageData) {
         if (inputChannels == null || inputChannels.isEmpty()) {
@@ -364,8 +377,8 @@ public class InstanSeg {
     /**
      * Print resource count for debugging purposes.
      * If we are not logging at debug level, do nothing.
-     * @param title
-     * @param manager
+     * @param title The name to be used in the log.
+     * @param manager The NDManager to print from.
      */
     private static void printResourceCount(String title, BaseNDManager manager) {
         if (logger.isDebugEnabled()) {
@@ -395,7 +408,7 @@ public class InstanSeg {
         private TaskRunner taskRunner = TaskRunnerUtils.getDefaultInstance().createTaskRunner();
         private Collection<? extends ColorTransforms.ColorTransform> channels;
         private InstanSegModel model;
-        private Class<? extends PathObject> preferredOutputClass;
+        private Class<? extends PathObject> preferredOutputType;
         private final Map<String, Object> optionalArgs = new LinkedHashMap<>();
 
         Builder() {}
@@ -555,7 +568,7 @@ public class InstanSeg {
 
         /**
          * Optionally request that random colors be used for the output objects.
-         * @param doRandomColors
+         * @param doRandomColors Whether to use random colors for output object.
          * @return this builder
          */
         public Builder randomColors(boolean doRandomColors) {
@@ -636,7 +649,7 @@ public class InstanSeg {
          * @return this builder
          */
         public Builder outputCells() {
-            this.preferredOutputClass = PathCellObject.class;
+            this.preferredOutputType = PathCellObject.class;
             return this;
         }
 
@@ -645,7 +658,7 @@ public class InstanSeg {
          * @return this builder
          */
         public Builder outputDetections() {
-            this.preferredOutputClass = PathDetectionObject.class;
+            this.preferredOutputType = PathDetectionObject.class;
             return this;
         }
 
@@ -654,7 +667,7 @@ public class InstanSeg {
          * @return this builder
          */
         public Builder outputAnnotations() {
-            this.preferredOutputClass = PathAnnotationObject.class;
+            this.preferredOutputType = PathAnnotationObject.class;
             return this;
         }
 

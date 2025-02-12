@@ -65,7 +65,7 @@ public class PytorchManager {
 
     /**
      * Query if the PyTorch engine is already available, without a need to download.
-     * @return
+     * @return whether PyTorch is available.
      */
     public static boolean hasPyTorchEngine() {
         return getEngineOffline() != null;
@@ -86,10 +86,10 @@ public class PytorchManager {
 
     /**
      * Call a function with the "offline" property set to true (to block automatic downloads).
-     * @param callable
-     * @return
-     * @param <T>
-     * @throws Exception
+     * @param callable The function to be called.
+     * @return The return value of the callable.
+     * @param <T> The return type of the callable.
+     * @throws Exception If the callable does.
      */
     private static <T> T callOffline(Callable<T> callable) throws Exception {
         return callWithTempProperty("ai.djl.offline", "true", callable);
@@ -97,10 +97,10 @@ public class PytorchManager {
 
     /**
      * Call a function with the "offline" property set to false (to allow automatic downloads).
-     * @param callable
-     * @return
-     * @param <T>
-     * @throws Exception
+     * @param callable The function to be called.
+     * @return The return value of the callable.
+     * @param <T> The return type of the callable.
+     * @throws Exception If the callable does.
      */
     private static <T> T callOnline(Callable<T> callable) throws Exception {
         return callWithTempProperty("ai.djl.offline", "false", callable);

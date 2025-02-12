@@ -14,7 +14,6 @@ import qupath.lib.images.ImageData;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -62,6 +61,7 @@ class InstanSegTask extends Task<Void> {
             return null;
         }
         // TODO: HANDLE OUTPUT CHANNELS!
+        // todo: Unclear what this means
         int nOutputs = model.getOutputChannels().orElse(1);
         int[] outputChannels = new int[0];
         if (nOutputs <= 0) {

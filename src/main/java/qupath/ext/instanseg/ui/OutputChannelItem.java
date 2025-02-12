@@ -40,7 +40,7 @@ public class OutputChannelItem {
 
     /**
      * Get the index of the output channel.
-     * @return
+     * @return The index of the output channel
      */
     public int getIndex() {
         return index;
