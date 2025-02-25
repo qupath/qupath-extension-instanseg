@@ -11,6 +11,7 @@ import java.io.FileOutputStream;
 import qupath.bioimageio.spec.Model;
 import qupath.bioimageio.spec.Resource;
 import qupath.bioimageio.spec.tensor.OutputTensor;
+import qupath.bioimageio.spec.tensor.axes.ScaledAxis;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.images.servers.PixelCalibration;
 
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -306,6 +308,10 @@ public class InstanSegModel {
     private static int extractChannelNum(Model model) {
         String axes = getAxesString(model.getInputs().getFirst().getAxes());
         int ind = axes.indexOf("c");
+        // v0.5 models use index axis because channel axes have to be fixed length list of channel names
+        if (ind == -1) {
+            ind = axes.indexOf("i");
+        }
         var shape = model.getInputs().getFirst().getShape();
         if (shape.getShapeStep()[ind] == 1) {
             return ANY_CHANNELS;
@@ -430,19 +436,39 @@ public class InstanSegModel {
     }
 
     private Optional<Map<String, Double>> getPixelSize() {
-        return getModel().flatMap(model -> {
-            var config = model.getConfig().getOrDefault("qupath", null);
-            if (config instanceof Map configMap) {
-                var axes = (List) configMap.get("axes");
-                String x = String.valueOf(((Map) (axes.get(0))).get("step"));
-                String y = String.valueOf(((Map) (axes.get(1))).get("step"));
-                return Optional.of(Map.of(
-                        "x", Double.valueOf(x),
-                        "y", Double.valueOf(y)
-                ));
+        if (model == null) {
+            return Optional.empty();
+        }
+        if (model.isFormatNewerThan("0.5.0")) {
+            var axes = model.getOutputs().getFirst().getAxes();
+            var xAxis = Arrays.stream(axes)
+                    .filter(a -> a.getID().equals("x"))
+                    .findFirst();
+            var yAxis = Arrays.stream(axes)
+                    .filter(a -> a.getID().equals("y"))
+                    .findFirst();
+            if (xAxis.isEmpty() || yAxis.isEmpty()) {
+                return Optional.empty();
             }
-            return Optional.of(Map.of("x", 1.0, "y", 1.0));
-        });
+            return Optional.of(Map.of(
+                        "x", ((ScaledAxis)(xAxis.get())).getScale(),
+                        "y", ((ScaledAxis)(yAxis.get())).getScale()
+            ));
+        } else {
+            return getModel().flatMap(model -> {
+                var config = model.getConfig().getOrDefault("qupath", null);
+                if (config instanceof Map configMap) {
+                    var axes = (List) configMap.get("axes");
+                    String x = String.valueOf(((Map) (axes.get(0))).get("step"));
+                    String y = String.valueOf(((Map) (axes.get(1))).get("step"));
+                    return Optional.of(Map.of(
+                            "x", Double.valueOf(x),
+                            "y", Double.valueOf(y)
+                    ));
+                }
+                return Optional.of(Map.of("x", 1.0, "y", 1.0));
+            });
+        }
     }
 
     /**
