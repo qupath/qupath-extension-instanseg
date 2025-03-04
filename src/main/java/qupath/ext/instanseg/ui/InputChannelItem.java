@@ -41,7 +41,7 @@ class InputChannelItem {
     InputChannelItem(ColorDeconvolutionStains stains, int i) {
         this.name = stains.getStain(i).getName();
         this.transform = ColorTransforms.createColorDeconvolvedChannel(stains, i);
-        this.constructor = String.format("ColorTransforms.createColorDeconvolvedChannel(stains, %d)", i);
+        this.constructor = String.format("ColorTransforms.createColorDeconvolvedChannel(QP.getCurrentImageData().getColorDeconvolutionStains(), %d)", i);
     }
 
     @Override
