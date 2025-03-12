@@ -60,13 +60,14 @@ class MatTranslator implements Translator<Mat, Mat[]> {
         var manager = ctx.getNDManager();
         var ndarray = DjlTools.matToNDArray(manager, input, inputLayoutNd);
         var out = new NDList(ndarray);
+        List<NDArray> args = sanitizeOptionalArgs(optionalArgs, manager);
+        out.addAll(args);
         if (outputChannels != null) {
             var array = manager.create(outputChannels);
+            array.setName("args.target_segmentation");
             var arrayCPU = array.toDevice(Device.cpu(), false);
             out.add(arrayCPU);
         }
-        List<NDArray> args = sanitizeOptionalArgs(optionalArgs, manager);
-        out.addAll(args);
         return out;
     }
 
