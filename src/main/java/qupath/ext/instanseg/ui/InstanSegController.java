@@ -334,10 +334,11 @@ public class InstanSegController extends BorderPane {
     }
 
     private void handleImageDataPropertyChange(PropertyChangeEvent event) {
-        // Update the input channels when the stains or image type changes
         String name = event.getPropertyName();
-        if ("stains".equals(name) || "imageType".equals(name))
+        if ("stains".equals(name) || "imageType".equals(name) || "serverMetadata".equals(name)) {
+            // Update the input channels when the stains or image type changes or the server metadata changes
             updateInputChannels(qupath.getImageData());
+        }
     }
 
 
