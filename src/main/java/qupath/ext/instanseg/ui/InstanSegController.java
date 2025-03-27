@@ -5,6 +5,7 @@ import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.ObjectBinding;
+import javafx.beans.binding.StringBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -168,8 +169,15 @@ public class InstanSegController extends BorderPane {
 
         // Create variables that depend upon the UI elements
         messageTextHelper = new MessageTextHelper(modelChoiceBox, deviceChoices, comboInputChannels, needsUpdating);
-        inputChannelCache = CheckModelCache.create(selectedModel.map(InstanSegModel::getName), comboInputChannels);
-        outputChannelCache = CheckModelCache.create(selectedModel.map(InstanSegModel::getName), comboOutputChannels);
+        StringBinding selectedModelName = Bindings.createStringBinding(() -> {
+            var model = selectedModel.get();
+            if (model != null && model.isValid())
+                return model.getName();
+            else
+                return null;
+        }, selectedModel, needsUpdating);
+        inputChannelCache = CheckModelCache.create(selectedModelName, comboInputChannels);
+        outputChannelCache = CheckModelCache.create(selectedModelName, comboOutputChannels);
 
         // These items are ordered in the same way they appear in the UI,
         // starting at the top
@@ -496,10 +504,27 @@ public class InstanSegController extends BorderPane {
         if (!model.isValid() || qupath.getImageData() == null) {
             return;
         }
-        var numChannels = model.getNumChannels();
-        if (!inputChannelCache.restoreChecks() && qupath.getImageData().isBrightfield() && numChannels.isPresent() && numChannels.get() != InstanSegModel.ANY_CHANNELS) {
+        int numChannels = model.getNumChannels().orElse(InstanSegModel.ANY_CHANNELS);
+        // Try to restore last used channels - but need to ensure this is valid for the model
+        var inputChannelsRestored = inputChannelCache.restoreChecks() && (numChannels == InstanSegModel.ANY_CHANNELS
+                || numChannels == comboInputChannels.getCheckModel().getItemCount());
+        // If we couldn't restore the channels, set as many as we need to be checked
+        if (!inputChannelsRestored) {
             comboInputChannels.getCheckModel().clearChecks();
-            comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
+            if (numChannels == InstanSegModel.ANY_CHANNELS) {
+                // For brightfield, default to RGB channels if we can choose any number
+                if (qupath.getImageData() != null && qupath.getImageData().isBrightfield()) {
+                    comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
+                } else {
+                    // For non-brightfield, default to everything
+                    comboInputChannels.getCheckModel().checkAll();
+                }
+            } else {
+                // Select as many channels as we need (and can)
+                for (int i = 0; i < Math.min(numChannels, comboInputChannels.getItems().size()); i++) {
+                    comboInputChannels.getCheckModel().check(i);
+                }
+            }
         }
         // Handle output channels
         var nOutputs = model.getOutputChannels().orElse(1);

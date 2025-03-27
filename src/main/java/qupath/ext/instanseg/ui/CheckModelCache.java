@@ -71,7 +71,7 @@ public class CheckModelCache<S, T> {
      */
     public boolean restoreChecks() {
         List<Integer> checks = lastChecks.get(value.get());
-        if (checks != null && checks.stream().allMatch(i -> i < checkbox.getItems().size())) {
+        if (checks != null && !checks.isEmpty() && checks.stream().allMatch(i -> i < checkbox.getItems().size())) {
             var checkModel = checkbox.getCheckModel();
             checkModel.clearChecks();
             checks.forEach(checkModel::checkIndices);
