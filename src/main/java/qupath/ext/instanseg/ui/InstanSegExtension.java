@@ -13,6 +13,7 @@ import qupath.fx.dialogs.Dialogs;
 import qupath.fx.prefs.annotations.DirectoryPref;
 import qupath.fx.prefs.annotations.Pref;
 import qupath.fx.prefs.annotations.PrefCategory;
+import qupath.fx.prefs.controlsfx.PropertyItemBuilder;
 import qupath.fx.prefs.controlsfx.PropertySheetUtils;
 import qupath.fx.utils.FXUtils;
 import qupath.lib.common.Version;
@@ -92,7 +93,19 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 		qupath.getPreferencePane()
 				.getPropertySheet()
 				.getItems()
-				.addAll(PropertySheetUtils.parseAnnotatedItems(new PreferenceProperties()));
+				.add(new PropertyItemBuilder<>(InstanSegPreferences.modelDirectoryProperty(), String.class)
+						.name(resources.getString("ui.prefs.model-directory"))
+						.description(resources.getString("ui.prefs.model-directory.description"))
+						.category(resources.getString("title"))
+						.build());
+		qupath.getPreferencePane()
+				.getPropertySheet()
+				.getItems()
+				.add(new PropertyItemBuilder<>(InstanSegPreferences.permitOnlineProperty(), InstanSegPreferences.OnlinePermission.class)
+						.name(resources.getString("ui.prefs.permit-online"))
+						.description(resources.getString("ui.prefs.permit-online.description"))
+						.category(resources.getString("title"))
+						.build());
 	}
 
 
@@ -123,16 +136,6 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 	@Override
 	public GitHubRepo getRepository() {
 		return EXTENSION_REPOSITORY;
-	}
-
-	@PrefCategory(bundle="qupath.ext.instanseg.ui.strings", value="title")
-	private static class PreferenceProperties {
-
-		@DirectoryPref(bundle="qupath.ext.instanseg.ui.strings", value="ui.prefs.model-directory")
-		private final StringProperty modelDirectory = InstanSegPreferences.modelDirectoryProperty();
-
-		@Pref(bundle="qupath.ext.instanseg.ui.strings", type=InstanSegPreferences.OnlinePermission.class, value="ui.prefs.permit-online")
-		private final ObjectProperty<InstanSegPreferences.OnlinePermission> permitOnline = InstanSegPreferences.permitOnlineProperty();
 	}
 
 }
