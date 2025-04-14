@@ -20,6 +20,7 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
@@ -109,6 +110,8 @@ public class InstanSegController extends BorderPane {
     private ToggleButton selectAllTMACoresButton;
     @FXML
     private CheckComboBox<OutputChannelItem> comboOutputChannels;
+    @FXML
+    private ComboBox<String> comboOutputType;
     @FXML
     private CheckBox makeMeasurementsCheckBox;
     @FXML
@@ -204,7 +207,13 @@ public class InstanSegController extends BorderPane {
         configureThreadSpinner();
         configureInputChannelCombo();
         configureOutputChannelCombo();
+        configureOutputTypeCombo();
         configureDefaultValues();
+    }
+
+    private void configureOutputTypeCombo() {
+        comboOutputType.getItems().addAll("Annotations", "Detections", "Cells");
+        comboOutputType.getSelectionModel().select(0);
     }
 
     private void refreshAvailableModels() {
@@ -836,7 +845,7 @@ public class InstanSegController extends BorderPane {
 
         var task = new InstanSegTask(qupath.getImageData(), model, selectedChannels,
                 comboOutputChannels.getCheckModel().getCheckedIndices(), device,
-                makeMeasurements, randomColors);
+                makeMeasurements, randomColors, comboOutputType.getValue());
 
         // Ensure PyTorch engine is available before running anything
         CompletableFuture.supplyAsync(this::ensurePyTorchAvailable, ForkJoinPool.commonPool())
