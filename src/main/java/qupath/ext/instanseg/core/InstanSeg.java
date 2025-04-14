@@ -732,11 +732,28 @@ public class InstanSeg {
 
     }
 
+    /**
+     * Possible output types for InstanSeg
+     */
     public enum OutputType {
+        /**
+         * Output possibly nested annotations
+         */
         ANNOTATION,
+        /**
+         * Output possibly nested detections
+         */
         DETECTION,
+        /**
+         * Output possibly cells that may or may not have a nucleus
+         */
         CELL;
 
+        /**
+         * Fetch the output type matching a string value.
+         * @param outputType the string input, possibly containing trailing whitespace; can be plural
+         * @return the matching output type, if we can find it; otherwise an exception
+         */
         public static OutputType fromString(String outputType) {
             outputType = outputType.strip();
             if (outputType.endsWith("s")) {
