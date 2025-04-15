@@ -22,7 +22,6 @@
 <?import org.controlsfx.control.SegmentedButton?>
 
 <?import javafx.scene.control.ComboBox?>
-<?import javafx.collections.FXCollections?>
 <fx:root maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefWidth="330" stylesheets="@instanseg.css" type="BorderPane" xmlns="http://javafx.com/javafx/22" xmlns:fx="http://javafx.com/fxml/1">
     <center>
         <VBox fx:id="vBox">
