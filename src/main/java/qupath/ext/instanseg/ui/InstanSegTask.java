@@ -34,9 +34,11 @@ class InstanSegTask extends Task<Void> {
     private final String device;
     private final boolean makeMeasurements;
     private final boolean randomColors;
+    private final String outputType;
 
     InstanSegTask(ImageData<BufferedImage> imageData, InstanSegModel model, List<InputChannelItem> channels,
-                  List<Integer> outputChannels, String device, boolean makeMeasurements, boolean randomColors) {
+                  List<Integer> outputChannels, String device, boolean makeMeasurements, boolean randomColors,
+                  String outputType) {
         this.imageData = imageData;
         this.model = model;
         this.channels = List.copyOf(channels);
@@ -44,6 +46,7 @@ class InstanSegTask extends Task<Void> {
         this.device = device;
         this.makeMeasurements = makeMeasurements;
         this.randomColors = randomColors;
+        this.outputType = outputType;
     }
 
 
@@ -85,6 +88,7 @@ class InstanSegTask extends Task<Void> {
                 .taskRunner(taskRunner)
                 .makeMeasurements(makeMeasurements)
                 .randomColors(randomColors)
+                .outputType(outputType)
                 .build();
 
         String cmd = String.format("""
@@ -98,6 +102,7 @@ class InstanSegTask extends Task<Void> {
                                 .nThreads(%d)
                                 .makeMeasurements(%s)
                                 .randomColors(%s)
+                                .outputType("%s")
                                 .build()
                                 .detectObjects()
                             """,
@@ -111,7 +116,8 @@ class InstanSegTask extends Task<Void> {
                 tilePadding,
                 nThreads,
                 makeMeasurements,
-                randomColors
+                randomColors,
+                outputType
         ).strip();
         InstanSegResults results = instanSeg.detectObjects(imageData, selectedObjects);
         imageData.getHierarchy().fireHierarchyChangedEvent(this);
