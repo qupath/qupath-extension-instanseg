@@ -672,6 +672,16 @@ public class InstanSeg {
         }
 
         /**
+         * Output whatever the default object type for the model is: probably cells for nuclei + cell models, nuclei for everything else.
+         * @return this builder
+         */
+        private Builder outputDefault() {
+            this.preferredOutputType = null;
+            return this;
+        }
+
+
+        /**
          * Set the output type based on a string value.
          * @param outputType the type of output (usually cell, annotation or detection)
          * @return this builder.
@@ -687,10 +697,12 @@ public class InstanSeg {
                 case ANNOTATION -> {
                     return this.outputAnnotations();
                 }
+                case DEFAULT -> {
+                    return this.outputDefault();
+                }
                 default -> throw new IllegalArgumentException("Unknown output type");
             }
         }
-
 
         /**
          * Set a number of optional arguments
@@ -747,7 +759,11 @@ public class InstanSeg {
         /**
          * Output possibly cells that may or may not have a nucleus
          */
-        CELL;
+        CELL,
+        /**
+         * Whatever the default model behaviour is.
+         */
+        DEFAULT;
 
         /**
          * Fetch the output type matching a string value.

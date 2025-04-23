@@ -212,7 +212,7 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureOutputTypeCombo() {
-        comboOutputType.getItems().addAll("Annotations", "Detections", "Cells");
+        comboOutputType.getItems().addAll("Default", "Detections", "Annotations", "Cells");
         comboOutputType.getSelectionModel().select(0);
     }
 
