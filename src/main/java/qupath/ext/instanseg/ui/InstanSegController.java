@@ -21,6 +21,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
@@ -209,6 +210,28 @@ public class InstanSegController extends BorderPane {
         configureOutputChannelCombo();
         configureOutputTypeCombo();
         configureDefaultValues();
+
+        // Fix tooltip issue with ControlsFX combo boxes
+        // Need to run later so that the CSS lookup can work
+        Platform.runLater(() -> {
+            fixComboBoxTooltip(modelChoiceBox);
+            fixComboBoxTooltip(comboInputChannels);
+            fixComboBoxTooltip(comboOutputChannels);
+        });
+    }
+
+    /**
+     * Workaround to enable tooltips for non-standard, ControlsFX combo boxes.
+     * Workaround for https://github.com/controlsfx/controlsfx/issues/1530
+     * @param combo a ControlsFX combo-box variation (e.g. searchable, or check combo box)
+     */
+    private static void fixComboBoxTooltip(Control combo) {
+        var tooltip = combo.getTooltip();
+        if (tooltip != null) {
+            for (var node : combo.lookupAll(".combo-box")) {
+                Tooltip.install(node, tooltip);
+            }
+        }
     }
 
     private void configureOutputTypeCombo() {
