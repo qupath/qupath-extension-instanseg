@@ -1,6 +1,7 @@
 package qupath.ext.instanseg.ui;
 
 import com.google.gson.Gson;
+import java.util.Arrays;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -381,7 +382,6 @@ public class InstanSegController extends BorderPane {
         }
     }
 
-
     private void updateInputChannels(ImageData<BufferedImage> imageData) {
         if (imageData == null) {
             return;
@@ -392,8 +392,10 @@ public class InstanSegController extends BorderPane {
         }
         // Store the checks without changing the current value
         inputChannelCache.snapshotChecks();
-        // Update the items
-        comboInputChannels.getCheckModel().clearChecks();
+        // Update the items, if some are available to be checked
+        if (!comboInputChannels.getItems().isEmpty()) {
+            comboInputChannels.getCheckModel().clearChecks();
+        }
         comboInputChannels.getItems().clear();
         comboInputChannels.getItems().setAll(InputChannelItem.getAvailableChannels(imageData));
         var model = selectedModel.get();
@@ -539,8 +541,8 @@ public class InstanSegController extends BorderPane {
         // Try to restore last used channels - but need to ensure this is valid for the model
         var inputChannelsRestored = inputChannelCache.restoreChecks() && (numChannels == InstanSegModel.ANY_CHANNELS
                 || numChannels == comboInputChannels.getCheckModel().getItemCount());
-        // If we couldn't restore the channels, set as many as we need to be checked
-        if (!inputChannelsRestored) {
+        // If we couldn't restore the channels, set as many as we need to be checked, assuming there are items to be checked
+        if (!inputChannelsRestored && comboInputChannels.getCheckModel().getItemCount() > 0) {
             resetInputChecks(qupath.getImageData(), model);
         }
         // Handle output channels

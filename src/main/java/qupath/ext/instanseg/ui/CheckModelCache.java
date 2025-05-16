@@ -55,13 +55,15 @@ public class CheckModelCache<S, T> {
 
     private List<Boolean> checksToBoolean(CheckComboBox<T> checkbox) {
         List<Boolean> out = new ArrayList<>(Collections.nCopies(checkbox.getItems().size(), false));
-        checkbox.getCheckModel().getCheckedIndices().forEach(i -> out.set(i, true));
+        if (!out.isEmpty()) {
+            checkbox.getCheckModel().getCheckedIndices().forEach(i -> out.set(i, true));
+        }
         return out;
     }
 
-    private void checkFromBoolean(CheckComboBox<T> checkbox, List<Boolean> checks) {
-        for (int i = 0; i < checks.size(); i++) {
-            if (checks.get(i)) {
+    private void checkFromBoolean(CheckComboBox<T> checkbox, List<Boolean> isChecked) {
+        for (int i = 0; i < isChecked.size(); i++) {
+            if (isChecked.get(i)) {
                 checkbox.getCheckModel().check(i);
             }
         }
