@@ -407,14 +407,15 @@ public class InstanSegController extends BorderPane {
 
     /**
      * Reset the checked input channels based on the current image and a model.
+     * If the number of channels in the image file matches the number in the model,
+     * or if we have an arbitrary channel model, then check all channels.
+     * Otherwise, check none.
      * @param imageData the current image, used to query number of channels available
      * @param model a model, used to check how many channels we handle
      */
     private void resetInputChecks(ImageData<BufferedImage> imageData, InstanSegModel model) {
         if (model != null && model.isValid()) {
             int nModelChannels = model.getNumChannels().orElse(InstanSegModel.ANY_CHANNELS);
-            // if the number of channels in the image file matches the number in the model, or if we have an arbitrary channel model check all
-            // otherwise, check none
             comboInputChannels.getCheckModel().clearChecks();
             if (nModelChannels == imageData.getServer().nChannels() || nModelChannels == InstanSegModel.ANY_CHANNELS) {
                 comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
