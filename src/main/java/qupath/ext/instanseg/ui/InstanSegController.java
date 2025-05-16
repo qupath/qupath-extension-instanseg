@@ -402,32 +402,22 @@ public class InstanSegController extends BorderPane {
             // of if there were no previous checks (e.g. because it's a new model)
             return;
         }
+        resetInputChecks(imageData, model);
+    }
 
-        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
-        if (!imageData.isBrightfield()) {
-            // if not a brightfield image but brightfield model, then don't check anything
-            if (model != null && modelDir != null && model.isValid()) {
-                int nModelChannels = model.getNumChannels().orElse(InstanSegModel.ANY_CHANNELS);
-                if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
-                    comboInputChannels.getCheckModel().clearChecks();
-                    return;
-                }
-            }
-            // if fluorescence image and arbitrary channel model, then bung in all channels
-            comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
-            return;
-        }
-
-        // if brightfield, then check R, G, and B
-        comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
-        if (model != null && modelDir != null && model.isValid()) {
-            var modelChannels = model.getNumChannels();
-            if (modelChannels.isPresent()) {
-                int nModelChannels = modelChannels.get();
-                if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
-                    comboInputChannels.getCheckModel().clearChecks();
-                    comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
-                }
+    /**
+     * Reset the checked input channels based on the current image and a model.
+     * @param imageData the current image, used to query number of channels available
+     * @param model a model, used to check how many channels we handle
+     */
+    private void resetInputChecks(ImageData<BufferedImage> imageData, InstanSegModel model) {
+        if (model != null && model.isValid()) {
+            int nModelChannels = model.getNumChannels().orElse(InstanSegModel.ANY_CHANNELS);
+            // if the number of channels in the image file matches the number in the model, or if we have an arbitrary channel model check all
+            // otherwise, check none
+            comboInputChannels.getCheckModel().clearChecks();
+            if (nModelChannels == imageData.getServer().nChannels() || nModelChannels == InstanSegModel.ANY_CHANNELS) {
+                comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
             }
         }
     }
@@ -550,21 +540,7 @@ public class InstanSegController extends BorderPane {
                 || numChannels == comboInputChannels.getCheckModel().getItemCount());
         // If we couldn't restore the channels, set as many as we need to be checked
         if (!inputChannelsRestored) {
-            comboInputChannels.getCheckModel().clearChecks();
-            if (numChannels == InstanSegModel.ANY_CHANNELS) {
-                // For brightfield, default to RGB channels if we can choose any number
-                if (qupath.getImageData() != null && qupath.getImageData().isBrightfield()) {
-                    comboInputChannels.getCheckModel().checkIndices(0, 1, 2);
-                } else {
-                    // For non-brightfield, default to everything
-                    comboInputChannels.getCheckModel().checkAll();
-                }
-            } else {
-                // Select as many channels as we need (and can)
-                for (int i = 0; i < Math.min(numChannels, comboInputChannels.getItems().size()); i++) {
-                    comboInputChannels.getCheckModel().check(i);
-                }
-            }
+            resetInputChecks(qupath.getImageData(), model);
         }
         // Handle output channels
         var nOutputs = model.getOutputChannels().orElse(1);
