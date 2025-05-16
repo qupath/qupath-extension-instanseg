@@ -1,6 +1,7 @@
 package qupath.ext.instanseg.ui;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -54,7 +55,7 @@ public class CheckModelCache<S, T> {
 
     private List<Boolean> checksToBoolean(CheckComboBox<T> checkbox) {
         List<Boolean> out = new ArrayList<>(Collections.nCopies(checkbox.getItems().size(), false));
-        checkbox.getCheckModel().getCheckedIndices().forEach(i -> out.set(i, false));
+        checkbox.getCheckModel().getCheckedIndices().forEach(i -> out.set(i, true));
         return out;
     }
 

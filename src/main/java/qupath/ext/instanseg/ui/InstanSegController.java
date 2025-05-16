@@ -399,7 +399,7 @@ public class InstanSegController extends BorderPane {
         var model = selectedModel.get();
         if (model != null && inputChannelCache.restoreChecks() && !comboInputChannels.getCheckModel().isEmpty()) {
             // Return if we could store previously-saved checks - this will fail if the items have changed,
-            // of if there were no previous checks (e.g. because its'a new model)
+            // of if there were no previous checks (e.g. because it's a new model)
             return;
         }
 
