@@ -1,5 +1,7 @@
 package qupath.ext.instanseg.ui;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -20,7 +22,7 @@ public class CheckModelCache<S, T> {
 
     private final ObjectProperty<S> value = new SimpleObjectProperty<>();
     private final CheckComboBox<T> checkbox;
-    private final Map<S, List<Integer>> lastChecks = new WeakHashMap<>();
+    private final Map<S, List<Boolean>> lastChecks = new WeakHashMap<>();
 
     private CheckModelCache(ObservableValue<S> value, CheckComboBox<T> checkbox) {
         this.value.bind(value);
@@ -46,7 +48,21 @@ public class CheckModelCache<S, T> {
 
     private void handleValueChange(ObservableValue<? extends S> observable, S oldValue, S newValue) {
         if (oldValue != null) {
-            lastChecks.put(oldValue, List.copyOf(checkbox.getCheckModel().getCheckedIndices()));
+            lastChecks.put(oldValue, checksToBoolean(checkbox));
+        }
+    }
+
+    private List<Boolean> checksToBoolean(CheckComboBox<T> checkbox) {
+        List<Boolean> out = new ArrayList<>(Collections.nCopies(checkbox.getItems().size(), false));
+        checkbox.getCheckModel().getCheckedIndices().forEach(i -> out.set(i, false));
+        return out;
+    }
+
+    private void checkFromBoolean(CheckComboBox<T> checkbox, List<Boolean> checks) {
+        for (int i = 0; i < checks.size(); i++) {
+            if (checks.get(i)) {
+                checkbox.getCheckModel().check(i);
+            }
         }
     }
 
@@ -65,16 +81,16 @@ public class CheckModelCache<S, T> {
      * such as to update the items in the CheckModel.
      * <p>
      * Also, it will not restore checks if the items in the CheckModel have changed, so that the previously-checked
-     * items are no longer available.
+     * items are no longer available, or if the number of checkable items has changed.
      *
      * @return true if the checks were restored, false otherwise
      */
     public boolean restoreChecks() {
-        List<Integer> checks = lastChecks.get(value.get());
-        if (checks != null && !checks.isEmpty() && checks.stream().allMatch(i -> i < checkbox.getItems().size())) {
+        List<Boolean> checks = lastChecks.get(value.get());
+        if (checks != null && !checks.isEmpty() && checks.size() == checkbox.getItems().size()) {
             var checkModel = checkbox.getCheckModel();
             checkModel.clearChecks();
-            checks.forEach(checkModel::checkIndices);
+            checkFromBoolean(checkbox, checks);
             return true;
         } else {
             return false;
@@ -106,7 +122,7 @@ public class CheckModelCache<S, T> {
     public boolean snapshotChecks() {
         var val = value.get();
         if (val != null) {
-            lastChecks.put(val, List.copyOf(checkbox.getCheckModel().getCheckedIndices()));
+            lastChecks.put(val, checksToBoolean(checkbox));
             return true;
         } else {
             return false;
