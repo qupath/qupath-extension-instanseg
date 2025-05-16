@@ -403,15 +403,23 @@ public class InstanSegController extends BorderPane {
             return;
         }
 
+        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
         if (!imageData.isBrightfield()) {
-            // if fluorescence or similar, then bung in all channels
+            // if not a brightfield image but brightfield model, then don't check anything
+            if (model != null && modelDir != null && model.isValid()) {
+                int nModelChannels = model.getNumChannels().orElse(InstanSegModel.ANY_CHANNELS);
+                if (nModelChannels != InstanSegModel.ANY_CHANNELS) {
+                    comboInputChannels.getCheckModel().clearChecks();
+                    return;
+                }
+            }
+            // if fluorescence image and arbitrary channel model, then bung in all channels
             comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, imageData.getServer().nChannels()).toArray());
             return;
         }
 
         // if brightfield, then check R, G, and B
         comboInputChannels.getCheckModel().checkIndices(IntStream.range(0, 3).toArray());
-        var modelDir = InstanSegUtils.getModelDirectory().orElse(null);
         if (model != null && modelDir != null && model.isValid()) {
             var modelChannels = model.getNumChannels();
             if (modelChannels.isPresent()) {
