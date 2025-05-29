@@ -5,11 +5,14 @@ import ai.djl.inference.Predictor;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.training.util.ProgressBar;
+import java.util.Comparator;
+import java.util.Random;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.tensor.OutputTensor;
+import qupath.lib.common.ColorTools;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
@@ -246,7 +249,7 @@ public class InstanSeg {
                 var tiler = createTiler(downsample, tileDims, padding);
                 var predictionProcessor = createProcessor(predictors, inputChannels, tileDims, padToInputSize);
                 var outputHandler = createOutputHandler(preferredOutputType, randomColors, boundaryThreshold, outputTensors);
-                var postProcessor = createPostProcessor();
+                var postProcessor = createPostProcessor(randomColors);
                 var processor = new PixelProcessor.Builder<Mat, Mat, Mat[]>()
                         .processor(predictionProcessor)
                         .maskSupplier(OpenCVProcessor.createMatMaskSupplier())
@@ -328,7 +331,7 @@ public class InstanSeg {
         // TODO: Reinstate this for Mat[] output (it was written for Mat output)
 //        if (debugTiles())
 //            return OutputHandler.createUnmaskedObjectOutputHandler(OpenCVProcessor.createAnnotationConverter());
-        var converter = new InstanSegOutputToObjectConverter(outputTensors, preferredOutputType, randomColors);
+        var converter = new InstanSegOutputToObjectConverter(outputTensors, preferredOutputType);
         if (boundaryThreshold >= 0) {
             return new PruneObjectOutputHandler<>(converter, boundaryThreshold);
         } else {
@@ -362,7 +365,7 @@ public class InstanSeg {
         }
     }
 
-    private static ObjectProcessor createPostProcessor() {
+    private static ObjectProcessor createPostProcessor(boolean randomColors) {
         if (debugTiles())
             return null;
         var merger = ObjectMerger.createIoMinMerger(0.5);
@@ -371,7 +374,30 @@ public class InstanSeg {
                 .keepFragments(false)
                 .sortBySolidity()
                 .build();
-        return merger.andThen(fixer);
+        return merger.andThen(fixer).andThen(input -> {
+            if (randomColors) {
+                PathObjectTools.setRandomColors(input, new Random(input.size()));
+            }
+            return input.stream().map(p -> (PathObject)p).toList();
+        });
+    }
+
+    /**
+     * Assign a random color to a PathObject and all descendants, returning the object.
+     *
+     * @param pathObject The PathObject
+     * @param rng A random number generator.
+     */
+    private static PathObject assignRandomColor(PathObject pathObject, Random rng) {
+        pathObject.setColor(randomRGB(rng));
+        for (var child : pathObject.getChildObjects()) {
+            assignRandomColor(child, rng);
+        }
+        return pathObject;
+    }
+
+    private static int randomRGB(Random rng) {
+        return ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
     }
 
     /**
