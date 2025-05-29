@@ -137,7 +137,7 @@ public class InstanSegController extends BorderPane {
     private final BooleanProperty needsUpdating = new SimpleBooleanProperty();
 
     private final ObjectProperty<InstanSegModel> selectedModel = new SimpleObjectProperty<>();
-    private final StringProperty lastSelectedModel = PathPrefs.createPersistentPreference("instanseg.lastSelectModel", null);
+    private final StringProperty lastSelectedModelPath = PathPrefs.createPersistentPreference("instanseg.lastSelectModel", null);
     private final BooleanBinding selectedModelIsAvailable = InstanSegUtils.createModelDownloadedBinding(selectedModel, needsUpdating);
 
     // Cache the checkbox status for input and output channels, so this can be restored when the selected model changes
@@ -284,17 +284,18 @@ public class InstanSegController extends BorderPane {
         selectedModel.addListener((v, o, n) -> refreshModelChoice());
         modelChoiceBox.setCellFactory(param -> new ModelListCell());
         watcher.getModels().addListener((ListChangeListener<InstanSegModel>) c -> refreshAvailableModels());
-        if (lastSelectedModel.get() != null) {
+        refreshAvailableModels();
+        if (lastSelectedModelPath.get() != null) {
             modelChoiceBox.getItems().stream()
-                    .filter(m -> m.getPath().orElse(Path.of("")).toString().equals(lastSelectedModel.get())
-                    )
+                    .filter(m -> m.getPath().orElse(Path.of("")).toString().equals(lastSelectedModelPath.get()))
                     .findFirst()
                     .ifPresent(instanSegModel -> modelChoiceBox.getSelectionModel().select(instanSegModel));
         }
-        modelChoiceBox.getSelectionModel().selectedItemProperty().addListener((v, o, n) -> {
-            lastSelectedModel.set(n.getPath().toString());
+        selectedModel.addListener((v, o, n) -> {
+            if (n != null) {
+                n.getPath().ifPresent(path -> lastSelectedModelPath.set(path.toString()));
+            }
         });
-        refreshAvailableModels();
     }
 
     private void configureInfoButton() {
