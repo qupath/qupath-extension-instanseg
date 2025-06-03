@@ -366,7 +366,7 @@ public class InstanSeg {
     private static ObjectProcessor createPostProcessor() {
         if (debugTiles())
             return null;
-        var merger = ObjectMerger.createIoMinMerger(0.5, MeasurementStrategy.MEDIAN);
+        var merger = ObjectMerger.createIoMinMerger(0.5, MeasurementStrategy.MEAN);
         var fixer = OverlapFixer.builder()
                 .clipOverlaps()
                 .keepFragments(false)
