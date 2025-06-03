@@ -22,6 +22,7 @@ import qupath.lib.objects.PathCellObject;
 import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.PathObjectTools;
+import qupath.lib.objects.utils.MeasurementStrategy;
 import qupath.lib.objects.utils.ObjectMerger;
 import qupath.lib.objects.utils.ObjectProcessor;
 import qupath.lib.objects.utils.OverlapFixer;
@@ -365,7 +366,7 @@ public class InstanSeg {
     private static ObjectProcessor createPostProcessor() {
         if (debugTiles())
             return null;
-        var merger = ObjectMerger.createIoMinMerger(0.5);
+        var merger = ObjectMerger.createIoMinMerger(0.5, MeasurementStrategy.MEDIAN);
         var fixer = OverlapFixer.builder()
                 .clipOverlaps()
                 .keepFragments(false)
