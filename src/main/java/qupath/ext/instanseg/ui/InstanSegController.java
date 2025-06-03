@@ -46,6 +46,7 @@ import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.prefs.PathPrefs;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.WebViews;
 import qupath.lib.images.ImageData;
@@ -137,6 +138,7 @@ public class InstanSegController extends BorderPane {
     private final BooleanProperty needsUpdating = new SimpleBooleanProperty();
 
     private final ObjectProperty<InstanSegModel> selectedModel = new SimpleObjectProperty<>();
+    private final StringProperty lastSelectedModelPath = PathPrefs.createPersistentPreference("instanseg.lastSelectModel", null);
     private final BooleanBinding selectedModelIsAvailable = InstanSegUtils.createModelDownloadedBinding(selectedModel, needsUpdating);
 
     // Cache the checkbox status for input and output channels, so this can be restored when the selected model changes
@@ -284,6 +286,17 @@ public class InstanSegController extends BorderPane {
         modelChoiceBox.setCellFactory(param -> new ModelListCell());
         watcher.getModels().addListener((ListChangeListener<InstanSegModel>) c -> refreshAvailableModels());
         refreshAvailableModels();
+        if (lastSelectedModelPath.get() != null) {
+            modelChoiceBox.getItems().stream()
+                    .filter(m -> m.getPath().orElse(Path.of("")).toString().equals(lastSelectedModelPath.get()))
+                    .findFirst()
+                    .ifPresent(instanSegModel -> modelChoiceBox.getSelectionModel().select(instanSegModel));
+        }
+        selectedModel.addListener((v, o, n) -> {
+            if (n != null) {
+                n.getPath().ifPresent(path -> lastSelectedModelPath.set(path.toString()));
+            }
+        });
     }
 
     private void configureInfoButton() {
