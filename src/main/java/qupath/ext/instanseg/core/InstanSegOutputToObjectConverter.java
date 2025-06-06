@@ -189,7 +189,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                         }).toList();
                     if (matchingClassNames.size() > 1) {
                         logger.warn("More than one matching class name for logits {}, choosing the first", lo.getName());
-                    } else if (matchingClassNames.size() == 0) {
+                    } else if (matchingClassNames.isEmpty()) {
                         // try to get default class names anyway...
                         return getClassNames(lo);
                     }
@@ -202,15 +202,11 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     private List<String> getClassNames(OutputTensor outputTensor) {
         var description = outputTensor.getDataDescription();
         List<String> outputClasses;
+        // if we have axis names
         if (description != null && description instanceof Tensors.NominalOrOrdinalDataDescription dataDescription) {
             outputClasses = dataDescription.getValues().stream().map(Object::toString).toList();
         } else {
-            outputClasses = new ArrayList<>();
-            // todo: identify axes by type/id/description
-            int nClasses = outputTensor.getShape().getShape()[1]; // output axes are index, class
-            for (int i = 0; i < nClasses; i++) {
-                outputClasses.add("Class " + i);
-            }
+            outputClasses = List.of();
         }
         return outputClasses;
     }
@@ -228,13 +224,25 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 try (var ml = pathObject.getMeasurementList()) {
                     for (int i = 0; i < values.length; i++) {
                         double val = values[i];
-                        ml.put("Logit: " + outputClasses.get(i), val);
+                        String className;
+                        if (!outputClasses.isEmpty()) {
+                            className = outputClasses.get(i);
+                        } else {
+                            className = "Class " + i;
+                        }
+                        ml.put("Logit: " + className, val);
                     }
                 }
             }
             case DETECTION_CLASSES -> {
                 for (double val : values) {
-                    pathObject.setPathClass(PathClass.fromString(outputClasses.get((int) val)));
+                    String className;
+                    if (!outputClasses.isEmpty()) {
+                        className = outputClasses.get((int) val);
+                    } else {
+                        className = "Class " + (int) val;
+                    }
+                    pathObject.setPathClass(PathClass.fromString(className));
                 }
             }
             case DETECTION_EMBEDDINGS -> {
