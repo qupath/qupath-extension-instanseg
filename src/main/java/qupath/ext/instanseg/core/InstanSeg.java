@@ -383,23 +383,6 @@ public class InstanSeg {
         });
     }
 
-    /**
-     * Assign a random color to a PathObject and all descendants, returning the object.
-     *
-     * @param pathObject The PathObject
-     * @param rng A random number generator.
-     */
-    private static PathObject assignRandomColor(PathObject pathObject, Random rng) {
-        pathObject.setColor(randomRGB(rng));
-        for (var child : pathObject.getChildObjects()) {
-            assignRandomColor(child, rng);
-        }
-        return pathObject;
-    }
-
-    private static int randomRGB(Random rng) {
-        return ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
-    }
 
     /**
      * Print resource count for debugging purposes.
