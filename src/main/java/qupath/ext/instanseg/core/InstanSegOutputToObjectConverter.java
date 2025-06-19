@@ -39,19 +39,12 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
 
     private final Class<? extends PathObject> preferredObjectClass;
 
-    /**
-     * Assign random colors to the objects.
-     * This may be turned off or made optional in the future.
-     */
-    private final boolean randomColors;
     private final List<OutputTensor> outputTensors;
 
     InstanSegOutputToObjectConverter(List<OutputTensor> outputTensors,
-                                     Class<? extends PathObject> preferredOutputType,
-                                     boolean randomColors) {
+                                     Class<? extends PathObject> preferredOutputType) {
         this.outputTensors = outputTensors;
         this.preferredObjectClass = preferredOutputType;
-        this.randomColors = randomColors;
     }
 
     @Override
@@ -152,11 +145,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
                 }
                 pathObjects.add(pathObject);
             }
-        }
-
-        if (randomColors) {
-            var rng = new Random(params.getRegionRequest().hashCode());
-            pathObjects.forEach(p -> assignRandomColor(p, rng));
         }
 
         return pathObjects;
@@ -260,18 +248,7 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
     }
 
 
-    /**
-     * Assign a random color to a PathObject and all descendants, returning the object.
-     *
-     * @param pathObject The PathObject
-     * @param rng A random number generator.
-     */
-    private static void assignRandomColor(PathObject pathObject, Random rng) {
-        pathObject.setColor(randomRGB(rng));
-        for (var child : pathObject.getChildObjects()) {
-            assignRandomColor(child, rng);
-        }
-    }
+
 
     private static ROI geometryToFilledROI(Geometry geom, ImagePlane plane) {
         if (geom == null)
@@ -303,8 +280,6 @@ class InstanSegOutputToObjectConverter implements OutputHandler.OutputToObjectCo
         return annotation;
     }
 
-    private static int randomRGB(Random rng) {
-        return ColorTools.packRGB(rng.nextInt(255), rng.nextInt(255), rng.nextInt(255));
-    }
+
 
 }
