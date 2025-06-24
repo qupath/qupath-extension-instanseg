@@ -5,7 +5,7 @@ plugins {
 
 qupathExtension {
     name = "qupath-extension-instanseg"
-    version = "0.1.0-rc1"
+    version = "0.1.0"
     group = "io.github.qupath"
     description = "A QuPath extension for running inference with the InstanSeg deep learning model"
     automaticModule = "qupath.extension.instanseg"
