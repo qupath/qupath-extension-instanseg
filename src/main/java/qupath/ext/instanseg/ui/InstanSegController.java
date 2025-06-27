@@ -774,12 +774,13 @@ public class InstanSegController extends BorderPane {
     }
 
     private void configureDirectoryLabel() {
-        isModelDirectoryValid.addListener((v, o, n) -> updateModelDirectoryLabel());
-        updateModelDirectoryLabel();
+        isModelDirectoryValid.addListener((v, o, n) -> updateModelDirectoryLabel(n));
+        modelDirectoryBinding.addListener((v, o, n) -> updateModelDirectoryLabel(isModelDirectoryValid.get()));
+        updateModelDirectoryLabel(isModelDirectoryValid.get());
     }
 
-    private void updateModelDirectoryLabel() {
-        if (isModelDirectoryValid.get()) {
+    private void updateModelDirectoryLabel(Boolean b) {
+        if (b) {
             modelDirLabel.getStyleClass().setAll("standard-message");
             String modelPath = modelDirectoryBinding.get().toString();
             modelDirLabel.setText(modelPath);
