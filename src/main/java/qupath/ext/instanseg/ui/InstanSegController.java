@@ -775,6 +775,7 @@ public class InstanSegController extends BorderPane {
 
     private void configureDirectoryLabel() {
         isModelDirectoryValid.addListener((v, o, n) -> updateModelDirectoryLabel());
+        modelDirectoryBinding.addListener((v, o, n) -> updateModelDirectoryLabel());
         updateModelDirectoryLabel();
     }
 
