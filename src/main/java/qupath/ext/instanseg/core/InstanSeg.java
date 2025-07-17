@@ -341,7 +341,7 @@ public class InstanSeg {
     }
 
     private static Tiler createTiler(double downsample, int tileDims, int padding) {
-        int sizeWithoutPadding = (int) Math.ceil(downsample * (tileDims - (double) padding*2));
+        int sizeWithoutPadding = (int) Math.round(downsample * (tileDims - (double) padding*2));
         return Tiler.builder(sizeWithoutPadding)
                 .alignCenter()
                 .cropTiles(false)
