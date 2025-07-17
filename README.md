@@ -4,12 +4,6 @@
 
 <img style="float: right" width="25%" alt="InstanSeg logo" src="https://github.com/instanseg/instanseg/raw/main/assets/instanseg_logo.png" />
 
-## 🚧 Work-in-progress! 🚧 
-
-**The easiest way to try this out is with the [new QuPath 0.6.0 Release Candidate](https://github.com/qupath/qupath/releases)!**
-
----
-
 **Welcome to the [InstanSeg](https://github.com/instanseg/instanseg) extension for [QuPath](http://qupath.github.io)!**
 
 **InstanSeg** is a novel deep-learning-based method for segmenting nuclei and cells... and potentially much more.
@@ -50,9 +44,7 @@ _*-Well, at least as much as your computer's memory allows_
 
 ## How do I _get_ InstanSeg in QuPath?
 
-This extension is for **QuPath v0.6.0... which we plan to release in October 2024**.
-
-If you can't wait, you can try the [release candidate v0.6.0-rc1](https://github.com/qupath/qupath/releases) - which comes with this extension pre-installed, along with the [Deep Java Library Extension](https://github.com/qupath/qupath-extension-djl).
+This extension is for **QuPath v0.6.0**. You can install the extension using QuPath's new [extension manager](https://qupath.readthedocs.io/en/0.6/docs/intro/extensions.html).
 
 > ### GPU support
 > If you have an NVIDIA graphics card & want to use CUDA, check out [GPU support](https://qupath.readthedocs.io/en/0.5/docs/deep/gpu.html).
