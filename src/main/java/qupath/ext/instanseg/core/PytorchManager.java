@@ -46,7 +46,10 @@ public class PytorchManager {
             }
             // This is expected to return GPUs if available, or CPU otherwise
             for (var device : engine.getDevices()) {
-                String name = device.toString();
+                String name = device.getDeviceType();
+                if (device.getDeviceId() != -1) {
+                    name += device.getDeviceId(); // gpu0, gpu1 etc
+                }
                 availableDevices.add(name);
             }
             // If we could use MPS, but don't have it already, add it
