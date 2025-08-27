@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.bioimageio.spec.tensor.OutputTensor;
 import qupath.lib.common.ColorTools;
+import qupath.lib.common.LogTools;
 import qupath.lib.experimental.pixels.OpenCVProcessor;
 import qupath.lib.experimental.pixels.OutputHandler;
 import qupath.lib.experimental.pixels.Parameters;
@@ -236,7 +237,6 @@ public class InstanSeg {
             BaseNDManager baseManager = (BaseNDManager)model.getNDManager();
             printResourceCount("Resource count before prediction",
                     (BaseNDManager)baseManager.getParentManager());
-            baseManager.debugDump(2);
             BlockingQueue<Predictor<Mat, Mat[]>> predictors = new ArrayBlockingQueue<>(nPredictors);
 
             try {
@@ -392,8 +392,15 @@ public class InstanSeg {
      */
     private static void printResourceCount(String title, BaseNDManager manager) {
         if (logger.isDebugEnabled()) {
-            logger.debug(title);
-            manager.debugDump(2);
+            try {
+                // This is broken in DJL v0.34.0
+                // See https://github.com/deepjavalibrary/djl/pull/3780
+                logger.debug(title);
+                manager.debugDump(2);
+            } catch (Exception e) {
+                LogTools.warnOnce(logger, "BaseNDManager.debugDump(2) failed with an exception");
+                logger.debug(e.getMessage(), e);
+            }
         }
     }
 
