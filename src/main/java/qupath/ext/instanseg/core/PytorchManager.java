@@ -1,5 +1,6 @@
 package qupath.ext.instanseg.core;
 
+import ai.djl.Device;
 import ai.djl.engine.Engine;
 import ai.djl.engine.EngineException;
 import org.slf4j.Logger;
@@ -34,7 +35,10 @@ public class PytorchManager {
 
     /**
      * Get the available devices for PyTorch, including MPS if Apple Silicon.
-     * @return Only "cpu" if no local engine is found.
+     * Returns just "cpu" if no local engine is found, as that device is always available.
+     * For discrete GPUs, it appends the device number to the device in a format that can be parsed by {@link Device#fromName(String)}.
+     * For example, the first GPU is "gpu0", the second is "gpu1", etc.
+     * @return the available devices in a format that can be parsed by {@link Device#fromName(String)}.
      */
     public static Collection<String> getAvailableDevices() {
         try {
@@ -47,6 +51,11 @@ public class PytorchManager {
             // This is expected to return GPUs if available, or CPU otherwise
             for (var device : engine.getDevices()) {
                 String name = device.getDeviceType();
+                // append the device ID for any devices that may be one of many (mainly GPUs)
+                // this means they can be parsed by Device.fromName(String name)
+                if (device.getDeviceId() != -1) {
+                    name += device.getDeviceId(); // gpu0, gpu1 etc
+                }
                 availableDevices.add(name);
             }
             // If we could use MPS, but don't have it already, add it
