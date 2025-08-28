@@ -51,6 +51,8 @@ public class PytorchManager {
             // This is expected to return GPUs if available, or CPU otherwise
             for (var device : engine.getDevices()) {
                 String name = device.getDeviceType();
+                // append the device ID for any devices that may be one of many (mainly GPUs)
+                // this means they can be parsed by Device.fromName(String name)
                 if (device.getDeviceId() != -1) {
                     name += device.getDeviceId(); // gpu0, gpu1 etc
                 }
