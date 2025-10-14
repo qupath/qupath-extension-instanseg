@@ -1,7 +1,6 @@
 package qupath.ext.instanseg.ui;
 
 import com.google.gson.Gson;
-import java.util.Arrays;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -267,15 +266,18 @@ public class InstanSegController extends BorderPane {
         var currentSelection = modelChoiceBox.getSelectionModel().getSelectedItem();
         modelChoiceBox.getItems().setAll(list);
         if (list.isEmpty()) {
+            // if no models, select nothing
             modelChoiceBox.getSelectionModel().clearSelection();
         } else if (currentSelection == null) {
-            modelChoiceBox.getSelectionModel().selectFirst();
+            // if no current selection, select nothing
+            modelChoiceBox.getSelectionModel().clearSelection();
         } else {
+            // if a current selection and some models, try to retain the current selection or default to nothing if not found
             modelChoiceBox.getSelectionModel().select(
                     list.stream()
                             .filter(m -> m.getName().equals(currentSelection.getName()))
                             .findFirst()
-                            .orElse(list.getFirst())
+                            .orElse(null)
             );
         }
     }
