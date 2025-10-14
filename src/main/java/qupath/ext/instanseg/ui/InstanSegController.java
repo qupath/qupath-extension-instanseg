@@ -270,7 +270,7 @@ public class InstanSegController extends BorderPane {
             modelChoiceBox.getSelectionModel().clearSelection();
         } else if (currentSelection == null) {
             // if no current selection, select nothing
-            modelChoiceBox.getSelectionModel().select(null);
+            modelChoiceBox.getSelectionModel().clearSelection();
         } else {
             // if a current selection and some models, try to retain the current selection or default to nothing if not found
             modelChoiceBox.getSelectionModel().select(
