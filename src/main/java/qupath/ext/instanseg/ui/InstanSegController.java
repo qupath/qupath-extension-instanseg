@@ -19,6 +19,8 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Cursor;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
@@ -46,6 +48,8 @@ import qupath.fx.utils.FXUtils;
 import qupath.lib.common.ThreadTools;
 import qupath.lib.display.ChannelDisplayInfo;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.UserDirectoryManager;
+import qupath.lib.gui.commands.Commands;
 import qupath.lib.gui.prefs.PathPrefs;
 import qupath.lib.gui.tools.GuiTools;
 import qupath.lib.gui.tools.WebViews;
@@ -928,20 +932,77 @@ public class InstanSegController extends BorderPane {
 
     private void promptToUpdateDirectory(StringProperty dirPath) {
         var modelDirPath = dirPath.get();
-        var dir = modelDirPath == null || modelDirPath.isEmpty() ? null : new File(modelDirPath);
-        if (dir != null) {
-            if (dir.isFile())
-                dir = dir.getParentFile();
-            else if (!dir.exists())
-                dir = null;
+        // if a path is already set, open a chooser there
+        if (modelDirPath != null) {
+            var dir = modelDirPath.isEmpty() ? null : new File(modelDirPath);
+            if (dir != null) {
+                if (dir.isFile())
+                    dir = dir.getParentFile();
+                else if (!dir.exists())
+                    dir = null;
+            }
+            var newDir = FileChoosers.promptForDirectory(
+                    FXUtils.getWindow(modelDirLabel), // Get window from any node here
+                    resources.getString("ui.model-directory.choose-directory"),
+                    dir);
+            if (newDir == null)
+                return;
+            dirPath.set(newDir.getAbsolutePath());
+        } else {
+            // if not path is set already, suggest default based on user path
+            var udm = UserDirectoryManager.getInstance();
+            // this should not be null in normal use but may be when working with a bundled extension (or building locally)
+            var upath = udm.getUserPath();
+            if (upath == null) {
+                upath = Commands.requestUserDirectory(true).toPath();
+            }
+            var ipath = upath.resolve("instanseg");
+
+            File dirDefault = ipath.toFile();
+            String msg;
+            if (dirDefault.exists()) {
+                msg = String.format(resources.getString("ui.options.directory-exists"),
+                        dirDefault.getAbsolutePath());
+            } else {
+                msg = String.format(resources.getString("ui.options.directory-create"),
+                        dirDefault.getAbsolutePath());
+            }
+            ButtonType btUseDefault = new ButtonType(resources.getString("ui.options.directory-default"), ButtonBar.ButtonData.YES);
+            ButtonType btChooseDirectory = new ButtonType(resources.getString("ui.options.directory-choose"), ButtonBar.ButtonData.NO);
+            ButtonType btCancel = new ButtonType(resources.getString("ui.options.cancel"), ButtonBar.ButtonData.CANCEL_CLOSE);
+
+            var result = Dialogs.builder()
+                    .title(resources.getString("ui.options.directory-choose-model"))
+                    .headerText(resources.getString("ui.options.directory-not-set"))
+                    .contentText(msg)
+                    .buttons(btUseDefault, btChooseDirectory, btCancel)
+                    .showAndWait()
+                    .orElse(btCancel);
+
+            if (result == btCancel) {
+                logger.info("Dialog cancelled - no user directory set");
+                return;
+            }
+            if (result == btUseDefault) {
+                if (!dirDefault.exists() && !dirDefault.mkdirs()) {
+                    Dialogs.showErrorMessage(resources.getString("title"),
+                            String.format(resources.getString("ui.options.directory-cannot-create"),
+                                    dirDefault.getAbsolutePath()));
+                    return;
+                }
+                dirPath.set(String.valueOf(dirDefault.toPath()));
+            } else {
+                File dirUser = FileChoosers.promptForDirectory(
+                        FXUtils.getWindow(modelDirLabel),
+                        resources.getString("ui.model-directory.choose-directory"),
+                        dirDefault);
+                if (dirUser == null) {
+                    logger.info("No InstanSeg model directory set!");
+                    return;
+                }
+                dirPath.set(String.valueOf(dirDefault.toPath()));
+            }
         }
-        var newDir = FileChoosers.promptForDirectory(
-                FXUtils.getWindow(modelDirLabel), // Get window from any node here
-                resources.getString("ui.model-directory.choose-directory"),
-                dir);
-        if (newDir == null)
-            return;
-        dirPath.set(newDir.getAbsolutePath());
     }
 
 }
