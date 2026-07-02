@@ -645,45 +645,7 @@ public class InstanSegController extends BorderPane {
         infoPopover.show(infoButton);
     }
 
-    private static boolean promptToAllowOnlineModelCheck() {
-        String always = resources.getString("ui.model-online-check.always");
-        String never = resources.getString("ui.model-online-check.never");
-        String prompt = resources.getString("ui.model-online-check.allow-once");
-        var permit = Dialogs.builder()
-                .title(resources.getString("title"))
-                .contentText(resources.getString("ui.model-online-check.prompt"))
-                .buttons(always, never, prompt)
-                .showAndWait()
-                .orElse(null);
-        if (permit == null)
-            return false;
-        String text = permit.getText();
-        if (always.equals(text)) {
-            InstanSegPreferences.permitOnlineProperty().set(InstanSegPreferences.OnlinePermission.YES);
-            return true;
-        } else if (never.equals(text)) {
-            InstanSegPreferences.permitOnlineProperty().set(InstanSegPreferences.OnlinePermission.NO);
-            return false;
-        } else if (prompt.equals(text)) {
-            InstanSegPreferences.permitOnlineProperty().set(InstanSegPreferences.OnlinePermission.PROMPT);
-            return true;
-        } else {
-            logger.warn("Unknown choice: {}", text);
-            return false;
-        }
-    }
-
     private static List<InstanSegModel> getRemoteModels() {
-        var permit = InstanSegPreferences.permitOnlineProperty().get();
-        if (permit == InstanSegPreferences.OnlinePermission.NO) {
-            logger.debug("Not allowed to check for models online.");
-            return List.of();
-        } else if (permit == InstanSegPreferences.OnlinePermission.PROMPT) {
-            if (!promptToAllowOnlineModelCheck()) {
-                logger.debug("User declined online model check.");
-                return List.of();
-            }
-        }
         InputStream in = InstanSegController.class.getResourceAsStream("model-index.json");
         assert in != null;
         String cont = new BufferedReader(new InputStreamReader(in))

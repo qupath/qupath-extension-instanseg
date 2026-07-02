@@ -98,14 +98,6 @@ public class InstanSegExtension implements QuPathExtension, GitHubProject {
 						.description(resources.getString("ui.prefs.model-directory.description"))
 						.category(resources.getString("title"))
 						.build());
-		qupath.getPreferencePane()
-				.getPropertySheet()
-				.getItems()
-				.add(new PropertyItemBuilder<>(InstanSegPreferences.permitOnlineProperty(), InstanSegPreferences.OnlinePermission.class)
-						.name(resources.getString("ui.prefs.permit-online"))
-						.description(resources.getString("ui.prefs.permit-online.description"))
-						.category(resources.getString("title"))
-						.build());
 	}
 
 
