@@ -2,7 +2,6 @@ package qupath.ext.instanseg.ui;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
-import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.StringProperty;
 import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.prefs.PathPrefs;
@@ -12,17 +11,6 @@ class InstanSegPreferences {
     private InstanSegPreferences() {
         throw new AssertionError("Cannot instantiate this class");
     }
-
-    /**
-     * Enum for whether we can look for models online.
-     */
-    enum OnlinePermission {
-        YES, NO, PROMPT
-    }
-
-    private static final ObjectProperty<OnlinePermission> permitOnlineProperty = PathPrefs.createPersistentPreference(
-            "instanseg.download.models",
-            OnlinePermission.PROMPT, OnlinePermission.class);
 
     private static final StringProperty modelDirectoryProperty = PathPrefs.createPersistentPreference(
             "instanseg.model.dir",
@@ -63,10 +51,6 @@ class InstanSegPreferences {
         } else {
             return "cpu";
         }
-    }
-
-    static ObjectProperty<OnlinePermission> permitOnlineProperty() {
-        return permitOnlineProperty;
     }
 
     static StringProperty modelDirectoryProperty() {
